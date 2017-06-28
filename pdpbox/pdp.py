@@ -539,6 +539,7 @@ def _pdp_plot_title(pdp_isolate_out, feature_name, ax, figsize, multi_flag, whic
         if 'subtitle_fontsize' in plot_params.keys():
             subtitle_fontsize = plot_params['subtitle_fontsize']
 
+    ax.set_facecolor('white')
     if multi_flag:
         ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
         ax.text(0, 0.45, "For Class %d" %(which_class), va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family)
@@ -557,6 +558,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
         if 'font_family' in plot_params.keys():
             font_family = plot_params['font_family']
 
+    ax.set_facecolor('white')
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -972,6 +974,7 @@ def _pdp_interact_plot_title(pdp_interact_out, feature_names, ax, figsize, multi
             if 'subtitle_fontsize' in plot_params.keys():
                 subtitle_fontsize = plot_params['subtitle_fontsize']
 
+    ax.set_facecolor('white')
     if only_inter:
         ax.text(0, 0.8, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
         if multi_flag:
