@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-from matplotlib.gridspec import GridSpec
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import copy
 
@@ -558,22 +558,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
         if 'font_family' in plot_params.keys():
             font_family = plot_params['font_family']
 
-    ax.set_facecolor('white')
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-    ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-    ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
-
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-    ax.tick_params(axis='both', which='major', labelsize=8, labelcolor='#424242', colors='#9E9E9E')
+    _axis_modify(font_family, ax)
     ax.set_xlabel(feature_name, fontsize=10)
 
     feature_type = pdp_isolate_out.feature_type
@@ -1047,10 +1032,7 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
             if 'font_family' in plot_params['pdp_inter'].keys():
                 font_family = plot_params['pdp_inter']['font_family']
 
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
+    _axis_modify(font_family, ax)
 
     feature_types = pdp_interact_out.feature_types
     pdp = copy.deepcopy(pdp_interact_out.pdp)
@@ -1111,7 +1093,6 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 
     ax.set_xlabel(feature_names[0], fontsize=10)
     ax.set_ylabel(feature_names[1], fontsize=10)
-    ax.tick_params(axis='both', which='major', labelsize=8, labelcolor='#424242', colors='#9E9E9E')
     ax.get_yaxis().tick_right()
 
     class ColorBarLocator(object):
@@ -1131,4 +1112,220 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
     if fig is not None:
         cax = fig.add_axes([0,0,0,0], axes_locator=ColorBarLocator(ax))
         fig.colorbar(c1, cax = cax, orientation='horizontal')
+
+
+def _axis_modify(font_family, ax):
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.tick_params(axis='both', which='major', labelsize=8, labelcolor='#424242', colors='#9E9E9E')
+    ax.set_facecolor('white')
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+    ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+    ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
     
+
+def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, which_class=None, ncols=None):
+    '''
+    pdp_isolate_out: instance of pdp_isolate_obj
+        a calculated pdp_isolate_obj instance
+    feature_name: string
+        name of the feature, not necessary the same as the column name
+    figsize: (width, height), default=None
+        figure size
+    plot_params: dict, default=None
+        values of plot parameters
+    multi_flag: boolean, default=False
+        whether it is a subplot of a multiclass plot
+    which_class: integer, default=None
+        which class to plot
+    ncols: integer, default=None
+        used under multiclass mode
+    '''
+
+    # check pdp_isolate_out
+    if type(pdp_isolate_out) == dict:
+        try:
+            if pdp_isolate_out['class_0']._type != 'pdp_isolate_instance':
+                raise ValueError('pdp_isolate_out: should be an instance of pdp_isolate_obj')
+        except: 
+            raise ValueError('pdp_isolate_out: should be an instance of pdp_isolate_obj')
+    else:
+        try:
+            if pdp_isolate_out._type != 'pdp_isolate_instance':
+                raise ValueError('pdp_isolate_out: should be an instance of pdp_isolate_obj')
+        except: 
+            raise ValueError('pdp_isolate_out: should be an instance of pdp_isolate_obj')
+
+    # check feature_name
+    if type(feature_name) != str:
+        raise ValueError('feature_name: should be a string')
+
+    # check figsize
+    if figsize is not None:
+        if type(figsize) != tuple:
+            raise ValueError('figsize: should be a tuple')
+        if len(figsize) != 2:
+            raise ValueError('figsize: should contain 2 elements: (width, height)')
+
+        # check plot_params
+    if (plot_params is not None) and (type(plot_params) != dict):
+        raise ValueError('plot_params: should be a dictionary')
+
+    if type(multi_flag) != bool:
+        raise ValueError('multi_flag: should be a boolean value')
+
+    # check ncols
+    if (ncols is not None) and (type(ncols) != int):
+        raise ValueError('ncols: should be an integer')
+
+    # check which_class
+    if multi_flag:
+        if type(pdp_isolate_out) != dict:
+            raise ValueError('multi_flag: can only be used under multi-class mode')
+        if which_class is None:
+            raise ValueError('which_class: should not be None when multi_flag is on')
+        if type(which_class) != int:
+            raise ValueError('which_class: should be an integer')
+        if which_class >= len(pdp_isolate_out.keys()):
+            raise ValueError('which_class: class does not exist')
+
+    if figsize is None:
+        figwidth = 16
+    else:
+        figwidth = figsize[0]
+
+    plt.figure(figsize=(figwidth, figwidth / 6.7))
+    ax1 = plt.subplot(111)
+
+    if type(pdp_isolate_out) == dict:
+        n_classes = len(pdp_isolate_out.keys())
+
+        if multi_flag:
+            _actual_plot_title(pdp_isolate_out=pdp_isolate_out['class_%d' %(which_class)], feature_name=feature_name, ax=ax1, figsize=figsize,
+                multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
+
+            _actual_plot(pdp_isolate_out=pdp_isolate_out['class_%d' %(which_class)], feature_name=feature_name, figwidth=figwidth, plot_params=plot_params, outer=None)
+        else:
+            _actual_plot_title(pdp_isolate_out=pdp_isolate_out['class_0'], feature_name=feature_name, ax=ax1, figsize=figsize,
+                multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
+
+            if ncols == None:
+                ncols = 2
+            nrows = int(np.ceil(float(n_classes) / ncols))
+
+            plt.figure(figsize=(figwidth, (figwidth/ncols)*nrows))
+            outer = GridSpec(nrows, ncols, wspace=0.2, hspace=0.2)
+
+            for n_class in range(n_classes):
+                _actual_plot(pdp_isolate_out=pdp_isolate_out['class_%d' %(n_class)], feature_name=feature_name + ' class_%d' %(n_class),
+                             figwidth=figwidth, plot_params=plot_params, outer=outer[n_class])
+    else:
+        _actual_plot_title(pdp_isolate_out=pdp_isolate_out, feature_name=feature_name, ax=ax1, figsize=figsize,
+            multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
+
+        _actual_plot(pdp_isolate_out=pdp_isolate_out, feature_name=feature_name, figwidth=figwidth, plot_params=plot_params, outer=None)
+
+
+def _actual_plot_title(pdp_isolate_out, feature_name, ax, figsize, multi_flag, which_class, plot_params):
+
+    font_family = 'Arial'
+    title = 'Actual predictions plot for %s' %(feature_name)
+    subtitle = 'Each point is clustered to the closest grid point.'
+
+    if figsize is not None:
+        title_fontsize = np.max([15 * (figsize[0] / 16.0), 10])
+        subtitle_fontsize = np.max([12 * (figsize[0] / 16.0), 8])
+    else:
+        title_fontsize=15
+        subtitle_fontsize=12
+
+    if plot_params is not None:
+        if 'font_family' in plot_params.keys():
+            font_family = plot_params['font_family']
+        if 'title' in plot_params.keys():
+            title = plot_params['title']
+        if 'title_fontsize' in plot_params.keys():
+            title_fontsize = plot_params['title_fontsize']
+        if 'subtitle_fontsize' in plot_params.keys():
+            subtitle_fontsize = plot_params['subtitle_fontsize']
+
+    ax.set_facecolor('white')
+    if multi_flag:
+        ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
+        ax.text(0, 0.45, "For Class %d" %(which_class), va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family)
+        ax.text(0, 0.25, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
+    else:
+        ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
+        ax.text(0, 0.4, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
+    ax.axis('off')
+
+
+def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
+    try:
+        import seaborn as sns
+    except:
+        raise RuntimeError('seaborn is necessary for the actual plot.')
+
+    if outer is None:
+        plt.figure(figsize=(figwidth, figwidth/1.6))
+        gs = GridSpec(2, 1)
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+    else:
+        inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer, wspace=0, hspace=0)
+        ax1 = plt.subplot(inner[0])
+        ax2 = plt.subplot(inner[1], sharex=ax1)
+
+    font_family = 'Arial'
+    boxcolor = '#66C2D7'
+    linecolor = '#1A4E5D'
+    barcolor = '#5BB573'
+
+    if plot_params is not None:
+        if 'font_family' in plot_params.keys():
+            font_family = plot_params['font_family']
+        if 'boxcolor' in plot_params.keys():
+            boxcolor = plot_params['boxcolor']
+        if 'linecolor' in plot_params.keys():
+            linecolor = plot_params['linecolor']
+        if 'barcolor' in plot_params.keys():
+            barcolor = plot_params['barcolor']
+
+    _axis_modify(font_family, ax1)
+    _axis_modify(font_family, ax2)
+
+    df = copy.deepcopy(pdp_isolate_out.ice_lines)
+    actual_columns = pdp_isolate_out.actual_columns
+    feature_type = pdp_isolate_out.feature_type
+    feature_grids = pdp_isolate_out.feature_grids
+    df = df[actual_columns + ['actual_preds']]
+
+    if pdp_isolate_out.feature_type == 'binary':
+        df['x'] = df[actual_columns[0]]
+    elif pdp_isolate_out.feature_type == 'onehot':
+        df['x'] = df[actual_columns].apply(lambda x : list(x).index(1), axis=1)
+    else:
+        df['x'] = df[actual_columns[0]].apply(lambda x : _find_closest(x, pdp_isolate_out.feature_grids))
+
+    pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
+    pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
+    
+    boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
+    sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1)
+    sns.pointplot(x=pred_median_gp['x'], y=pred_median_gp['actual_preds'], ax=ax1, color=linecolor)
+    ax1.set_xlabel('')
+    ax1.set_ylabel('actual_preds')
+
+    ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
+    ax2.set_xlabel(feature_name)
+    ax2.set_ylabel('count')
+    plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids)
