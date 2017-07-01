@@ -179,6 +179,76 @@ pdp.pdp_plot(pdp_feat_67, 'feat_67', center=True, x_quantile=True, ncols=3)
 # only plot out class 2
 pdp.pdp_plot(pdp_feat_67, 'feat_67', center=True, multi_flag=True, which_class=2, plot_org_pts=True, plot_lines=True, frac_to_plot=1000, x_quantile=True)
 ```
+----------------------------------------------------------------------------------------
+
+#### pdpbox.pdp.actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, which_class=None, ncols=None)
+  
+**Parameters:**
+  
+* **pdp_isolate_out**: instance of pdp_isolate_obj  
+	- a calculated pdp_isolate_obj instance  
+  
+* **feature_name**: string  
+	- name of the feature, not necessary the same as the column name  
+
+* **figsize**: (width, height), default=None
+	- figure size
+
+* **plot_params**: dict, default=None
+	- values of plot parameters 
+    
+	**plot_params possible values and description:**
+	- **'font_family'**: font_family for the plot, default='Arial
+	- **'title'**: title for the plot, default=ICEplot for (feature_name)
+	- **'title_fontsize'**: title font size, default=15
+	- **'subtitle_fontsize'**: subtitle font size, default=12
+	- **'boxcolor'**: color for the boxplot, default='#66C2D7'
+	- **'linecolor'**: color for the line in the boxplot, default='#1A4E5D'
+	- **'barcolor'**: color for the barplot, default='#5BB573'
+	
+	- Example:
+	```python
+	plot_params = {
+		'font_family': 'Helvetica',
+		'title_fontsize': 16,
+		'boxcolor': 'orange',
+		...
+	}
+	```
+
+* **multi_flag**: boolean, default=False
+	- whether it is a subplot of a multiclass plot
+
+* **which_class**: integer, default=None
+	- which class to plot
+
+* **ncols**: integer, default=None
+	- used under multiclass mode
+
+**Examples:**
+```python
+from pdpbox import pdp
+pdp_sex = pdp.pdp_isolate(clf, titanic[features], 'Sex')
+
+pdp.actual_plot(pdp_sex, 'Sex')
+
+# customized plot
+plot_params = {
+    'boxcolor': 'orange',
+    'linecolor': 'darkblue',
+    'barcolor': 'lightblue'
+}
+pdp.actual_plot(pdp_sex, 'Sex', plot_params=plot_params)
+
+# for multiclass
+pdp_feat_67 = pdp.pdp_isolate(clf, otto_train, 'feat_67')
+
+# plot out all classes
+pdp.actual_plot(pdp_feat_67, 'feat_67')
+
+# only plot out class 2
+pdp.actual_plot(pdp_feat_67, 'feat_67', multi_flag=True, which_class=2)
+```
 ----
 
 #### pdpbox.pdp.pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts=False, plot_lines=False, frac_to_plot=1., cluster=False, n_cluster_centers=None, cluster_method=None, x_quantile=False, figsize=None, plot_params=None, multi_flag=False, which_class=None, only_inter=False, ncols=None)
