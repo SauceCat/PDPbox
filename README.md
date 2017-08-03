@@ -42,6 +42,9 @@ python setup.py install
 #### **Numeric feature:** single variable plot with percentile_range=(5, 95)
 <img src="https://github.com/SauceCat/pdpBox/blob/master/images/numeric_05.png" width="80%">
 
+#### **Numeric feature:** single variable plot with customized grid points
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/numeric_06.png" width="80%">
+
 #### **Numeric feature:** actual predictions plot for a single variable
 <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_03.PNG" width="80%">
 
