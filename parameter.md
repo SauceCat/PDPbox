@@ -1,6 +1,6 @@
 ## PDPbox functions and parameters
 
-#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None)
+#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None)
 function to calculate PDP plot for a single variable 
   
 **Parameters:** 
@@ -20,6 +20,9 @@ function to calculate PDP plot for a single variable
 * **percentile_range**: (low, high), default=None  
   - percentile range to consider for numeric features  
 
+* **cust_grid_points**: list, default=None  
+  - customized grid points for numeric features  
+
 **Example:**  
 ```python
 from pdpbox import pdp
@@ -34,10 +37,11 @@ pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare')
 # more options
 pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20)
 pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20, percentile_range=(5, 95))
+pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20, cust_grid_points=range(0, 100, 10))
 ```
 -------------------------------------------------------------------------------------------------------
     
-#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None])
+#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None])
 function to calculate interaction plot for two variables 
   
 **Parameters:**
@@ -56,6 +60,9 @@ function to calculate interaction plot for two variables
 
 * **percentile_ranges**: list, default=[None, None]  
   - a list of percentile range to consider for each feature  
+  
+* **cust_grid_points**: list, default=[None, None]  
+  - a list of customized grid points to consider for each feature  
 
 **Examples:**  
 ```python
@@ -68,6 +75,7 @@ inter2 = pdp.pdp_interact(clf, titanic[features], ['Sex', 'Age'], num_grid_point
 
 # interaction between onehot encoding feature and numeric feature
 inter3 = pdp.pdp_interact(clf, titanic[features], [['Embarked_C', 'Embarked_S', 'Embarked_Q'], 'Age'], num_grid_points=[None, 10])
+inter4 = pdp.pdp_interact(clf, titanic[features], [['Embarked_C', 'Embarked_S', 'Embarked_Q'], 'Age'], cust_grid_points=[None, range(0, 50, 5)])
 ```
 ----------------------------------------------------------------------------------------
 
