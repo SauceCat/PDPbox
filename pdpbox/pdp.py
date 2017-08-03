@@ -61,7 +61,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
         classifier = True
         predict = model.predict_proba
     except:
-        n_classes = None
+        n_classes = 0
         classifier = False
         predict = model.predict 
         
@@ -595,7 +595,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 
     if plot_org_pts:
         if feature_type == 'onehot':
-            ice_plot_data['x'] = ice_plot_data[actual_columns].apply(lambda x: list(x).index(1), axis=1)
+            ice_plot_data['x'] = ice_plot_data[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
         else:
             if x_quantile and feature_type=='numeric':
                 feature_grids = pdp_isolate_out.feature_grids
@@ -612,6 +612,13 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 
     std = ice_lines[display_columns].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, std_hl=std_hl, plot_org_pts=plot_org_pts, plot_lines=plot_lines, ax=ax, plot_params=plot_params)
+
+def _find_onehot_actual(x):
+	try:
+		value = list(x).index(1)
+	except:
+		value = np.nan 
+	return value
 
 
 def _find_closest(x, feature_grids):
@@ -688,6 +695,7 @@ def _ice_plot_pts(ice_plot_data, ax, plot_params):
             point_neg_color = plot_params['point_neg_color']
 
     ice_plot_data['color'] = ice_plot_data['actual_preds'].apply(lambda x : point_pos_color if x >=0 else point_neg_color)
+    ice_plot_data = ice_plot_data[ice_plot_data['x'].isnull()==False].reset_index(drop=True)
     ax.scatter(ice_plot_data['x'], ice_plot_data['actual_preds'], s=point_size, marker="+", linewidth=1, color=ice_plot_data['color'])     
 
 
