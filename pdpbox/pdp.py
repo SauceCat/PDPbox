@@ -120,7 +120,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
         ice_lines = pd.DataFrame()
     
     # do prediction chunk by chunk to save memory usage
-    data_chunk_size = _train_X.shape[0] / feature_grids.size
+    data_chunk_size = int(_train_X.shape[0] / feature_grids.size)
     
     # get the actual prediction and actual values
     actual_preds = predict(_train_X)
@@ -612,6 +612,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 
     std = ice_lines[display_columns].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, std_hl=std_hl, plot_org_pts=plot_org_pts, plot_lines=plot_lines, ax=ax, plot_params=plot_params)
+
 
 def _find_onehot_actual(x):
 	try:
@@ -1320,10 +1321,11 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
     if pdp_isolate_out.feature_type == 'binary':
         df['x'] = df[actual_columns[0]]
     elif pdp_isolate_out.feature_type == 'onehot':
-        df['x'] = df[actual_columns].apply(lambda x : list(x).index(1), axis=1)
+        df['x'] = df[actual_columns].apply(lambda x : _find_onehot_actual(x), axis=1)
     else:
         df['x'] = df[actual_columns[0]].apply(lambda x : _find_closest(x, pdp_isolate_out.feature_grids))
 
+    df = df[df['x'].isnull()==False].reset_index(drop=True)
     pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
     pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
     
