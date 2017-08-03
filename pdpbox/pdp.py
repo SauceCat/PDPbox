@@ -226,7 +226,7 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
 	return ice_data
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None]):
+def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None]):
 	'''
 	model: sklearn model
 		a fitted model
@@ -263,9 +263,15 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	if len(percentile_ranges) != 2:
 		raise ValueError('percentile_ranges: should only contain 2 elements')
 
+	# check cust_grid_points
+	if type(cust_grid_points) != list:
+		raise ValueError('cust_grid_points: should be a list')
+	if len(cust_grid_points) != 2:
+		raise ValueError('cust_grid_points: should only contain 2 elements')
+
 	# calculate pdp_isolate for each feature
-	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], percentile_range=percentile_ranges[0])
-	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], percentile_range=percentile_ranges[1])
+	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0])
+	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1])
 
 	# whether it is for multiclassifier
 	if type(pdp_isolate_out1) == dict:
@@ -434,7 +440,6 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
 		if (type(frac_to_plot) == int) and (frac_to_plot > pdp_isolate_out.ice_lines.shape[0]):
 			raise ValueError('frac_to_plot: sample size should not be larger than the population size')
 
-
 	# check n_cluster_centers
 	if cluster:
 		if n_cluster_centers is None:
@@ -595,25 +600,34 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 		ice_lines['actual_preds'] -= ice_lines[display_columns[0]]
 		ice_lines[display_columns[0]] = 0
 
-	if plot_org_pts or plot_lines:
-		ice_plot_data = _sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
-
 	if plot_lines:
+		if (frac_to_plot > 1) and (frac_to_plot > len(ice_lines)):
+			raise ValueError("frac_to_plot: sample amount %d larger than population %d" %(frac_to_plot, len(ice_lines))) 
+		ice_plot_data = _sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
 		std_fill = False
 		std_hl = True
 		if not cluster:
 			_ice_line_plot(x=x, ice_plot_data=ice_plot_data, display_columns=display_columns, ax=ax, plot_params=plot_params)  
 
 	if plot_org_pts:
+		ice_lines_temp = ice_lines.copy()
 		if feature_type == 'onehot':
-			ice_plot_data['x'] = ice_plot_data[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
-		else:
-			if x_quantile and feature_type=='numeric':
-				feature_grids = pdp_isolate_out.feature_grids
-				ice_plot_data['x'] = ice_plot_data[actual_columns[0]].apply(lambda x : _find_closest(x, feature_grids))
+			ice_lines_temp['x'] = ice_lines_temp[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
+			ice_lines_temp = ice_lines_temp[ice_lines_temp['x'].isnull()==False].reset_index(drop=True)
+		elif feature_type=='numeric':
+			feature_grids = pdp_isolate_out.feature_grids
+			ice_lines_temp = ice_lines_temp[(ice_lines_temp[actual_columns[0]] >= feature_grids[0]) & (ice_lines_temp[actual_columns[0]] <= feature_grids[-1])]
+			if x_quantile:
+				ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]].apply(lambda x : _find_closest(x, feature_grids))
 			else:
-				ice_plot_data['x'] = ice_plot_data[actual_columns[0]]
-		_ice_plot_pts(ice_plot_data=ice_plot_data, ax=ax, plot_params=plot_params)
+				ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]]
+		else:
+			ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]]
+
+		if (frac_to_plot > 1) and (frac_to_plot > len(ice_lines_temp)):
+			raise ValueError("frac_to_plot: sample amount %d larger than population %d" %(frac_to_plot, len(ice_lines_temp))) 
+		ice_plot_data_pts = _sample_data(ice_lines=ice_lines_temp, frac_to_plot=frac_to_plot)
+		_ice_plot_pts(ice_plot_data_pts=ice_plot_data_pts, ax=ax, plot_params=plot_params)
 
 	if cluster:
 		std_fill = False
@@ -693,7 +707,7 @@ def _pdp_std_plot(x, y, std, std_fill, std_hl, plot_org_pts, plot_lines, ax, plo
 		ax.set_ylim(np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0]))
 			
 
-def _ice_plot_pts(ice_plot_data, ax, plot_params):
+def _ice_plot_pts(ice_plot_data_pts, ax, plot_params):
 	point_size = 50
 	point_pos_color = '#5BB573'
 	point_neg_color = '#E75438'
@@ -706,9 +720,8 @@ def _ice_plot_pts(ice_plot_data, ax, plot_params):
 		if 'point_neg_color' in plot_params.keys():
 			point_neg_color = plot_params['point_neg_color']
 
-	ice_plot_data['color'] = ice_plot_data['actual_preds'].apply(lambda x : point_pos_color if x >=0 else point_neg_color)
-	ice_plot_data = ice_plot_data[ice_plot_data['x'].isnull()==False].reset_index(drop=True)
-	ax.scatter(ice_plot_data['x'], ice_plot_data['actual_preds'], s=point_size, marker="+", linewidth=1, color=ice_plot_data['color'])     
+	ice_plot_data_pts['color'] = ice_plot_data_pts['actual_preds'].apply(lambda x : point_pos_color if x >=0 else point_neg_color)
+	ax.scatter(ice_plot_data_pts['x'], ice_plot_data_pts['actual_preds'], s=point_size, marker="+", linewidth=1, color=ice_plot_data_pts['color'])     
 
 
 def _ice_line_plot(x, ice_plot_data, display_columns, ax, plot_params):
@@ -1333,10 +1346,11 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 		df['x'] = df[actual_columns[0]]
 	elif pdp_isolate_out.feature_type == 'onehot':
 		df['x'] = df[actual_columns].apply(lambda x : _find_onehot_actual(x), axis=1)
+		df = df[df['x'].isnull()==False].reset_index(drop=True)
 	else:
-		df['x'] = df[actual_columns[0]].apply(lambda x : _find_closest(x, pdp_isolate_out.feature_grids))
+		df = df[(df[actual_columns[0]] >= feature_grids[0]) & (df[actual_columns[0]] <= feature_grids[-1])].reset_index(drop=True)
+		df['x'] = df[actual_columns[0]].apply(lambda x : _find_closest(x, feature_grids))
 
-	df = df[df['x'].isnull()==False].reset_index(drop=True)
 	pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
 	pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
 	
