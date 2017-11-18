@@ -132,6 +132,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	
 	# do prediction chunk by chunk to save memory usage
 	data_chunk_size = int(_train_X.shape[0] / feature_grids.size)
+	if data_chunk_size == 0:
+		data_chunk_size = _train_X.shape[0]
 	
 	# get the actual prediction and actual values
 	actual_preds = predict(_train_X)
@@ -300,7 +302,10 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	# do prediction chunk by chunk to save memory usage
 	ice_lines = pd.DataFrame()
 	grids_size = len(feature_grids[0]) * len(feature_grids[1])
+
 	data_chunk_size = int(_train_X.shape[0] / grids_size)
+	if data_chunk_size == 0:
+		data_chunk_size = _train_X.shape[0]
 	
 	for i in range(0, len(_train_X), data_chunk_size):
 		data_chunk = _train_X[i:(i + data_chunk_size)].reset_index(drop=True)
