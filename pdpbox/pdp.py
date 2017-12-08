@@ -54,6 +54,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		number of grid points for numeric features
 	percentile_range: (low, high), default=None
 		percentile range to consider for numeric features
+	cust_grid_points: list, default=None
+		customized grid points
 	'''
 	# check model
 	try:
@@ -108,6 +110,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	if (cust_grid_points is not None) and (type(cust_grid_points) != list):
 		raise ValueError('cust_grid_points: should be a list')
 
+	# create feature grids
 	if feature_type == 'binary':
 		feature_grids = np.array([0, 1])
 		display_columns = ['%s_0' %(feature), '%s_1' %(feature)]
@@ -240,6 +243,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		a list of number of grid points for each feature
 	percentile_ranges: list, default=[None, None]
 		a list of percentile range to consider for each feature
+	cust_grid_points: list, default=None
+		a list of customized grid points
 	'''
 
 	# check input dataset
@@ -1365,7 +1370,253 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 	ax1.set_xlabel('')
 	ax1.set_ylabel('actual_preds')
 
-	ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
+	rects = ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
 	ax2.set_xlabel(feature_name)
 	ax2.set_ylabel('count')
 	plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids)
+
+	_autolabel(rects, ax2, barcolor)
+
+
+def target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None, cust_grid_points=None, figsize=None, plot_params=None):
+	'''
+	df: pandas DataFrame
+		the whole dataset to investigate, including at least the feature to investigate as well as the target values
+	feature: string or list
+		column to investigate (for one-hot encoding features, a list of columns should be provided)
+	feature_name: string
+		name of the feature, not necessary the same as the column name
+	target: string or list
+		the column name of the target value
+		for multi-class problem, a list of one-hot encoding target values should be provided
+	num_grid_points: integer, default=10
+		number of grid points for numeric features
+	percentile_range: (low, high), default=None
+		percentile range to consider for numeric features
+	cust_grid_points: list, default=None
+		customized grid points
+	figsize: (width, height), default=None
+		figure size
+	plot_params: dict, default=None
+		values of plot parameters
+	'''
+
+	# check input dataset
+	if type(df) != pd.core.frame.DataFrame:
+		raise ValueError('df: only accept pandas DataFrame')
+
+	# check feature
+	if type(feature) == str:
+		if feature not in df.columns.values:
+			raise ValueError('feature does not exist: %s' %(feature))
+		if sorted(list(np.unique(df[feature]))) == [0, 1]:
+			feature_type='binary'
+		else:
+			feature_type='numeric'
+	elif type(feature) == list:
+		if len(feature) < 2:
+			raise ValueError('one-hot encoding feature should contain more than 1 element')
+		if not set(feature) < set(df.columns.values):
+			raise ValueError('feature does not exist: %s' %(str(feature)))
+		feature_type='onehot'
+	else:
+		raise ValueError('feature: please pass a string or a list (for onehot encoding feature)')
+
+	# check feature_name
+	if type(feature_name) != str:
+		raise ValueError('feature_name: should be a string')
+
+	# check num_grid_points
+	if num_grid_points is not None and type(num_grid_points) != int:
+		raise ValueError('num_grid_points: should be an integer')
+
+	# check percentile_range
+	if percentile_range is not None:
+		if type(percentile_range) != tuple:
+			raise ValueError('percentile_range: should be a tuple')
+		if len(percentile_range) != 2:
+			raise ValueError('percentile_range: should contain 2 elements')
+		if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
+			raise ValueError('percentile_range: should be between 0 and 100')
+
+	# check cust_grid_points
+	if (feature_type != 'numeric') and (cust_grid_points is not None):
+		raise ValueError('only numeric feature can accept cust_grid_points')
+	if (cust_grid_points is not None) and (type(cust_grid_points) != list):
+		raise ValueError('cust_grid_points: should be a list')
+
+	# check figsize
+	if figsize is not None:
+		if type(figsize) != tuple:
+			raise ValueError('figsize: should be a tuple')
+		if len(figsize) != 2:
+			raise ValueError('figsize: should contain 2 elements: (width, height)')
+
+	# check plot_params
+	if (plot_params is not None) and (type(plot_params) != dict):
+		raise ValueError('plot_params: should be a dictionary')
+
+	# check target values and calculate target rate through feature grids
+	if type(target) == str:
+		if target not in df.columns.values:
+			raise ValueError('target does not exist: %s' %(target))
+		if sorted(list(np.unique(df[target]))) == [0, 1]:
+			target_type='binary'
+		else:
+			target_type='regression'
+	elif type(target) == list:
+		if len(target) < 2:
+			raise ValueError('multi-class target should contain more than 1 element')
+		if not set(target) < set(df.columns.values):
+			raise ValueError('target does not exist: %s' %(str(target)))
+		for target_idx in range(len(target)):
+			if sorted(list(np.unique(df[target[target_idx]]))) != [0, 1]:
+				raise ValueError('multi-class targets should be one-hot encoded: %s' %(str(target[target_idx])))
+		target_type='multi-class'
+	else:
+		raise ValueError('target: please pass a string or a list (for multi-class targets)')
+
+	# create feature grids and bar counts
+	useful_features = []
+	if type(feature) == list:
+		useful_features += feature
+	else:
+		useful_features.append(feature)
+	if type(target) == list:
+		useful_features += target 
+	else:
+		useful_features.append(target)
+
+	bar_counts = df[useful_features].copy()
+	if feature_type == 'binary':
+		feature_grids = np.array([0, 1])
+		bar_counts['x'] = bar_counts[feature]
+	if feature_type == 'numeric':
+		if cust_grid_points is None:
+			feature_grids = _get_grids(df[feature], num_grid_points, percentile_range)
+		else:
+			feature_grids = np.array(sorted(cust_grid_points))
+		bar_counts = bar_counts[(bar_counts[feature] >= feature_grids[0]) & (bar_counts[feature] <= feature_grids[-1])].reset_index(drop=True)
+		bar_counts['x'] = bar_counts[feature].apply(lambda x : _find_closest(x, feature_grids))
+	if feature_type == 'onehot':
+		feature_grids = np.array(feature)
+		bar_counts['x'] = bar_counts[feature].apply(lambda x : _find_onehot_actual(x), axis=1)
+		bar_counts = bar_counts[bar_counts['x'].isnull()==False].reset_index(drop=True)
+
+	bar_counts['fake_count'] = 1
+	bar_counts_gp = bar_counts.groupby('x', as_index=False).agg({'fake_count': 'count'})
+
+	target_lines = []
+	if target_type in ['binary', 'regression']:
+		target_line = bar_counts.groupby('x', as_index=False).agg({target: 'mean'})
+		target_lines.append(target_line)
+	else:
+		for target_idx in range(len(target)):
+			target_line = bar_counts.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
+			target_lines.append(target_line)
+
+	if figsize is None:
+		figwidth = 16
+		figheight = 7
+	else:
+		figwidth = figsize[0]
+		figheight = figsize[1]
+
+	font_family = 'Arial'
+	linecolor = '#1A4E5D'
+	barcolor = '#5BB573'
+	linewidth = 2
+	markersize = 5
+
+	if plot_params is not None:
+		if 'font_family' in plot_params.keys():
+			font_family = plot_params['font_family']
+		if 'linecolor' in plot_params.keys():
+			linecolor = plot_params['linecolor']
+		if 'barcolor' in plot_params.keys():
+			barcolor = plot_params['barcolor']
+		if 'linewidth' in plot_params.keys():
+			linewidth = plot_params['linewidth']
+		if 'markersize' in plot_params.keys():
+			markersize = plot_params['markersize']
+
+	plt.figure(figsize=(figwidth, figwidth / 6.7))
+	ax1 = plt.subplot(111)
+	_target_plot_title(feature_name=feature_name, ax=ax1, figsize=figsize, plot_params=plot_params)
+
+	boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
+
+	plt.figure(figsize=(figwidth, figheight))
+	ax1 = plt.subplot(111)
+	rects = ax1.bar(bar_counts_gp['x'], bar_counts_gp['fake_count'], width=boxwith, color=barcolor, alpha=0.5)
+	ax1.set_xlabel(feature_name)
+	ax1.set_ylabel('count')
+	plt.xticks(range(len(feature_grids)), feature_grids)
+	_autolabel(rects, ax1, barcolor)
+
+	ax2 = ax1.twinx()
+	if len(target_lines) == 1:
+		target_line = target_lines[0]
+		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize)
+		for idx in range(target_line.shape[0]):
+			#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target], 3)), xy=(idx, target_line.iloc[idx][target]), textcoords='data')
+			bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
+			ax2.text(idx, target_line.iloc[idx][target], '%.3f'%(round(target_line.iloc[idx][target], 3)), 
+				ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
+	else:
+		for target_idx in range(len(target)):
+			target_line = target_lines[target_idx]
+			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize, label=target[target_idx])
+			for idx in range(target_line.shape[0]):
+				#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target[target_idx]], 3)), xy=(idx, target_line.iloc[idx][target[target_idx]]), textcoords='data')
+				bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
+				ax2.text(idx, target_line.iloc[idx][target[target_idx]], '%.3f'%(round(target_line.iloc[idx][target[target_idx]], 3)), 
+					ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
+	_axis_modify(font_family, ax2)
+	ax2.get_yaxis().tick_right()
+	ax2.grid(False)
+	ax2.set_ylabel('target_avg')		
+
+	_axis_modify(font_family, ax1)
+
+	
+def _autolabel(rects, ax, barcolor):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        bbox_props = {'facecolor': 'white', 'edgecolor':barcolor, 'boxstyle': "square,pad=0.5"}
+        ax.text(rect.get_x() + rect.get_width()/2., height,
+                '%d' % int(height),
+                ha='center', va='center', bbox=bbox_props, color=barcolor, weight='bold')
+
+def _target_plot_title(feature_name, ax, figsize, plot_params):
+
+	font_family = 'Arial'
+	title = 'Real target plot for %s' %(feature_name)
+	subtitle = 'Each point is clustered to the closest grid point.'
+
+	if figsize is not None:
+		title_fontsize = np.max([15 * (figsize[0] / 16.0), 10])
+		subtitle_fontsize = np.max([12 * (figsize[0] / 16.0), 8])
+	else:
+		title_fontsize=15
+		subtitle_fontsize=12
+
+	if plot_params is not None:
+		if 'font_family' in plot_params.keys():
+			font_family = plot_params['font_family']
+		if 'title' in plot_params.keys():
+			title = plot_params['title']
+		if 'title_fontsize' in plot_params.keys():
+			title_fontsize = plot_params['title_fontsize']
+		if 'subtitle_fontsize' in plot_params.keys():
+			subtitle_fontsize = plot_params['subtitle_fontsize']
+
+	ax.set_facecolor('white')
+	ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
+	ax.text(0, 0.4, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
+	ax.axis('off')
+
+
