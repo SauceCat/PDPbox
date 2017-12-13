@@ -11,12 +11,13 @@ warnings.filterwarnings('ignore')
 
 class pdp_isolate_obj:
 	def __init__(self, n_classes, classifier, model_features, predict, feature, feature_type, feature_grids, 
-		actual_columns, display_columns, ice_lines, pdp):
+		actual_columns, display_columns, ice_lines, pdp, predict_kwds={}):
 		self._type = 'pdp_isolate_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
 		self.predict = predict
+		self.predict_kwds = predict_kwds
 		self.feature = feature
 		self.feature_type = feature_type
 		self.feature_grids = feature_grids
@@ -27,13 +28,14 @@ class pdp_isolate_obj:
 
 
 class pdp_interact_obj:
-	def __init__(self, n_classes, classifier, model_features, predict, features, feature_types, feature_grids, 
-		pdp_isolate_out1, pdp_isolate_out2, pdp):
+	def __init__(self, n_classes, classifier, model_features, predict, features, feature_types, feature_grids,
+		pdp_isolate_out1, pdp_isolate_out2, pdp, predict_kwds={}):
 		self._type = 'pdp_interact_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
 		self.predict = predict
+		self.predict_kwds = predict_kwds
 		self.features = features
 		self.feature_types = feature_types
 		self.feature_grids = feature_grids
@@ -42,7 +44,7 @@ class pdp_interact_obj:
 		self.pdp = pdp
 
 
-def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None):
+def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -56,6 +58,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		percentile range to consider for numeric features
 	cust_grid_points: list, default=None
 		customized grid points
+	predict_kwds: dict, default={}
+		keywords to be passed to the model's predict function
 	'''
 	# check model
 	try:
@@ -139,7 +143,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		data_chunk_size = _train_X.shape[0]
 	
 	# get the actual prediction and actual values
-	actual_preds = predict(_train_X)
+	actual_preds = predict(_train_X, **predict_kwds)
 	actual_columns = []
 	if feature_type == 'onehot':
 		for feat in feature:
@@ -163,7 +167,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	for i in range(0, len(_train_X), data_chunk_size):
 		data_chunk = _train_X[i : (i + data_chunk_size)].reset_index(drop=True)
 		ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids)
-		preds = predict(ice_chunk[model_features])
+		preds = predict(ice_chunk[model_features], **predict_kwds)
 		
 		if n_classes > 2:
 			for n_class in range(n_classes):
@@ -196,11 +200,11 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		for n_class in range(n_classes):
 			pdp_isolate_out['class_%d' %(n_class)] = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features = model_features, 
 				predict=predict, feature=feature, feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, 
-				display_columns=display_columns, ice_lines=ice_lines['class_%d' %(n_class)], pdp=pdp['class_%d' %(n_class)])
+				display_columns=display_columns, ice_lines=ice_lines['class_%d' %(n_class)], pdp=pdp['class_%d' %(n_class)], predict_kwds=predict_kwds)
 	else:  
 		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, predict=predict, feature=feature, 
 			feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, display_columns=display_columns, 
-			ice_lines=ice_lines, pdp=pdp)
+			ice_lines=ice_lines, pdp=pdp, predict_kwds=predict_kwds)
 			
 	return pdp_isolate_out
 
@@ -231,7 +235,7 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
 	return ice_data
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None]):
+def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None], predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -245,6 +249,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		a list of percentile range to consider for each feature
 	cust_grid_points: list, default=None
 		a list of customized grid points
+	predict_kwds: dict, default={}
+		keywords to be passed to the model's predict function
 	'''
 
 	# check input dataset
@@ -315,7 +321,7 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	for i in range(0, len(_train_X), data_chunk_size):
 		data_chunk = _train_X[i:(i + data_chunk_size)].reset_index(drop=True)
 		ice_chunk = _make_ice_data_inter(data_chunk[model_features], features, feature_types, feature_grids)
-		preds = predict(ice_chunk[model_features])
+		preds = predict(ice_chunk[model_features], **predict_kwds)
 		result_chunk = ice_chunk[feature_list].copy()
 		
 		if n_classes > 2:
@@ -338,11 +344,11 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 			_pdp = pdp[feature_list + ['class_%d_preds' %(n_class)]].rename(columns={'class_%d_preds' %(n_class): 'preds'})
 			pdp_interact_out['class_%d' %(n_class)] = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
 				predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids,
-				pdp_isolate_out1=pdp_isolate_out1['class_%d' %(n_class)], pdp_isolate_out2=pdp_isolate_out2['class_%d' %(n_class)], pdp=_pdp)
+				pdp_isolate_out1=pdp_isolate_out1['class_%d' %(n_class)], pdp_isolate_out2=pdp_isolate_out2['class_%d' %(n_class)], pdp=_pdp, predict_kwds=predict_kwds)
 	else:  
 		pdp_interact_out = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
 			predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids, 
-			pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
+			pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp, predict_kwds=predict_kwds)
 			
 	return pdp_interact_out
 
