@@ -55,6 +55,9 @@ python setup.py install
 #### **Numeric feature:** target plot for a single variable (true survived rate through different values of a variable)
 <img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_02.png" width="80%">
 
+#### **Numeric feature:** target plot for a single variable (multiclass)
+<img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_04.png" width="80%">
+
 #### **Onehot encoding feature:** single variable plot with individual lines and original points
 <img src="https://github.com/SauceCat/pdpBox/blob/master/images/onehot_01.png" width="80%">
 
