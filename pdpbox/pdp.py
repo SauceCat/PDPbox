@@ -1559,19 +1559,21 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 		target_line = target_lines[0]
 		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize)
 		for idx in range(target_line.shape[0]):
-			#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target], 3)), xy=(idx, target_line.iloc[idx][target]), textcoords='data')
 			bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 			ax2.text(idx, target_line.iloc[idx][target], '%.3f'%(round(target_line.iloc[idx][target], 3)), 
 				ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
 	else:
+		linecolors = plt.get_cmap('tab10')(range(10))
 		for target_idx in range(len(target)):
+			linecolor = linecolors[target_idx]
 			target_line = target_lines[target_idx]
 			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize, label=target[target_idx])
 			for idx in range(target_line.shape[0]):
-				#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target[target_idx]], 3)), xy=(idx, target_line.iloc[idx][target[target_idx]]), textcoords='data')
 				bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 				ax2.text(idx, target_line.iloc[idx][target[target_idx]], '%.3f'%(round(target_line.iloc[idx][target[target_idx]], 3)), 
 					ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
+			plt.legend()
+
 	_axis_modify(font_family, ax2)
 	ax2.get_yaxis().tick_right()
 	ax2.grid(False)
