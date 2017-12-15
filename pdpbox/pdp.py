@@ -10,13 +10,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class pdp_isolate_obj:
-	def __init__(self, n_classes, classifier, model_features, predict, feature, feature_type, feature_grids, 
+	def __init__(self, n_classes, classifier, model_features, feature, feature_type, feature_grids, 
 		actual_columns, display_columns, ice_lines, pdp):
 		self._type = 'pdp_isolate_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
-		self.predict = predict
 		self.feature = feature
 		self.feature_type = feature_type
 		self.feature_grids = feature_grids
@@ -27,13 +26,12 @@ class pdp_isolate_obj:
 
 
 class pdp_interact_obj:
-	def __init__(self, n_classes, classifier, model_features, predict, features, feature_types, feature_grids, 
+	def __init__(self, n_classes, classifier, model_features, features, feature_types, feature_grids, 
 		pdp_isolate_out1, pdp_isolate_out2, pdp):
 		self._type = 'pdp_interact_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
-		self.predict = predict
 		self.features = features
 		self.feature_types = feature_types
 		self.feature_grids = feature_grids
@@ -195,10 +193,10 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		pdp_isolate_out = {}
 		for n_class in range(n_classes):
 			pdp_isolate_out['class_%d' %(n_class)] = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features = model_features, 
-				predict=predict, feature=feature, feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, 
+				feature=feature, feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, 
 				display_columns=display_columns, ice_lines=ice_lines['class_%d' %(n_class)], pdp=pdp['class_%d' %(n_class)])
 	else:  
-		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, predict=predict, feature=feature, 
+		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, feature=feature, 
 			feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, display_columns=display_columns, 
 			ice_lines=ice_lines, pdp=pdp)
 			
@@ -276,22 +274,26 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	if len(cust_grid_points) != 2:
 		raise ValueError('cust_grid_points: should only contain 2 elements')
 
+	# check model
+	try:
+		n_classes = len(model.classes_)
+		classifier = True
+		predict = model.predict_proba
+	except:
+		n_classes = 0
+		classifier = False
+		predict = model.predict 
+
 	# calculate pdp_isolate for each feature
 	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0])
 	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1])
 
 	# whether it is for multiclassifier
 	if type(pdp_isolate_out1) == dict:
-		n_classes = pdp_isolate_out1['class_0'].n_classes
-		classifier = pdp_isolate_out1['class_0'].classifier
-		predict = pdp_isolate_out1['class_0'].predict
 		model_features = pdp_isolate_out1['class_0'].model_features
 		feature_grids = [pdp_isolate_out1['class_0'].feature_grids, pdp_isolate_out2['class_0'].feature_grids]
 		feature_types = [pdp_isolate_out1['class_0'].feature_type, pdp_isolate_out2['class_0'].feature_type]
 	else:
-		n_classes = pdp_isolate_out1.n_classes
-		classifier = pdp_isolate_out1.classifier
-		predict = pdp_isolate_out1.predict
 		model_features = pdp_isolate_out1.model_features
 		feature_grids = [pdp_isolate_out1.feature_grids, pdp_isolate_out2.feature_grids]
 		feature_types = [pdp_isolate_out1.feature_type, pdp_isolate_out2.feature_type]
@@ -337,11 +339,11 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		for n_class in range(n_classes):
 			_pdp = pdp[feature_list + ['class_%d_preds' %(n_class)]].rename(columns={'class_%d_preds' %(n_class): 'preds'})
 			pdp_interact_out['class_%d' %(n_class)] = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-				predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids,
+				features=features, feature_types=feature_types, feature_grids=feature_grids,
 				pdp_isolate_out1=pdp_isolate_out1['class_%d' %(n_class)], pdp_isolate_out2=pdp_isolate_out2['class_%d' %(n_class)], pdp=_pdp)
 	else:  
 		pdp_interact_out = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-			predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids, 
+			features=features, feature_types=feature_types, feature_grids=feature_grids, 
 			pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
 			
 	return pdp_interact_out
@@ -1388,7 +1390,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 		name of the feature, not necessary the same as the column name
 	target: string or list
 		the column name of the target value
-		for multi-class problem, a list of one-hot encoding target values should be provided
+		for multi-class problem, a list of one-hot encoding target values could be provided
 	num_grid_points: integer, default=10
 		number of grid points for numeric features
 	percentile_range: (low, high), default=None
@@ -1526,7 +1528,6 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	linecolor = '#1A4E5D'
 	barcolor = '#5BB573'
 	linewidth = 2
-	markersize = 5
 
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
@@ -1537,8 +1538,6 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 			barcolor = plot_params['barcolor']
 		if 'linewidth' in plot_params.keys():
 			linewidth = plot_params['linewidth']
-		if 'markersize' in plot_params.keys():
-			markersize = plot_params['markersize']
 
 	plt.figure(figsize=(figwidth, figwidth / 6.7))
 	ax1 = plt.subplot(111)
@@ -1557,7 +1556,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	ax2 = ax1.twinx()
 	if len(target_lines) == 1:
 		target_line = target_lines[0]
-		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize)
+		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o')
 		for idx in range(target_line.shape[0]):
 			bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 			ax2.text(idx, target_line.iloc[idx][target], '%.3f'%(round(target_line.iloc[idx][target], 3)), 
@@ -1567,7 +1566,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 		for target_idx in range(len(target)):
 			linecolor = linecolors[target_idx]
 			target_line = target_lines[target_idx]
-			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize, label=target[target_idx])
+			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', label=target[target_idx])
 			for idx in range(target_line.shape[0]):
 				bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 				ax2.text(idx, target_line.iloc[idx][target[target_idx]], '%.3f'%(round(target_line.iloc[idx][target[target_idx]], 3)), 
