@@ -582,9 +582,12 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 	cluster_method, x_quantile, ax, plot_params):
 
 	font_family='Arial'
+	xticks_rotation = 0
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
 			font_family = plot_params['font_family']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
 
 	_axis_modify(font_family, ax)
 	ax.set_xlabel(feature_name, fontsize=10)
@@ -596,7 +599,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 	if feature_type == 'binary' or feature_type == 'onehot' or x_quantile:
 		x = range(len(display_columns))
 		ax.set_xticks(x)
-		ax.set_xticklabels(display_columns)
+		ax.set_xticklabels(display_columns, rotation=xticks_rotation)
 	else:
 		x = display_columns
 
@@ -715,8 +718,8 @@ def _pdp_std_plot(x, y, std, std_fill, std_hl, plot_org_pts, plot_lines, ax, plo
 	if std_fill:
 		ax.fill_between(x, upper, lower, alpha=fill_alpha, color=fill_color)
 
-	if not plot_org_pts and not plot_lines:
-		ax.set_ylim(np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0]))
+	#if not plot_org_pts and not plot_lines:
+	ax.set_ylim(np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0]))
 			
 
 def _ice_plot_pts(ice_plot_data_pts, ax, plot_params):
@@ -1065,6 +1068,7 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 	contour_color = 'white'
 	contour_label_fontsize = 9
 	contour_cmap = 'viridis'
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'pdp_inter' in plot_params.keys():
@@ -1076,6 +1080,8 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 				contour_cmap = plot_params['pdp_inter']['contour_cmap']
 			if 'font_family' in plot_params['pdp_inter'].keys():
 				font_family = plot_params['pdp_inter']['font_family']
+			if 'xticks_rotation' in plot_params.keys():
+				xticks_rotation = plot_params['xticks_rotation']
 
 	_axis_modify(font_family, ax)
 
@@ -1111,14 +1117,14 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 
 	if feature_types[0] == 'onehot':
 		ax.set_xticks(range(X.shape[1]))
-		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns)
+		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
 	elif feature_types[0] == 'binary':
 		ax.set_xticks([0, 1])
-		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns)
+		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
 	else:
 		if x_quantile:
 			ax.set_xticks(range(len(pdp_interact_out.feature_grids[0])))
-			ax.set_xticklabels(pdp_interact_out.feature_grids[0])
+			ax.set_xticklabels(pdp_interact_out.feature_grids[0], rotation=xticks_rotation)
 
 	if feature_types[1] == 'onehot':    
 		ax.set_yticks(range(Y.shape[0]))
@@ -1334,6 +1340,7 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 	boxcolor = '#66C2D7'
 	linecolor = '#1A4E5D'
 	barcolor = '#5BB573'
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
@@ -1344,6 +1351,9 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 			linecolor = plot_params['linecolor']
 		if 'barcolor' in plot_params.keys():
 			barcolor = plot_params['barcolor']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
+
 
 	_axis_modify(font_family, ax1)
 	_axis_modify(font_family, ax2)
@@ -1365,17 +1375,23 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 
 	pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
 	pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
+	pred_mean_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'mean'}).rename(columns={'actual_preds': 'preds_mean'})
+	pred_std_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'std'}).rename(columns={'actual_preds': 'preds_std'})
+	pred_outlier_gp = pred_mean_gp.merge(pred_std_gp, on='x', how='left')
+	pred_outlier_gp['outlier_upper'] = pred_outlier_gp['preds_mean'] + 3 * pred_outlier_gp['preds_std']
+	pred_outlier_gp['outlier_lower'] = pred_outlier_gp['preds_mean'] - 3 * pred_outlier_gp['preds_std']
 	
 	boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
-	sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1)
+	sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1, notch=True)
 	sns.pointplot(x=pred_median_gp['x'], y=pred_median_gp['actual_preds'], ax=ax1, color=linecolor)
 	ax1.set_xlabel('')
 	ax1.set_ylabel('actual_preds')
+	ax1.set_ylim(pred_outlier_gp['outlier_lower'].min(), pred_outlier_gp['outlier_upper'].max())
 
 	rects = ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
 	ax2.set_xlabel(feature_name)
 	ax2.set_ylabel('count')
-	plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids)
+	plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids, rotation=xticks_rotation)
 
 	_autolabel(rects, ax2, barcolor)
 
@@ -1528,6 +1544,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	linecolor = '#1A4E5D'
 	barcolor = '#5BB573'
 	linewidth = 2
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
@@ -1538,6 +1555,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 			barcolor = plot_params['barcolor']
 		if 'linewidth' in plot_params.keys():
 			linewidth = plot_params['linewidth']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
 
 	plt.figure(figsize=(figwidth, figwidth / 6.7))
 	ax1 = plt.subplot(111)
@@ -1550,7 +1569,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	rects = ax1.bar(bar_counts_gp['x'], bar_counts_gp['fake_count'], width=boxwith, color=barcolor, alpha=0.5)
 	ax1.set_xlabel(feature_name)
 	ax1.set_ylabel('count')
-	plt.xticks(range(len(feature_grids)), feature_grids)
+	plt.xticks(range(len(feature_grids)), feature_grids, rotation=xticks_rotation)
 	_autolabel(rects, ax1, barcolor)
 
 	ax2 = ax1.twinx()
