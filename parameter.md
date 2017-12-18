@@ -365,3 +365,71 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 # plot contour plots for all classes
 pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_pts=True, plot_lines=True, frac_to_plot=0.01, multi_flag=False, which_class=5, x_quantile=True, only_inter=True, ncols=3)
 ```
+----------------------------------------------------------------------------------------
+
+#### pdpbox.pdp.target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None, cust_grid_points=None, figsize=None, plot_params=None)
+  
+**Parameters:**
+  
+* **df**: pandas DataFrame 
+	- the whole dataset to investigate, including at least the feature to investigate as well as the target values
+	
+* **feature**: string or list  
+  	- column to investigate (for one-hot encoding features, a list of columns should be provided)  
+  
+* **feature_name**: string  
+	- name of the feature, not necessary the same as the column name  
+	
+* **target**: string or list  
+	- the column name of the target value
+	- for multi-class problem, a list of one-hot encoding target values could be provided
+	
+* **num_grid_points**: integer, default=10  
+  - number of grid points for numeric features  
+
+* **percentile_range**: (low, high), default=None  
+  - percentile range to consider for numeric features  
+
+* **cust_grid_points**: list, default=None  
+  - customized grid points for numeric features  
+
+* **figsize**: (width, height), default=None
+	- figure size
+
+* **plot_params**: dict, default=None
+	- values of plot parameters 
+    
+	**plot_params possible values and description:**
+	- **'font_family'**: font_family for the plot, default='Arial
+	- **'linecolor'**: color for the line in the target plot, default='#1A4E5D'
+	- **'barcolor'**: color for the barplot, default='#5BB573'
+	- **'linewidth'**: width of the line in the target plot, default=2
+	
+	- Example:
+	```python
+	plot_params = {
+		'font_family': 'Helvetica',
+		'barcolor': 'orange',
+		...
+	}
+	```
+
+**Examples:**
+```python
+from pdpbox import pdp
+
+# for binary classifier
+pdp.target_plot(titanic, 'Sex', 'sex', 'Survived')
+
+# for multiclass
+# first dummy the multiple targets
+target_dummies = pd.get_dummies(otto_raw['target'], prefix='target')
+otto_raw = pd.concat([otto_raw, target_dummies], axis=1)
+
+# for one single class
+pdp.target_plot(otto_raw, 'feat_67', 'feat_67', 'target_0')
+
+# for multiple classes
+pdp.target_plot(otto_raw, 'feat_67', 'feat_67', ['target_0', 'target_1'])
+```
+----

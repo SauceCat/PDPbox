@@ -10,14 +10,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class pdp_isolate_obj:
-	def __init__(self, n_classes, classifier, model_features, predict, feature, feature_type, feature_grids, 
-		actual_columns, display_columns, ice_lines, pdp, predict_kwds={}):
+	def __init__(self, n_classes, classifier, model_features, feature, feature_type, feature_grids, 
+		actual_columns, display_columns, ice_lines, pdp):
 		self._type = 'pdp_isolate_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
-		self.predict = predict
-		self.predict_kwds = predict_kwds
 		self.feature = feature
 		self.feature_type = feature_type
 		self.feature_grids = feature_grids
@@ -28,14 +26,12 @@ class pdp_isolate_obj:
 
 
 class pdp_interact_obj:
-	def __init__(self, n_classes, classifier, model_features, predict, features, feature_types, feature_grids,
-		pdp_isolate_out1, pdp_isolate_out2, pdp, predict_kwds={}):
+	def __init__(self, n_classes, classifier, model_features, features, feature_types, feature_grids, 
+		pdp_isolate_out1, pdp_isolate_out2, pdp):
 		self._type = 'pdp_interact_instance'
 		self.n_classes = n_classes
 		self.classifier = classifier
 		self.model_features = model_features
-		self.predict = predict
-		self.predict_kwds = predict_kwds
 		self.features = features
 		self.feature_types = feature_types
 		self.feature_grids = feature_grids
@@ -199,10 +195,10 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		pdp_isolate_out = {}
 		for n_class in range(n_classes):
 			pdp_isolate_out['class_%d' %(n_class)] = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features = model_features, 
-				predict=predict, feature=feature, feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, 
-				display_columns=display_columns, ice_lines=ice_lines['class_%d' %(n_class)], pdp=pdp['class_%d' %(n_class)], predict_kwds=predict_kwds)
+				feature=feature, feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, 
+				display_columns=display_columns, ice_lines=ice_lines['class_%d' %(n_class)], pdp=pdp['class_%d' %(n_class)])
 	else:  
-		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, predict=predict, feature=feature, 
+		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, feature=feature, 
 			feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, display_columns=display_columns, 
 			ice_lines=ice_lines, pdp=pdp, predict_kwds=predict_kwds)
 			
@@ -282,22 +278,26 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	if len(cust_grid_points) != 2:
 		raise ValueError('cust_grid_points: should only contain 2 elements')
 
+	# check model
+	try:
+		n_classes = len(model.classes_)
+		classifier = True
+		predict = model.predict_proba
+	except:
+		n_classes = 0
+		classifier = False
+		predict = model.predict 
+
 	# calculate pdp_isolate for each feature
 	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0])
 	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1])
 
 	# whether it is for multiclassifier
 	if type(pdp_isolate_out1) == dict:
-		n_classes = pdp_isolate_out1['class_0'].n_classes
-		classifier = pdp_isolate_out1['class_0'].classifier
-		predict = pdp_isolate_out1['class_0'].predict
 		model_features = pdp_isolate_out1['class_0'].model_features
 		feature_grids = [pdp_isolate_out1['class_0'].feature_grids, pdp_isolate_out2['class_0'].feature_grids]
 		feature_types = [pdp_isolate_out1['class_0'].feature_type, pdp_isolate_out2['class_0'].feature_type]
 	else:
-		n_classes = pdp_isolate_out1.n_classes
-		classifier = pdp_isolate_out1.classifier
-		predict = pdp_isolate_out1.predict
 		model_features = pdp_isolate_out1.model_features
 		feature_grids = [pdp_isolate_out1.feature_grids, pdp_isolate_out2.feature_grids]
 		feature_types = [pdp_isolate_out1.feature_type, pdp_isolate_out2.feature_type]
@@ -343,12 +343,12 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		for n_class in range(n_classes):
 			_pdp = pdp[feature_list + ['class_%d_preds' %(n_class)]].rename(columns={'class_%d_preds' %(n_class): 'preds'})
 			pdp_interact_out['class_%d' %(n_class)] = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-				predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids,
-				pdp_isolate_out1=pdp_isolate_out1['class_%d' %(n_class)], pdp_isolate_out2=pdp_isolate_out2['class_%d' %(n_class)], pdp=_pdp, predict_kwds=predict_kwds)
+				features=features, feature_types=feature_types, feature_grids=feature_grids,
+				pdp_isolate_out1=pdp_isolate_out1['class_%d' %(n_class)], pdp_isolate_out2=pdp_isolate_out2['class_%d' %(n_class)], pdp=_pdp)
 	else:  
 		pdp_interact_out = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-			predict=predict, features=features, feature_types=feature_types, feature_grids=feature_grids, 
-			pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp, predict_kwds=predict_kwds)
+			features=features, feature_types=feature_types, feature_grids=feature_grids, 
+			pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
 			
 	return pdp_interact_out
 
@@ -586,9 +586,12 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 	cluster_method, x_quantile, ax, plot_params):
 
 	font_family='Arial'
+	xticks_rotation = 0
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
 			font_family = plot_params['font_family']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
 
 	_axis_modify(font_family, ax)
 	ax.set_xlabel(feature_name, fontsize=10)
@@ -600,7 +603,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
 	if feature_type == 'binary' or feature_type == 'onehot' or x_quantile:
 		x = range(len(display_columns))
 		ax.set_xticks(x)
-		ax.set_xticklabels(display_columns)
+		ax.set_xticklabels(display_columns, rotation=xticks_rotation)
 	else:
 		x = display_columns
 
@@ -719,8 +722,8 @@ def _pdp_std_plot(x, y, std, std_fill, std_hl, plot_org_pts, plot_lines, ax, plo
 	if std_fill:
 		ax.fill_between(x, upper, lower, alpha=fill_alpha, color=fill_color)
 
-	if not plot_org_pts and not plot_lines:
-		ax.set_ylim(np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0]))
+	#if not plot_org_pts and not plot_lines:
+	ax.set_ylim(np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0]))
 			
 
 def _ice_plot_pts(ice_plot_data_pts, ax, plot_params):
@@ -1069,6 +1072,7 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 	contour_color = 'white'
 	contour_label_fontsize = 9
 	contour_cmap = 'viridis'
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'pdp_inter' in plot_params.keys():
@@ -1080,6 +1084,8 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 				contour_cmap = plot_params['pdp_inter']['contour_cmap']
 			if 'font_family' in plot_params['pdp_inter'].keys():
 				font_family = plot_params['pdp_inter']['font_family']
+			if 'xticks_rotation' in plot_params.keys():
+				xticks_rotation = plot_params['xticks_rotation']
 
 	_axis_modify(font_family, ax)
 
@@ -1115,14 +1121,14 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
 
 	if feature_types[0] == 'onehot':
 		ax.set_xticks(range(X.shape[1]))
-		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns)
+		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
 	elif feature_types[0] == 'binary':
 		ax.set_xticks([0, 1])
-		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns)
+		ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
 	else:
 		if x_quantile:
 			ax.set_xticks(range(len(pdp_interact_out.feature_grids[0])))
-			ax.set_xticklabels(pdp_interact_out.feature_grids[0])
+			ax.set_xticklabels(pdp_interact_out.feature_grids[0], rotation=xticks_rotation)
 
 	if feature_types[1] == 'onehot':    
 		ax.set_yticks(range(Y.shape[0]))
@@ -1338,6 +1344,7 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 	boxcolor = '#66C2D7'
 	linecolor = '#1A4E5D'
 	barcolor = '#5BB573'
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
@@ -1348,6 +1355,9 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 			linecolor = plot_params['linecolor']
 		if 'barcolor' in plot_params.keys():
 			barcolor = plot_params['barcolor']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
+
 
 	_axis_modify(font_family, ax1)
 	_axis_modify(font_family, ax2)
@@ -1369,17 +1379,23 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 
 	pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
 	pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
+	pred_mean_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'mean'}).rename(columns={'actual_preds': 'preds_mean'})
+	pred_std_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'std'}).rename(columns={'actual_preds': 'preds_std'})
+	pred_outlier_gp = pred_mean_gp.merge(pred_std_gp, on='x', how='left')
+	pred_outlier_gp['outlier_upper'] = pred_outlier_gp['preds_mean'] + 3 * pred_outlier_gp['preds_std']
+	pred_outlier_gp['outlier_lower'] = pred_outlier_gp['preds_mean'] - 3 * pred_outlier_gp['preds_std']
 	
 	boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
-	sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1)
+	sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1, notch=True)
 	sns.pointplot(x=pred_median_gp['x'], y=pred_median_gp['actual_preds'], ax=ax1, color=linecolor)
 	ax1.set_xlabel('')
 	ax1.set_ylabel('actual_preds')
+	ax1.set_ylim(pred_outlier_gp['outlier_lower'].min(), pred_outlier_gp['outlier_upper'].max())
 
 	rects = ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
 	ax2.set_xlabel(feature_name)
 	ax2.set_ylabel('count')
-	plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids)
+	plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids, rotation=xticks_rotation)
 
 	_autolabel(rects, ax2, barcolor)
 
@@ -1394,7 +1410,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 		name of the feature, not necessary the same as the column name
 	target: string or list
 		the column name of the target value
-		for multi-class problem, a list of one-hot encoding target values should be provided
+		for multi-class problem, a list of one-hot encoding target values could be provided
 	num_grid_points: integer, default=10
 		number of grid points for numeric features
 	percentile_range: (low, high), default=None
@@ -1532,7 +1548,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	linecolor = '#1A4E5D'
 	barcolor = '#5BB573'
 	linewidth = 2
-	markersize = 5
+	xticks_rotation = 0
 
 	if plot_params is not None:
 		if 'font_family' in plot_params.keys():
@@ -1543,8 +1559,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 			barcolor = plot_params['barcolor']
 		if 'linewidth' in plot_params.keys():
 			linewidth = plot_params['linewidth']
-		if 'markersize' in plot_params.keys():
-			markersize = plot_params['markersize']
+		if 'xticks_rotation' in plot_params.keys():
+			xticks_rotation = plot_params['xticks_rotation']
 
 	plt.figure(figsize=(figwidth, figwidth / 6.7))
 	ax1 = plt.subplot(111)
@@ -1557,27 +1573,29 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
 	rects = ax1.bar(bar_counts_gp['x'], bar_counts_gp['fake_count'], width=boxwith, color=barcolor, alpha=0.5)
 	ax1.set_xlabel(feature_name)
 	ax1.set_ylabel('count')
-	plt.xticks(range(len(feature_grids)), feature_grids)
+	plt.xticks(range(len(feature_grids)), feature_grids, rotation=xticks_rotation)
 	_autolabel(rects, ax1, barcolor)
 
 	ax2 = ax1.twinx()
 	if len(target_lines) == 1:
 		target_line = target_lines[0]
-		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize)
+		ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o')
 		for idx in range(target_line.shape[0]):
-			#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target], 3)), xy=(idx, target_line.iloc[idx][target]), textcoords='data')
 			bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 			ax2.text(idx, target_line.iloc[idx][target], '%.3f'%(round(target_line.iloc[idx][target], 3)), 
 				ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
 	else:
+		linecolors = plt.get_cmap('tab10')(range(10))
 		for target_idx in range(len(target)):
+			linecolor = linecolors[target_idx]
 			target_line = target_lines[target_idx]
-			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', markersize=markersize, label=target[target_idx])
+			ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o', label=target[target_idx])
 			for idx in range(target_line.shape[0]):
-				#ax2.annotate('%.3f' %(round(target_line.iloc[idx][target[target_idx]], 3)), xy=(idx, target_line.iloc[idx][target[target_idx]]), textcoords='data')
 				bbox_props = {'facecolor':linecolor, 'edgecolor':'none', 'boxstyle': "square,pad=0.5"}
 				ax2.text(idx, target_line.iloc[idx][target[target_idx]], '%.3f'%(round(target_line.iloc[idx][target[target_idx]], 3)), 
 					ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
+			plt.legend()
+
 	_axis_modify(font_family, ax2)
 	ax2.get_yaxis().tick_right()
 	ax2.grid(False)
