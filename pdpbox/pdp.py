@@ -200,7 +200,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	else:  
 		pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features, feature=feature, 
 			feature_type=feature_type, feature_grids=feature_grids, actual_columns=actual_columns, display_columns=display_columns, 
-			ice_lines=ice_lines, pdp=pdp, predict_kwds=predict_kwds)
+			ice_lines=ice_lines, pdp=pdp)
 			
 	return pdp_isolate_out
 
