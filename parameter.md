@@ -146,6 +146,7 @@ inter4 = pdp.pdp_interact(clf, titanic[features], [['Embarked_C', 'Embarked_S', 
 	- **'point_neg_color'**: color of the negative point, default='#E75438'
 	- **'line_cmap'**: matplotlib color map for individual lines, default='Blues'
 	- **'cluster_cmap'**: matplotlib color map for clustered lines, default='Blues'
+	- **'xticks_rotation'**: xticks rotation, default=0 
 	
 	- Example:
 	```python
@@ -219,6 +220,7 @@ pdp.pdp_plot(pdp_feat_67, 'feat_67', center=True, multi_flag=True, which_class=2
 	- **'boxcolor'**: color for the boxplot, default='#66C2D7'
 	- **'linecolor'**: color for the line in the boxplot, default='#1A4E5D'
 	- **'barcolor'**: color for the barplot, default='#5BB573'
+	- **'xticks_rotation'**: xticks rotation, default=0 
 	
 	- Example:
 	```python
@@ -316,6 +318,7 @@ They are exact the same as those in function **pdpbox.pdp.pdp_isolate_plot**. No
 	- **'contour_color'**: color of contour, default='white'
 	- **'contour_label_fontsize'**: contour label font size, default=9
 	- **'contour_cmap'**: matplotlib color map for contour color fill, default='viridis'
+	- **'xticks_rotation'**: xticks rotation, default=0 
 
 	**under 'pdp' key:**
 	- **'pdp_color'**: color for PDP line, default='#1A4E5D'
@@ -331,6 +334,7 @@ They are exact the same as those in function **pdpbox.pdp.pdp_isolate_plot**. No
 	- **'point_neg_color'**: color of the negative point, default='#E75438'
 	- **'line_cmap'**: matplotlib color map for individual lines, default='Blues'
 	- **'cluster_cmap'**: matplotlib color map for clustered lines, default='Blues'
+	- **'xticks_rotation'**: xticks rotation, default=0 
 	
 	- Example:
 	```python
@@ -410,6 +414,7 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 	- **'linecolor'**: color for the line in the target plot, default='#1A4E5D'
 	- **'barcolor'**: color for the barplot, default='#5BB573'
 	- **'linewidth'**: width of the line in the target plot, default=2
+	- **'xticks_rotation'**: xticks rotation, default=0 
 	
 	- Example:
 	```python
