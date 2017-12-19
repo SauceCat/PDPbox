@@ -1,6 +1,6 @@
 ## PDPbox functions and parameters
 
-#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None)
+#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, predict_kwds={})
 function to calculate PDP plot for a single variable 
   
 **Parameters:** 
@@ -22,6 +22,9 @@ function to calculate PDP plot for a single variable
 
 * **cust_grid_points**: list, default=None  
   - customized grid points for numeric features  
+  
+* **predict_kwds**: dict, default={}
+  - keywords to be passed to the model's predict function
 
 **Example:**  
 ```python
@@ -41,7 +44,7 @@ pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20, c
 ```
 -------------------------------------------------------------------------------------------------------
     
-#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None])
+#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None], predict_kwds={})
 function to calculate interaction plot for two variables 
   
 **Parameters:**
@@ -63,6 +66,9 @@ function to calculate interaction plot for two variables
   
 * **cust_grid_points**: list, default=[None, None]  
   - a list of customized grid points to consider for each feature  
+
+* **predict_kwds**: dict, default={}
+  - keywords to be passed to the model's predict function
 
 **Examples:**  
 ```python
