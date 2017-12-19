@@ -40,7 +40,7 @@ class pdp_interact_obj:
 		self.pdp = pdp
 
 
-def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None):
+def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -54,6 +54,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		percentile range to consider for numeric features
 	cust_grid_points: list, default=None
 		customized grid points
+	predict_kwds: dict, default={}
+		keywords to be passed to the model's predict function
 	'''
 	# check model
 	try:
@@ -137,7 +139,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		data_chunk_size = _train_X.shape[0]
 	
 	# get the actual prediction and actual values
-	actual_preds = predict(_train_X)
+	actual_preds = predict(_train_X, **predict_kwds)
 	actual_columns = []
 	if feature_type == 'onehot':
 		for feat in feature:
@@ -161,7 +163,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	for i in range(0, len(_train_X), data_chunk_size):
 		data_chunk = _train_X[i : (i + data_chunk_size)].reset_index(drop=True)
 		ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids)
-		preds = predict(ice_chunk[model_features])
+		preds = predict(ice_chunk[model_features], **predict_kwds)
 		
 		if n_classes > 2:
 			for n_class in range(n_classes):
@@ -229,7 +231,7 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
 	return ice_data
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None]):
+def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None], predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -243,6 +245,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		a list of percentile range to consider for each feature
 	cust_grid_points: list, default=None
 		a list of customized grid points
+	predict_kwds: dict, default={}
+		keywords to be passed to the model's predict function
 	'''
 
 	# check input dataset
@@ -317,7 +321,7 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	for i in range(0, len(_train_X), data_chunk_size):
 		data_chunk = _train_X[i:(i + data_chunk_size)].reset_index(drop=True)
 		ice_chunk = _make_ice_data_inter(data_chunk[model_features], features, feature_types, feature_grids)
-		preds = predict(ice_chunk[model_features])
+		preds = predict(ice_chunk[model_features], **predict_kwds)
 		result_chunk = ice_chunk[feature_list].copy()
 		
 		if n_classes > 2:
