@@ -1,6 +1,7 @@
 # PDPbox
-python partial dependence plot toolbox
+[![PyPI version](https://badge.fury.io/py/PDPbox.svg)](https://badge.fury.io/py/PDPbox)
 
+python partial dependence plot toolbox
 This repository is inspired by [ICEbox](https://github.com/kapelner/ICEbox). The goal is to visualize the impact of certain features towards model prediction for any supervised learning algorithm. (now support all scikit-learn algorithms)
 
 ## The common problem
