@@ -21,11 +21,16 @@ For description about the functions and parameters, please refer to [PDPbox func
 For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/master/test.
 
 ## Install PDPbox
-```bash
-git clone https://github.com/SauceCat/PDPbox.git
-cd PDPbox
-python setup.py install
-```
+- Through pip :100:
+  ```bash
+  pip install pdpbox
+  ```
+- Through git
+  ```bash
+  git clone https://github.com/SauceCat/PDPbox.git
+  cd PDPbox
+  python setup.py install
+  ```
 
 ## Examples
 #### **Binary feature:** single variable plot with original points and individual lines
