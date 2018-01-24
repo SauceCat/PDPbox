@@ -6,6 +6,8 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import matplotlib.patches as mpatches
 import copy
 
+from sklearn.externals.joblib import Parallel, delayed
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -40,7 +42,7 @@ class pdp_interact_obj:
 		self.pdp = pdp
 
 
-def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, predict_kwds={}):
+def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, n_jobs=1, predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -54,6 +56,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 		percentile range to consider for numeric features
 	cust_grid_points: list, default=None
 		customized grid points
+	n_jobs: integer, default=1
+		the number of jobs to run in parallel
 	predict_kwds: dict, default={}
 		keywords to be passed to the model's predict function
 	'''
@@ -110,6 +114,10 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 	if (cust_grid_points is not None) and (type(cust_grid_points) != list):
 		raise ValueError('cust_grid_points: should be a list')
 
+	# check n_jobs
+	if type(n_jobs) != int:
+		raise ValueError('n_jobs: only accept integer value') 
+
 	# create feature grids
 	if feature_type == 'binary':
 		feature_grids = np.array([0, 1])
@@ -158,31 +166,30 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 			_train_X['actual_preds'] = actual_preds[:, 1]
 		else:
 			_train_X['actual_preds'] = actual_preds
-	
-	# get ice lines
-	for i in range(0, len(_train_X), data_chunk_size):
-		data_chunk = _train_X[i : (i + data_chunk_size)].reset_index(drop=True)
-		ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids)
-		preds = predict(ice_chunk[model_features], **predict_kwds)
-		
-		if n_classes > 2:
-			for n_class in range(n_classes):
-				ice_chunk_result = pd.DataFrame(preds[:, n_class].reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
-				ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
-				ice_chunk_result['actual_preds'] = data_chunk['actual_preds_class_%d' %(n_class)].values
-				ice_lines['class_%d' %(n_class)] = pd.concat([ice_lines['class_%d' %(n_class)], ice_chunk_result])
-		else:
-			if classifier:
-				ice_chunk_result = pd.DataFrame(preds[:, 1].reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
-			else:
-				ice_chunk_result = pd.DataFrame(preds.reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
-			ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
-			ice_chunk_result['actual_preds'] = data_chunk['actual_preds'].values
-			ice_lines = pd.concat([ice_lines, ice_chunk_result])
 
-		ice_chunk.drop(ice_chunk.columns.values, axis=1, inplace=True)
-		data_chunk.drop(data_chunk.columns.values, axis=1, inplace=True)
-			
+	# parallel get ice lines
+	ice_params = {
+		'model': model,
+		'classifier': classifier, 
+		'model_features': model_features,
+		'n_classes': n_classes,
+		'feature': feature,
+		'feature_type': feature_type, 
+		'feature_grids': feature_grids, 
+		'display_columns': display_columns, 
+		'actual_columns': actual_columns,
+		'predict_kwds': predict_kwds
+	}
+	ice_chunk_results = Parallel(n_jobs=n_jobs)(delayed(_calc_ice_lines)
+		(_train_X[i : (i + data_chunk_size)].reset_index(drop=True), **ice_params) for i in range(0, len(_train_X), data_chunk_size))
+
+	if type(ice_chunk_results[0]) == pd.core.frame.DataFrame:
+		ice_lines = pd.concat(ice_chunk_results, axis=0).reset_index(drop=True)
+	else:
+		for n_class in range(n_classes):
+			ice_lines['class_%d' %(n_class)] = pd.concat([ice_chunk_result[n_class] 
+				for ice_chunk_result in ice_chunk_results], axis=0).reset_index(drop=True)
+
 	# calculate pdp
 	if n_classes > 2:
 		pdp = {}
@@ -231,7 +238,44 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
 	return ice_data
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None], predict_kwds={}):
+def _calc_ice_lines(data_chunk, model, classifier, model_features, n_classes, feature, feature_type, 
+	feature_grids, display_columns, actual_columns, predict_kwds):
+
+	ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids)
+
+	if classifier:
+		predict = model.predict_proba
+	else:
+		predict = model.predict
+
+	preds = predict(ice_chunk[model_features], **predict_kwds)
+	
+	if n_classes > 2:
+		ice_chunk_results = []
+		for n_class in range(n_classes):
+			ice_chunk_result = pd.DataFrame(preds[:, n_class].reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
+			ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
+			ice_chunk_result['actual_preds'] = data_chunk['actual_preds_class_%d' %(n_class)].values
+			ice_chunk_results.append(ice_chunk_result)
+	else:
+		if classifier:
+			ice_chunk_result = pd.DataFrame(preds[:, 1].reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
+		else:
+			ice_chunk_result = pd.DataFrame(preds.reshape((data_chunk.shape[0], feature_grids.size)), columns=display_columns)
+		ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
+		ice_chunk_result['actual_preds'] = data_chunk['actual_preds'].values
+
+	#ice_chunk.drop(ice_chunk.columns.values, axis=1, inplace=True)
+	#data_chunk.drop(data_chunk.columns.values, axis=1, inplace=True)
+	
+	if n_classes > 2:
+		return ice_chunk_results
+	else:
+		return ice_chunk_result
+
+
+def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], 
+	cust_grid_points=[None, None], n_jobs=1, predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -245,6 +289,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		a list of percentile range to consider for each feature
 	cust_grid_points: list, default=None
 		a list of customized grid points
+	n_jobs: integer, default=1
+		the number of jobs to run in parallel
 	predict_kwds: dict, default={}
 		keywords to be passed to the model's predict function
 	'''
@@ -278,6 +324,10 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	if len(cust_grid_points) != 2:
 		raise ValueError('cust_grid_points: should only contain 2 elements')
 
+	# check n_jobs
+	if type(n_jobs) != int:
+		raise ValueError('n_jobs: only accept integer value') 
+
 	# check model
 	try:
 		n_classes = len(model.classes_)
@@ -289,8 +339,10 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 		predict = model.predict 
 
 	# calculate pdp_isolate for each feature
-	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0])
-	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1])
+	pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0], 
+		percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0], n_jobs=n_jobs)
+	pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1], 
+		percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1], n_jobs=n_jobs)
 
 	# whether it is for multiclassifier
 	if type(pdp_isolate_out1) == dict:
@@ -317,24 +369,23 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 	data_chunk_size = int(_train_X.shape[0] / grids_size)
 	if data_chunk_size == 0:
 		data_chunk_size = _train_X.shape[0]
-	
-	for i in range(0, len(_train_X), data_chunk_size):
-		data_chunk = _train_X[i:(i + data_chunk_size)].reset_index(drop=True)
-		ice_chunk = _make_ice_data_inter(data_chunk[model_features], features, feature_types, feature_grids)
-		preds = predict(ice_chunk[model_features], **predict_kwds)
-		result_chunk = ice_chunk[feature_list].copy()
-		
-		if n_classes > 2:
-			for n_class in range(n_classes):
-				result_chunk['class_%d_preds' %(n_class)] = preds[:, n_class]
-		else:
-			if classifier:
-				result_chunk['preds'] = preds[:, 1]
-			else:
-				result_chunk['preds'] = preds
-		ice_lines = pd.concat([ice_lines, result_chunk])
-		ice_chunk.drop(ice_chunk.columns.values, axis=1, inplace=True)
-		data_chunk.drop(data_chunk.columns.values, axis=1, inplace=True)
+
+	# parallel get ice lines
+	ice_params = {
+		'model': model,
+		'classifier': classifier, 
+		'model_features': model_features,
+		'n_classes': n_classes,
+		'features': features,
+		'feature_types': feature_types, 
+		'feature_grids': feature_grids, 
+		'feature_list': feature_list,
+		'predict_kwds': predict_kwds
+	}
+	ice_chunk_results = Parallel(n_jobs=n_jobs)(delayed(_calc_ice_lines_inter)
+		(_train_X[i : (i + data_chunk_size)].reset_index(drop=True), **ice_params) for i in range(0, len(_train_X), data_chunk_size))
+
+	ice_lines = pd.concat(ice_chunk_results, axis=0).reset_index(drop=True)
 
 	pdp = ice_lines.groupby(feature_list, as_index=False).mean()
 
@@ -374,6 +425,32 @@ def _make_ice_data_inter(data, features, feature_types, feature_grids):
 		ice_data[features[1]] = np.tile(np.repeat(feature_grids[1], feature_grids[0].size, axis=0), data.shape[0])
 
 	return ice_data
+
+
+def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_classes, features, feature_types, 
+	feature_grids, feature_list, predict_kwds):
+
+	ice_chunk = _make_ice_data_inter(data_chunk[model_features], features, feature_types, feature_grids)
+
+	if classifier:
+		predict = model.predict_proba
+	else:
+		predict = model.predict
+	preds = predict(ice_chunk[model_features], **predict_kwds)
+	result_chunk = ice_chunk[feature_list].copy()
+	
+	if n_classes > 2:
+		for n_class in range(n_classes):
+			result_chunk['class_%d_preds' %(n_class)] = preds[:, n_class]
+	else:
+		if classifier:
+			result_chunk['preds'] = preds[:, 1]
+		else:
+			result_chunk['preds'] = preds
+
+	return result_chunk
+	#ice_chunk.drop(ice_chunk.columns.values, axis=1, inplace=True)
+	#data_chunk.drop(data_chunk.columns.values, axis=1, inplace=True)
 
 
 def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plot_lines=False, frac_to_plot=1, cluster=False, n_cluster_centers=None, 
