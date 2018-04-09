@@ -10,14 +10,13 @@ import pdp_calc_utils
 from sklearn.cluster import MiniBatchKMeans, KMeans
 
 
-def _pdp_plot_title(n_grids, feature_name, ax, figsize, multi_flag, which_class, plot_params):
+def _pdp_plot_title(n_grids, feature_name, ax, multi_flag, which_class, plot_params):
     """
     Draw pdp plot title
 
     :param n_grids: number of grids
     :param feature_name: name of the feature
     :param ax: axes to plot on
-    :param figsize: figure size
     :param multi_flag: whether it is a subplot of a multi-classes plot
     :param which_class: which class to plot
     :param plot_params: values of plot parameters
@@ -319,7 +318,7 @@ def _ice_cluster_plot(x, ice_lines, display_columns, n_cluster_centers, cluster_
         ax.plot(x, y, linewidth=1, c=colors[i % 10])
 
 
-def _pdp_interact_plot_title(pdp_interact_out, feature_names, ax, figsize,
+def _pdp_interact_plot_title(pdp_interact_out, feature_names, ax,
                              multi_flag, which_class, only_inter, plot_params):
     """
     Draw pdp interaction plot title
@@ -440,7 +439,7 @@ def _pdp_interact_plot(pdp_interact_out, feature_names, center, plot_org_pts, pl
     gs = GridSpec(2, 2)
     ax0 = plt.subplot(gs[0, 0])
 
-    _pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names, ax=ax0, figsize=figsize,
+    _pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names, ax=ax0,
                              multi_flag=multi_flag, which_class=which_class, only_inter=False, plot_params=plot_params)
 
     ax1 = plt.subplot(gs[0, 1])

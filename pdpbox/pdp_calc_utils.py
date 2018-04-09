@@ -238,12 +238,3 @@ def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_class
             result_chunk['preds'] = preds
 
     return result_chunk
-
-
-
-
-
-
-
-
-

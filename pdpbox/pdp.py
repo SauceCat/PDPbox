@@ -289,7 +289,7 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
         else:
             n_grids = len(pdp_isolate_out.feature_grids)
             _pdp_isolate_out = pdp_isolate_out
-        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1, figsize=figsize,
+        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
                                        multi_flag=False, which_class=None, plot_params=plot_params)
 
         ax2 = plt.subplot(gs[1:, :])
@@ -527,7 +527,7 @@ def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts
                 _pdp_interact_out = pdp_interact_out
 
             pdp_plot_utils._pdp_interact_plot_title(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
-                                                    ax=ax0, figsize=figsize, multi_flag=multi_flag, which_class=which_class,
+                                                    ax=ax0, multi_flag=multi_flag, which_class=which_class,
                                                     only_inter=only_inter, plot_params=plot_params)
 
             ax1 = plt.subplot(gs[1:, :])
