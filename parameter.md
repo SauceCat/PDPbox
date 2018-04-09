@@ -202,7 +202,7 @@ pdp.pdp_plot(pdp_feat_67, 'feat_67', center=True, multi_flag=True, which_class=2
 ```
 ----------------------------------------------------------------------------------------
 
-#### pdpbox.pdp.actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, which_class=None, ncols=None)
+#### pdpbox.info_plots.actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, which_class=None, ncols=None)
   
 **Parameters:**
   
@@ -249,10 +249,10 @@ pdp.pdp_plot(pdp_feat_67, 'feat_67', center=True, multi_flag=True, which_class=2
 
 **Examples:**
 ```python
-from pdpbox import pdp
+from pdpbox import info_plots, pdp
 pdp_sex = pdp.pdp_isolate(clf, titanic[features], 'Sex')
 
-pdp.actual_plot(pdp_sex, 'Sex')
+info_plots.actual_plot(pdp_sex, 'Sex')
 
 # customized plot
 plot_params = {
@@ -260,16 +260,16 @@ plot_params = {
     'linecolor': 'darkblue',
     'barcolor': 'lightblue'
 }
-pdp.actual_plot(pdp_sex, 'Sex', plot_params=plot_params)
+info_plots.actual_plot(pdp_sex, 'Sex', plot_params=plot_params)
 
 # for multiclass
 pdp_feat_67 = pdp.pdp_isolate(clf, otto_train, 'feat_67')
 
 # plot out all classes
-pdp.actual_plot(pdp_feat_67, 'feat_67')
+info_plots.actual_plot(pdp_feat_67, 'feat_67')
 
 # only plot out class 2
-pdp.actual_plot(pdp_feat_67, 'feat_67', multi_flag=True, which_class=2)
+info_plots.actual_plot(pdp_feat_67, 'feat_67', multi_flag=True, which_class=2)
 ```
 ----
 
@@ -383,7 +383,7 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 ```
 ----------------------------------------------------------------------------------------
 
-#### pdpbox.pdp.target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None, cust_grid_points=None, figsize=None, plot_params=None)
+#### pdpbox.info_plots.target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None, cust_grid_points=None, figsize=None, plot_params=None)
   
 **Parameters:**
   
@@ -433,10 +433,10 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 
 **Examples:**
 ```python
-from pdpbox import pdp
+from pdpbox import info_plots
 
 # for binary classifier
-pdp.target_plot(titanic, 'Sex', 'sex', 'Survived')
+info_plots.target_plot(titanic, 'Sex', 'sex', 'Survived')
 
 # for multiclass
 # first dummy the multiple targets
@@ -444,9 +444,9 @@ target_dummies = pd.get_dummies(otto_raw['target'], prefix='target')
 otto_raw = pd.concat([otto_raw, target_dummies], axis=1)
 
 # for one single class
-pdp.target_plot(otto_raw, 'feat_67', 'feat_67', 'target_0')
+info_plots.target_plot(otto_raw, 'feat_67', 'feat_67', 'target_0')
 
 # for multiple classes
-pdp.target_plot(otto_raw, 'feat_67', 'feat_67', ['target_0', 'target_1'])
+info_plots.target_plot(otto_raw, 'feat_67', 'feat_67', ['target_0', 'target_1'])
 ```
 ----
