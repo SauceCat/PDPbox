@@ -332,7 +332,8 @@ class pdp_interact_obj:
         self.pdp = pdp
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None],
+def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=['percentile', 'percentile'],
+                 percentile_ranges=[None, None], grid_ranges=[None, None],
                  cust_grid_points=[None, None], n_jobs=1, predict_kwds={}):
     """
     Calculate PDP interaction plot
@@ -345,8 +346,12 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
         a list containing two features
     :param num_grid_points: list, default=[10, 10]
         a list of number of grid points for each feature
+    :param grid_types: list, default=['percentile', 'percentile']
+        a list of grid types for each feature
     :param percentile_ranges: list, default=[None, None]
         a list of percentile range to consider for each feature
+    :param grid_ranges: list, default=[None, None]
+        a list of grid range to consider for each feature
     :param cust_grid_points: list, default=None
         a list of customized grid points
     :param n_jobs: integer, default=1
@@ -365,11 +370,11 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 
     # calculate pdp_isolate for each feature
     pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0],
-                                   percentile_range=percentile_ranges[0], cust_grid_points=cust_grid_points[0],
-                                   n_jobs=n_jobs)
+                                   grid_type=grid_types[0], percentile_range=percentile_ranges[0],
+                                   grid_range=grid_ranges[0], cust_grid_points=cust_grid_points[0], n_jobs=n_jobs)
     pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1],
-                                   percentile_range=percentile_ranges[1], cust_grid_points=cust_grid_points[1],
-                                   n_jobs=n_jobs)
+                                   grid_type=grid_types[1], percentile_range=percentile_ranges[1],
+                                   grid_range=grid_ranges[1], cust_grid_points=cust_grid_points[1], n_jobs=n_jobs)
 
     # whether it is for multi-classes
     if type(pdp_isolate_out1) == dict:
