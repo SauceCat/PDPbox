@@ -30,8 +30,8 @@ class pdp_isolate_obj:
         self.pdp = pdp
 
 
-def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None,
-                cust_grid_points=None, n_jobs=1, predict_kwds={}):
+def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile',
+                percentile_range=None, grid_range=None, cust_grid_points=None, n_jobs=1, predict_kwds={}):
     """
     Calculate PDP isolation plot
 
@@ -42,8 +42,12 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
         column to investigate (for one-hot encoding features, a list of columns should be provided)
     :param num_grid_points: integer, default=10
         number of grid points for numeric features
+    :param grid_type, default='percentile'
+        can be 'percentile' or 'equal'
     :param percentile_range: (low, high), default=None
         percentile range to consider for numeric features
+    :param grid_range: (low, high), default=None
+        value range to consider for numeric features
     :param cust_grid_points: list, default=None
         customized grid points
     :param n_jobs: integer, default=1
@@ -76,6 +80,13 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
             raise ValueError('percentile_range: should contain 2 elements')
         if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
             raise ValueError('percentile_range: should be between 0 and 100')
+
+    # check grid_range
+    if grid_range is not None:
+        if type(grid_range) != tuple:
+            raise ValueError('grid_range: should be a tuple')
+        if len(grid_range) != 2:
+            raise ValueError('grid_range: should contain 2 elements')
 
     # copy training data set and get the model features
     # it's extremely important to keep the original feature order
@@ -113,7 +124,13 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
     else:
         # calculate grid points for numeric features
         if cust_grid_points is None:
-            feature_grids = pdp_calc_utils._get_grids(_train_X[feature].values, num_grid_points, percentile_range)
+            # check grid_range
+            if grid_range is not None:
+                if np.min(grid_range) < np.min(_train_X[feature].values) \
+                        or np.max(grid_range) > np.max(_train_X[feature].values):
+                    warnings.warn('grid_range: out of bound.')
+            feature_grids = pdp_calc_utils._get_grids(_train_X[feature].values, num_grid_points, grid_type,
+                                                      percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
         display_columns = feature_grids
@@ -262,7 +279,7 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
         plt.figure(figsize=(figwidth, figwidth / 8.))
         ax1 = plt.subplot(111)
         n_grids = len(pdp_isolate_out['class_0'].feature_grids)
-        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1, figsize=figsize,
+        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
                                        multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
 
         # PDP plots for each class
@@ -500,8 +517,8 @@ def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts
             # draw graph title
             plt.figure(figsize=(figwidth, figwidth / 7.5))
             ax0 = plt.subplot(111)
-            pdp_plot_utils._pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names, ax=ax0,
-                                                    figsize=figsize, multi_flag=multi_flag, which_class=which_class,
+            pdp_plot_utils._pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names,
+                                                    ax=ax0, multi_flag=multi_flag, which_class=which_class,
                                                     only_inter=only_inter, plot_params=plot_params)
 
             plt.figure(figsize=(figwidth, (figwidth / ncols) * nrows))

@@ -2,29 +2,39 @@ import pandas as pd
 import numpy as np
 
 
-def _get_grids(x, num_grid_points, percentile_range):
+def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
     """
     Calculate grid points for numeric features
 
     :param x: array of feature values
     :param num_grid_points: number of grid points to calculate
-    :param percentile_range:
-        tuple of (min, max) percentile
+    :param grid_type, default='percentile'
+        can be 'percentile' or 'equal'
+    :param percentile_range: (low, high), default=None
+        percentile range to consider for numeric features
+    :param grid_range: (low, high), default=None
+        value range to consider for numeric features
 
     :return:
         array of calculated grid points
     """
 
-    if num_grid_points >= np.unique(x).size:
-        grids = np.unique(x)
-    else:
-        # grid points are calculated based on percentile in unique level
-        # thus the final number of grid points might be smaller than num_grid_points
-        if percentile_range is not None:
-            grids = np.unique(
-                np.percentile(x, np.linspace(np.min(percentile_range), np.max(percentile_range), num_grid_points)))
+    if grid_type == 'percentile':
+        if num_grid_points >= np.unique(x).size:
+            grids = np.unique(x)
         else:
-            grids = np.unique(np.percentile(x, np.linspace(0, 100, num_grid_points)))
+            # grid points are calculated based on percentile in unique level
+            # thus the final number of grid points might be smaller than num_grid_points
+            if percentile_range is not None:
+                grids = np.unique(
+                    np.percentile(x, np.linspace(np.min(percentile_range), np.max(percentile_range), num_grid_points)))
+            else:
+                grids = np.unique(np.percentile(x, np.linspace(0, 100, num_grid_points)))
+    else:
+        if grid_range is not None:
+            grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
+        else:
+            grids = np.linspace(np.min(x), np.max(x), num_grid_points)
 
     return np.array([round(val, 2) for val in grids])
 
