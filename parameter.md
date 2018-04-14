@@ -1,6 +1,6 @@
 ## PDPbox functions and parameters
 
-#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, n_jobs=1, predict_kwds={})
+#### pdpbox.pdp.pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None, n_jobs=1, predict_kwds={})
 function to calculate PDP plot for a single variable 
   
 **Parameters:** 
@@ -17,8 +17,14 @@ function to calculate PDP plot for a single variable
 * **num_grid_points**: integer, default=10  
   - number of grid points for numeric features  
 
+* **grid_type**: string, default='percentile'  
+  - can be 'percentile' or 'equal'  
+
 * **percentile_range**: (low, high), default=None  
   - percentile range to consider for numeric features  
+
+* **grid_range**: (low, high), default=None  
+  - value range to consider for numeric features  
 
 * **cust_grid_points**: list, default=None  
   - customized grid points for numeric features  
@@ -44,10 +50,11 @@ pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare')
 pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20)
 pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20, percentile_range=(5, 95))
 pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=20, cust_grid_points=range(0, 100, 10))
+pdp_fare = pdp.pdp_isolate(clf, titanic[features], 'Fare', num_grid_points=10, grid_type='equal', grid_range=(10, 300))
 ```
 -------------------------------------------------------------------------------------------------------
     
-#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], cust_grid_points=[None, None], n_jobs=1, predict_kwds={})
+#### pdpbox.pdp.pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=['percentile', 'percentile'], percentile_ranges=[None, None], grid_ranges=[None, None], cust_grid_points=[None, None], n_jobs=1, predict_kwds={})
 function to calculate interaction plot for two variables 
   
 **Parameters:**
@@ -63,10 +70,16 @@ function to calculate interaction plot for two variables
 
 * **num_grid_points**: list, default=[10, 10]  
   - a list of number of grid points for each feature  
-
+  
+* **grid_types**: list, default=['percentile', 'percentile']	
+  - a list of grid types for each feature	
+  
 * **percentile_ranges**: list, default=[None, None]  
   - a list of percentile range to consider for each feature  
   
+* **grid_ranges**: list, default=[None, None]	
+  - a list of grid range to consider for each feature	
+
 * **cust_grid_points**: list, default=[None, None]  
   - a list of customized grid points to consider for each feature  
   
@@ -88,6 +101,7 @@ inter2 = pdp.pdp_interact(clf, titanic[features], ['Sex', 'Age'], num_grid_point
 # interaction between onehot encoding feature and numeric feature
 inter3 = pdp.pdp_interact(clf, titanic[features], [['Embarked_C', 'Embarked_S', 'Embarked_Q'], 'Age'], num_grid_points=[None, 10])
 inter4 = pdp.pdp_interact(clf, titanic[features], [['Embarked_C', 'Embarked_S', 'Embarked_Q'], 'Age'], cust_grid_points=[None, range(0, 50, 5)])
+inter5 = pdp.pdp_interact(clf, titanic[features], ['Age', 'Fare'], grid_types=['equal', 'equal'], grid_ranges=[(0, 80), (10, 100)])
 ```
 ----------------------------------------------------------------------------------------
 
