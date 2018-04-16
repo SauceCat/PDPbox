@@ -70,8 +70,8 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
                                      figwidth=figwidth, plot_params=plot_params, outer=None)
 
 
-def target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None,
-                cust_grid_points=None, figsize=None, plot_params=None):
+def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
+                percentile_range=None, grid_range=None, cust_grid_points=None, figsize=None, plot_params=None):
     """
     Plot target distribution through feature grids
 
@@ -86,8 +86,12 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
         for multi-class problem, a list of one-hot encoding target values could be provided
     :param num_grid_points: integer, default=10
         number of grid points for numeric features
+    :param grid_type, default='percentile'
+        can be 'percentile' or 'equal'
     :param percentile_range: (low, high), default=None
         percentile range to consider for numeric features
+    :param grid_range: (low, high), default=None
+        value range to consider for numeric features
     :param cust_grid_points: list, default=None
         customized grid points
     :param figsize: (width, height), default=None
@@ -166,7 +170,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, percentil
         bar_counts['x'] = bar_counts[feature]
     if feature_type == 'numeric':
         if cust_grid_points is None:
-            feature_grids = pdp_calc_utils._get_grids(df[feature], num_grid_points, percentile_range)
+            feature_grids = pdp_calc_utils._get_grids(df[feature], num_grid_points, grid_type,
+                                                      percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
         bar_counts = bar_counts[(bar_counts[feature] >= feature_grids[0])

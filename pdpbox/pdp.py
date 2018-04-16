@@ -31,7 +31,8 @@ class pdp_isolate_obj:
 
 
 def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile',
-                percentile_range=None, grid_range=None, cust_grid_points=None, n_jobs=1, predict_kwds={}):
+                percentile_range=None, grid_range=None, cust_grid_points=None, n_jobs=1,
+                predict_kwds={}, data_transformer=None):
     """
     Calculate PDP isolation plot
 
@@ -54,6 +55,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         the number of jobs to run in parallel
     :param predict_kwds: dict, default={}
         keywords to be passed to the model's predict function
+    :param data_transformer: function
+        function to transform the data set as some features changing values
 
     :return: instance of pdp_isolate_obj
     """
@@ -173,7 +176,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         'feature_grids': feature_grids,
         'display_columns': display_columns,
         'actual_columns': actual_columns,
-        'predict_kwds': predict_kwds
+        'predict_kwds': predict_kwds,
+        'data_transformer': data_transformer
     }
     ice_chunk_results = Parallel(n_jobs=n_jobs)(delayed(pdp_calc_utils._calc_ice_lines)
                                                 (_train_X[i: (i + data_chunk_size)].reset_index(drop=True),
@@ -333,8 +337,8 @@ class pdp_interact_obj:
 
 
 def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=['percentile', 'percentile'],
-                 percentile_ranges=[None, None], grid_ranges=[None, None],
-                 cust_grid_points=[None, None], n_jobs=1, predict_kwds={}):
+                 percentile_ranges=[None, None], grid_ranges=[None, None], cust_grid_points=[None, None],
+                 n_jobs=1, predict_kwds={}):
     """
     Calculate PDP interaction plot
 

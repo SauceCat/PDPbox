@@ -39,7 +39,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
     return np.array([round(val, 2) for val in grids])
 
 
-def _make_ice_data(data, feature, feature_type, feature_grids):
+def _make_ice_data(data, feature, feature_type, feature_grids, data_transformer):
     """
     Prepare data for calculating ice lines
 
@@ -47,6 +47,8 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
     :param feature: column name of the feature
     :param feature_type: type of the feature
     :param feature_grids: array of grids to calculate on
+    :param data_transformer: function
+        function to transform the data set as some features changing values
 
     :return:
         the extended data chunk (extended by feature_grids)
@@ -62,11 +64,15 @@ def _make_ice_data(data, feature, feature_type, feature_grids):
     else:
         ice_data[feature] = np.tile(feature_grids, data.shape[0])
 
+    # we can add transformer here
+    if data_transformer is not None:
+        ice_data = data_transformer(ice_data)
+
     return ice_data
 
 
 def _calc_ice_lines(data_chunk, model, classifier, model_features, n_classes, feature, feature_type,
-                    feature_grids, display_columns, actual_columns, predict_kwds):
+                    feature_grids, display_columns, actual_columns, predict_kwds, data_transformer):
     """
     Calculate ice lines
 
@@ -81,13 +87,15 @@ def _calc_ice_lines(data_chunk, model, classifier, model_features, n_classes, fe
     :param display_columns: column names to display
     :param actual_columns: column names of the actual values
     :param predict_kwds: other parameters pass to the predictor
+    :param data_transformer: function
+        function to transform the data set as some features changing values
 
     :return:
         a dataframe (or a list of dataframes, when it is multi-class problem) of calculated ice lines
         each row in a dataframe represents one line
     """
 
-    ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids)
+    ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids, data_transformer)
 
     if classifier:
         predict = model.predict_proba
