@@ -239,7 +239,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     free_memory = psutil.virtual_memory()[1] * memory_limit
     num_units = int(np.floor(free_memory / unit_memory))
 
-    true_n_jobs = np.min([num_units-2, n_jobs])
+    true_n_jobs = np.min([num_units, n_jobs])
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
         delayed(_calc_ice_lines)(_train_X.copy(), model, classifier, model_features, n_classes, feature,
@@ -312,8 +312,12 @@ def _make_ice_data_inter(data, features, feature_types, feature_grids):
     return ice_data
 
 
-def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_classes, features, feature_types,
-                          feature_grids, feature_list, predict_kwds):
+def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_classes, features,
+                          feature_grids_combo, feature_list, predict_kwds):
+    delayed(_calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes, features,
+                                   grids_combo[i], predict_kwds, data_transformer)
+
+
     """
     Calculate interaction ice lines
 
@@ -430,15 +434,30 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
     free_memory = psutil.virtual_memory()[1] * memory_limit
     num_units = int(np.floor(free_memory / unit_memory))
 
-    true_n_jobs = np.min([num_units - 2, n_jobs])
+    true_n_jobs = np.min([num_units, n_jobs])
 
-    
+    # create grid combination
+    grids1, grids2 = feature_grids
+    if feature_types[0] == 'onehot':
+        grids1 = range(len(grids1))
+    if feature_types[1] == 'onehot':
+        grids2 = range(len(grids2))
+
+    grids_combo_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
+    grids_combo1, grids_combo2 = grids_combo_temp[:, 0], grids_combo_temp[:, 1]
+    if feature_types[0] == 'onehot':
+        grids_combo1 = np.zeros((len(grids_combo1), len(grids1)), dtype=int)
+        grids_combo1[range(len(grids_combo1)), grids_combo1-1] = 1
+    if feature_types[1] == 'onehot':
+        grids_combo2 = np.zeros((len(grids_combo2), len(grids2)), dtype=int)
+        grids_combo2[range(len(grids_combo2)), grids_combo2-1] = 1
+
+    grids_combo = np.concatenate((grids_combo1, grids_combo2), axis=1)
+
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
         delayed(_calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes, features,
-                                      feature_types, feature_grids[i], display_columns[i], predict_kwds,
-                                      data_transformer)
-        for i in range(len(feature_grids)))
+                                       grids_combo[i], predict_kwds, data_transformer) for i in range(len(grids_combo)))
 
     # do prediction chunk by chunk to save memory usage
     grids_size = len(feature_grids[0]) * len(feature_grids[1])
