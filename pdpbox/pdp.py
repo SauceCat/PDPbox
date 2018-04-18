@@ -11,6 +11,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 import pdp_calc_utils, pdp_plot_utils
+import psutil
 
 
 class pdp_isolate_obj:
@@ -31,7 +32,7 @@ class pdp_isolate_obj:
 
 
 def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile',
-                percentile_range=None, grid_range=None, cust_grid_points=None, n_jobs=1,
+                percentile_range=None, grid_range=None, cust_grid_points=None, memory_limit=0.5, n_jobs=1,
                 predict_kwds={}, data_transformer=None):
     """
     Calculate PDP isolation plot
@@ -51,6 +52,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         value range to consider for numeric features
     :param cust_grid_points: list, default=None
         customized grid points
+    :param memory_limit: float, default=0.5
+        fraction of RAM can be used to do the calculation
     :param n_jobs: integer, default=1
         the number of jobs to run in parallel
     :param predict_kwds: dict, default={}
@@ -117,6 +120,10 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     if (feature_type != 'numeric') and (cust_grid_points is not None):
         raise ValueError('only numeric feature can accept cust_grid_points')
 
+    # check memory_limit
+    if memory_limit <= 0 or memory_limit >= 1:
+        raise ValueError('memory_limit: should be (0, 1)')
+
     # create feature grids
     if feature_type == 'binary':
         feature_grids = np.array([0, 1])
@@ -159,43 +166,42 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         else:
             _train_X['actual_preds'] = actual_preds
 
-    # do prediction chunk by chunk to save memory usage
-    # calculate data chunk size
-    data_chunk_size = int(_train_X.shape[0] / feature_grids.size)
-    if data_chunk_size == 0:
-        data_chunk_size = _train_X.shape[0]
+    # new from here
+    # calculate memory usage
+    unit_memory = _train_X.memory_usage(deep=True).sum()
+    free_memory = psutil.virtual_memory()[1] * memory_limit
+    num_units = int(np.floor(free_memory / unit_memory))
 
-    # parallel get ice lines
-    ice_params = {
-        'model': model,
-        'classifier': classifier,
-        'model_features': model_features,
-        'n_classes': n_classes,
-        'feature': feature,
-        'feature_type': feature_type,
-        'feature_grids': feature_grids,
-        'display_columns': display_columns,
-        'actual_columns': actual_columns,
-        'predict_kwds': predict_kwds,
-        'data_transformer': data_transformer
-    }
-    ice_chunk_results = Parallel(n_jobs=n_jobs)(delayed(pdp_calc_utils._calc_ice_lines)
-                                                (_train_X[i: (i + data_chunk_size)].reset_index(drop=True),
-                                                 **ice_params) for i in range(0, len(_train_X), data_chunk_size))
+    true_n_jobs = np.min([num_units, n_jobs])
+
+    grid_results = Parallel(n_jobs=true_n_jobs)(
+        delayed(pdp_calc_utils._calc_ice_lines)(_train_X.copy(), model, classifier, model_features, n_classes,
+                                                feature, feature_type, feature_grids[i], display_columns[i],
+                                                predict_kwds, data_transformer) for i in range(len(feature_grids)))
+
+    if n_classes > 2:
+        ice_lines = []
+        for n_class in range(n_classes):
+            ice_line_n_class = pd.concat([grid_result[n_class] for grid_result in grid_results], axis=1)
+            ice_line_n_class = pd.concat([ice_line_n_class, _train_X[actual_columns],
+                                          _train_X['actual_preds_class_%d' % n_class]], axis=1)
+            ice_line_n_class = ice_line_n_class.rename(columns={'actual_preds_class_%d' % n_class: 'actual_preds'})
+            ice_lines.append(ice_line_n_class)
+    else:
+        ice_lines = pd.concat(grid_results, axis=1)
+        ice_lines = pd.concat([ice_lines, _train_X[actual_columns], _train_X['actual_preds']], axis=1)
 
     # check whether the results is for multi-class
     # combine the final results
     if n_classes > 2:
         pdp_isolate_out = {}
         for n_class in range(n_classes):
-            ice_lines = pd.concat([ice_chunk_result[n_class] for ice_chunk_result in ice_chunk_results], axis=0).reset_index(drop=True)
-            pdp = ice_lines[display_columns].mean().values
+            pdp = ice_lines[n_class][display_columns].mean().values
             pdp_isolate_out['class_%d' % n_class] = \
                 pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                 feature=feature, feature_type=feature_type, feature_grids=feature_grids,
-                                actual_columns=actual_columns, display_columns=display_columns, ice_lines=ice_lines, pdp=pdp)
+                                actual_columns=actual_columns, display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp)
     else:
-        ice_lines = pd.concat(ice_chunk_results, axis=0).reset_index(drop=True)
         pdp = ice_lines[display_columns].mean().values
         pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                           feature=feature, feature_type=feature_type, feature_grids=feature_grids,
@@ -338,7 +344,7 @@ class pdp_interact_obj:
 
 def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=['percentile', 'percentile'],
                  percentile_ranges=[None, None], grid_ranges=[None, None], cust_grid_points=[None, None],
-                 n_jobs=1, predict_kwds={}):
+                 memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None):
     """
     Calculate PDP interaction plot
 
@@ -358,10 +364,14 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
         a list of grid range to consider for each feature
     :param cust_grid_points: list, default=None
         a list of customized grid points
+    :param memory_limit: float, default=0.5
+        fraction of RAM can be used to do the calculation
     :param n_jobs: integer, default=1
         the number of jobs to run in parallel
     :param predict_kwds: dict, default={}
         keywords to be passed to the model's predict function
+    :param data_transformer: function
+        function to transform the data set as some features changing values
 
     :return:
         instance of pdp_interact_obj
@@ -375,10 +385,14 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
     # calculate pdp_isolate for each feature
     pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0],
                                    grid_type=grid_types[0], percentile_range=percentile_ranges[0],
-                                   grid_range=grid_ranges[0], cust_grid_points=cust_grid_points[0], n_jobs=n_jobs)
+                                   grid_range=grid_ranges[0], cust_grid_points=cust_grid_points[0],
+                                   memory_limit=memory_limit, n_jobs=n_jobs, predict_kwds=predict_kwds,
+                                   data_transformer=data_transformer)
     pdp_isolate_out2 = pdp_isolate(model, _train_X, features[1], num_grid_points=num_grid_points[1],
                                    grid_type=grid_types[1], percentile_range=percentile_ranges[1],
-                                   grid_range=grid_ranges[1], cust_grid_points=cust_grid_points[1], n_jobs=n_jobs)
+                                   grid_range=grid_ranges[1], cust_grid_points=cust_grid_points[1],
+                                   memory_limit=memory_limit, n_jobs=n_jobs, predict_kwds=predict_kwds,
+                                   data_transformer=data_transformer)
 
     # whether it is for multi-classes
     if type(pdp_isolate_out1) == dict:
@@ -402,30 +416,39 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
         else:
             feature_list.append(feat)
 
-    # do prediction chunk by chunk to save memory usage
-    grids_size = len(feature_grids[0]) * len(feature_grids[1])
-    data_chunk_size = int(_train_X.shape[0] / grids_size)
-    if data_chunk_size == 0:
-        data_chunk_size = _train_X.shape[0]
+    # new from here
+    # calculate memory usage
+    unit_memory = _train_X.memory_usage(deep=True).sum()
+    free_memory = psutil.virtual_memory()[1] * memory_limit
+    num_units = int(np.floor(free_memory / unit_memory))
 
-    # parallel get ice lines
-    ice_params = {
-        'model': model,
-        'classifier': classifier,
-        'model_features': model_features,
-        'n_classes': n_classes,
-        'features': features,
-        'feature_types': feature_types,
-        'feature_grids': feature_grids,
-        'feature_list': feature_list,
-        'predict_kwds': predict_kwds
-    }
-    ice_chunk_results = Parallel(n_jobs=n_jobs)(delayed(pdp_calc_utils._calc_ice_lines_inter)
-                                                (_train_X[i: (i + data_chunk_size)].reset_index(drop=True),
-                                                 **ice_params) for i in range(0, len(_train_X), data_chunk_size))
+    true_n_jobs = np.min([num_units, n_jobs])
 
-    ice_lines = pd.concat(ice_chunk_results, axis=0).reset_index(drop=True)
+    # create grid combination
+    grids1, grids2 = feature_grids
+    if feature_types[0] == 'onehot':
+        grids1 = range(len(grids1))
+    if feature_types[1] == 'onehot':
+        grids2 = range(len(grids2))
 
+    grids_combo_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
+    grids_combo1, grids_combo2 = grids_combo_temp[:, 0], grids_combo_temp[:, 1]
+    if feature_types[0] == 'onehot':
+        grids_combo1_temp = np.array(grids_combo1.T, dtype=np.int64)[0]
+        grids_combo1 = np.zeros((len(grids_combo1), len(grids1)), dtype=int)
+        grids_combo1[range(len(grids_combo1)), grids_combo1_temp] = 1
+    if feature_types[1] == 'onehot':
+        grids_combo2_temp = np.array(grids_combo2.T, dtype=np.int64)[0]
+        grids_combo2 = np.zeros((len(grids_combo2), len(grids2)), dtype=int)
+        grids_combo2[range(len(grids_combo2)), grids_combo2_temp] = 1
+
+    grids_combo = np.array(np.concatenate((grids_combo1, grids_combo2), axis=1))
+
+    grid_results = Parallel(n_jobs=true_n_jobs)(
+        delayed(pdp_calc_utils._calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes,
+                                                      feature_list, grids_combo[i], predict_kwds, data_transformer) for i in range(len(grids_combo)))
+
+    ice_lines = pd.concat(grid_results, axis=0).reset_index(drop=True)
     pdp = ice_lines.groupby(feature_list, as_index=False).mean()
 
     if n_classes > 2:
@@ -436,7 +459,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
                                  features=features, feature_types=feature_types, feature_grids=feature_grids,
                                  pdp_isolate_out1=pdp_isolate_out1['class_%d' % n_class],
                                  pdp_isolate_out2=pdp_isolate_out2['class_%d' % n_class],
-                                 pdp=pdp[feature_list + ['class_%d_preds' % n_class]].rename(columns={'class_%d_preds' % n_class: 'preds'}))
+                                 pdp=pdp[feature_list + ['class_%d_preds' % n_class]].rename(
+                                     columns={'class_%d_preds' % n_class: 'preds'}))
     else:
         pdp_interact_out = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                             features=features, feature_types=feature_types, feature_grids=feature_grids,

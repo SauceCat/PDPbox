@@ -39,63 +39,18 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
     return np.array([round(val, 2) for val in grids])
 
 
-def _make_ice_data(data, feature, feature_type, feature_grids, data_transformer):
-    """
-    Prepare data for calculating ice lines
-
-    :param data: chunk of data to calculate on
-    :param feature: column name of the feature
-    :param feature_type: type of the feature
-    :param feature_grids: array of grids to calculate on
-    :param data_transformer: function
-        function to transform the data set as some features changing values
-
-    :return:
-        the extended data chunk (extended by feature_grids)
-    """
-
-    ice_data = pd.DataFrame(np.repeat(data.values, feature_grids.size, axis=0), columns=data.columns)
-
+def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
+                    feature_grid, display_column, predict_kwds, data_transformer):
     if feature_type == 'onehot':
-        for i, col in enumerate(feature):
-            col_value = [0] * feature_grids.size
-            col_value[i] = 1
-            ice_data[col] = np.tile(col_value, data.shape[0])
+        other_grids = list(set(feature) - set([feature_grid]))
+        data[feature_grid] = 1
+        for grid in other_grids:
+            data[grid] = 0
     else:
-        ice_data[feature] = np.tile(feature_grids, data.shape[0])
+        data[feature] = feature_grid
 
-    # we can add transformer here
     if data_transformer is not None:
-        ice_data = data_transformer(ice_data)
-
-    return ice_data
-
-
-def _calc_ice_lines(data_chunk, model, classifier, model_features, n_classes, feature, feature_type,
-                    feature_grids, display_columns, actual_columns, predict_kwds, data_transformer):
-    """
-    Calculate ice lines
-
-    :param data_chunk: chunk of data to calculate on
-    :param model: the fitted model
-    :param classifier: whether the model is a classifier
-    :param model_features: features used by the model
-    :param n_classes: number of classes if it is a classifier
-    :param feature: column name of the feature
-    :param feature_type: type of the feature
-    :param feature_grids: array of grids to calculate on
-    :param display_columns: column names to display
-    :param actual_columns: column names of the actual values
-    :param predict_kwds: other parameters pass to the predictor
-    :param data_transformer: function
-        function to transform the data set as some features changing values
-
-    :return:
-        a dataframe (or a list of dataframes, when it is multi-class problem) of calculated ice lines
-        each row in a dataframe represents one line
-    """
-
-    ice_chunk = _make_ice_data(data_chunk[model_features], feature, feature_type, feature_grids, data_transformer)
+        data = data_transformer(data)
 
     if classifier:
         predict = model.predict_proba
@@ -103,32 +58,20 @@ def _calc_ice_lines(data_chunk, model, classifier, model_features, n_classes, fe
         predict = model.predict
 
     # get predictions for this chunk
-    preds = predict(ice_chunk[model_features], **predict_kwds)
+    preds = predict(data[model_features], **predict_kwds)
 
-    # if it is multi-class problem, the return result is a list of dataframes
-    # display_columns are columns for pdp predictions
     if n_classes > 2:
-        ice_chunk_results = []
+        grid_results = []
         for n_class in range(n_classes):
-            ice_chunk_result = pd.DataFrame(preds[:, n_class].reshape((data_chunk.shape[0], feature_grids.size)),
-                                            columns=display_columns)
-            ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
-            ice_chunk_result['actual_preds'] = data_chunk['actual_preds_class_%d' % n_class].values
-            ice_chunk_results.append(ice_chunk_result)
+            grid_result = pd.DataFrame(preds[:, n_class], columns=[display_column])
+            grid_results.append(grid_result)
     else:
         if classifier:
-            ice_chunk_result = pd.DataFrame(preds[:, 1].reshape((data_chunk.shape[0], feature_grids.size)),
-                                            columns=display_columns)
+            grid_results = pd.DataFrame(preds[:, 1], columns=[display_column])
         else:
-            ice_chunk_result = pd.DataFrame(preds.reshape((data_chunk.shape[0], feature_grids.size)),
-                                            columns=display_columns)
-        ice_chunk_result = pd.concat([ice_chunk_result, data_chunk[actual_columns]], axis=1)
-        ice_chunk_result['actual_preds'] = data_chunk['actual_preds'].values
+            grid_results = pd.DataFrame(preds, columns=[display_column])
 
-    if n_classes > 2:
-        return ice_chunk_results
-    else:
-        return ice_chunk_result
+    return grid_results
 
 
 def _sample_data(ice_lines, frac_to_plot):
@@ -181,43 +124,9 @@ def _find_closest(x, feature_grids):
     return values.index(min(values, key=lambda y: abs(y-x)))
 
 
-def _make_ice_data_inter(data, features, feature_types, feature_grids):
-    """
-    Prepare data for calculating interaction ice lines
+def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
+                          feature_grids_combo, predict_kwds, data_transformer):
 
-    :param data: chunk of data to calculate on
-    :param features: feature column names
-    :param feature_types: feature types
-    :param feature_grids: feature grids
-
-    :return:
-        the extended data chunk (extended by feature grids)
-    """
-
-    grids_size = len(feature_grids[0]) * len(feature_grids[1])
-    ice_data = pd.DataFrame(np.repeat(data.values, grids_size, axis=0), columns=data.columns)
-
-    if feature_types[0] == 'onehot':
-        for i, col in enumerate(features[0]):
-            col_value = [0] * feature_grids[0].size
-            col_value[i] = 1
-            ice_data[col] = np.tile(col_value, data.shape[0] * feature_grids[1].size)
-    else:
-        ice_data[features[0]] = np.tile(feature_grids[0], data.shape[0] * feature_grids[1].size)
-
-    if feature_types[1] == 'onehot':
-        for i, col in enumerate(features[1]):
-            col_value = [0] * feature_grids[1].size
-            col_value[i] = 1
-            ice_data[col] = np.tile(np.repeat(col_value, feature_grids[0].size, axis=0), data.shape[0])
-    else:
-        ice_data[features[1]] = np.tile(np.repeat(feature_grids[1], feature_grids[0].size, axis=0), data.shape[0])
-
-    return ice_data
-
-
-def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_classes, features, feature_types,
-                          feature_grids, feature_list, predict_kwds):
     """
     Calculate interaction ice lines
 
@@ -236,23 +145,27 @@ def _calc_ice_lines_inter(data_chunk, model, classifier, model_features, n_class
         a dataframe containing changing feature values and corresponding predictions
     """
 
-    ice_chunk = _make_ice_data_inter(data_chunk[model_features], features, feature_types, feature_grids)
+    for idx in range(len(feature_list)):
+        data[feature_list[idx]] = feature_grids_combo[idx]
+
+    if data_transformer is not None:
+        data = data_transformer(data)
 
     if classifier:
         predict = model.predict_proba
     else:
         predict = model.predict
 
-    preds = predict(ice_chunk[model_features], **predict_kwds)
-    result_chunk = ice_chunk[feature_list].copy()
+    preds = predict(data[model_features], **predict_kwds)
+    result = data[feature_list].copy()
 
     if n_classes > 2:
         for n_class in range(n_classes):
-            result_chunk['class_%d_preds' % (n_class)] = preds[:, n_class]
+            result['class_%d_preds' % n_class] = preds[:, n_class]
     else:
         if classifier:
-            result_chunk['preds'] = preds[:, 1]
+            result['preds'] = preds[:, 1]
         else:
-            result_chunk['preds'] = preds
+            result['preds'] = preds
 
-    return result_chunk
+    return result
