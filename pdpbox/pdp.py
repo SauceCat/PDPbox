@@ -140,11 +140,14 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
                 if np.min(grid_range) < np.min(_train_X[feature].values) \
                         or np.max(grid_range) > np.max(_train_X[feature].values):
                     warnings.warn('grid_range: out of bound.')
-            feature_grids = pdp_calc_utils._get_grids(_train_X[feature].values, num_grid_points, grid_type,
-                                                      percentile_range, grid_range)
+            feature_grids, percentile_info = pdp_calc_utils._get_grids(_train_X[feature].values, num_grid_points, grid_type,
+                                                                       percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
+
         display_columns = feature_grids
+        if percentile_info is not None:
+            display_columns = [str(feature_grids[i]) + '\n' + str(percentile_info[i]) for i in range(len(percentile_info))]
 
     # get the actual prediction and actual values
     actual_columns = []
@@ -177,8 +180,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
         delayed(pdp_calc_utils._calc_ice_lines)(_train_X.copy(), model, classifier, model_features, n_classes,
-                                                feature, feature_type, feature_grids[i], display_columns[i],
-                                                predict_kwds, data_transformer) for i in range(len(feature_grids)))
+                                                feature, feature_type, feature_grids[i], predict_kwds,
+                                                data_transformer) for i in range(len(feature_grids)))
 
     if n_classes > 2:
         ice_lines = []
@@ -197,13 +200,13 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     if n_classes > 2:
         pdp_isolate_out = {}
         for n_class in range(n_classes):
-            pdp = ice_lines[n_class][display_columns].mean().values
+            pdp = ice_lines[n_class][feature_grids].mean().values
             pdp_isolate_out['class_%d' % n_class] = \
                 pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                 feature=feature, feature_type=feature_type, feature_grids=feature_grids,
                                 actual_columns=actual_columns, display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp)
     else:
-        pdp = ice_lines[display_columns].mean().values
+        pdp = ice_lines[feature_grids].mean().values
         pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                           feature=feature, feature_type=feature_type, feature_grids=feature_grids,
                                           actual_columns=actual_columns, display_columns=display_columns,

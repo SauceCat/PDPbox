@@ -60,7 +60,7 @@ def _axis_modify(font_family, ax):
     for tick in ax.get_yticklabels():
         tick.set_fontname(font_family)
 
-    ax.tick_params(axis='both', which='major', labelsize=8, labelcolor='#424242', colors='#9E9E9E')
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
     ax.set_facecolor('white')
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
@@ -117,16 +117,17 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
     ax.set_xlabel(feature_name, fontsize=10)
 
     feature_type = pdp_isolate_out.feature_type
+    feature_grids = pdp_isolate_out.feature_grids
     display_columns = pdp_isolate_out.display_columns
     actual_columns = pdp_isolate_out.actual_columns
 
     if feature_type == 'binary' or feature_type == 'onehot' or x_quantile:
-        x = range(len(display_columns))
+        x = range(len(feature_grids))
         ax.set_xticks(x)
         ax.set_xticklabels(display_columns, rotation=xticks_rotation)
     else:
         # for numeric feature
-        x = display_columns
+        x = feature_grids
 
     ice_lines = copy.deepcopy(pdp_isolate_out.ice_lines)
     pdp_y = copy.deepcopy(pdp_isolate_out.pdp)
@@ -139,20 +140,20 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
     # whether to center the plot
     if center:
         pdp_y -= pdp_y[0]
-        for col in display_columns[1:]:
-            ice_lines[col] -= ice_lines[display_columns[0]]
-        ice_lines['actual_preds'] -= ice_lines[display_columns[0]]
-        ice_lines[display_columns[0]] = 0
+        for col in feature_grids[1:]:
+            ice_lines[col] -= ice_lines[feature_grids[0]]
+        ice_lines['actual_preds'] -= ice_lines[feature_grids[0]]
+        ice_lines[feature_grids[0]] = 0
 
     if cluster or plot_lines:
         std_fill = False
         pdp_hl = True
         if cluster:
-            _ice_cluster_plot(x=x, ice_lines=ice_lines, display_columns=display_columns, n_cluster_centers=n_cluster_centers,
+            _ice_cluster_plot(x=x, ice_lines=ice_lines, feature_grids=feature_grids, n_cluster_centers=n_cluster_centers,
                               cluster_method=cluster_method, ax=ax, plot_params=plot_params)
         else:
             ice_plot_data = pdp_calc_utils._sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
-            _ice_line_plot(x=x, ice_plot_data=ice_plot_data, display_columns=display_columns, ax=ax, plot_params=plot_params)
+            _ice_line_plot(x=x, ice_plot_data=ice_plot_data, feature_grids=feature_grids, ax=ax, plot_params=plot_params)
 
     if plot_org_pts:
         ice_lines_temp = ice_lines.copy()
@@ -173,7 +174,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
         ice_plot_data_pts = pdp_calc_utils._sample_data(ice_lines=ice_lines_temp, frac_to_plot=frac_to_plot)
         _ice_plot_pts(ice_plot_data_pts=ice_plot_data_pts, ax=ax, plot_params=plot_params)
 
-    std = ice_lines[display_columns].std().values
+    std = ice_lines[feature_grids].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=ax, plot_params=plot_params)
 
 
@@ -258,13 +259,12 @@ def _ice_plot_pts(ice_plot_data_pts, ax, plot_params):
                color=ice_plot_data_pts['color'])
 
 
-def _ice_line_plot(x, ice_plot_data, display_columns, ax, plot_params):
+def _ice_line_plot(x, ice_plot_data, feature_grids, ax, plot_params):
     """
     Plot the ice lines
 
     :param x: x axis values
     :param ice_plot_data: ice lines to plot
-    :param display_columns: column names to display
     :param ax: axes to plot on
     :param plot_params: dictionary of plot config
     """
@@ -280,17 +280,16 @@ def _ice_line_plot(x, ice_plot_data, display_columns, ax, plot_params):
     colors = plt.get_cmap(line_cmap)(np.linspace(0, 1, 20))[5:15]
 
     for i in range(len(ice_plot_data)):
-        y = list(ice_plot_data[display_columns].iloc[i].values)
+        y = list(ice_plot_data[feature_grids].iloc[i].values)
         ax.plot(x, y, linewidth=linewidth, c=colors[i % 10], alpha=linealpha)
 
 
-def _ice_cluster_plot(x, ice_lines, display_columns, n_cluster_centers, cluster_method, ax, plot_params):
+def _ice_cluster_plot(x, ice_lines, feature_grids, n_cluster_centers, cluster_method, ax, plot_params):
     """
     Cluster the ice lines and plot out the cluster centers
 
     :param x: x axis values
     :param ice_lines: ice lines
-    :param display_columns: column names to display
     :param n_cluster_centers: number of cluster centers
     :param cluster_method: cluster method
     :param ax: axes to plot on
@@ -302,8 +301,8 @@ def _ice_cluster_plot(x, ice_lines, display_columns, n_cluster_centers, cluster_
     else:
         kmeans = KMeans(n_clusters=n_cluster_centers, random_state=0, n_jobs=1)
 
-    kmeans.fit(ice_lines[display_columns])
-    cluster_plot_data = pd.DataFrame(kmeans.cluster_centers_, columns=display_columns)
+    kmeans.fit(ice_lines[feature_grids])
+    cluster_plot_data = pd.DataFrame(kmeans.cluster_centers_, columns=feature_grids)
 
     cluster_cmap = 'Blues'
 
@@ -314,7 +313,7 @@ def _ice_cluster_plot(x, ice_lines, display_columns, n_cluster_centers, cluster_
     colors = plt.get_cmap(cluster_cmap)(np.linspace(0, 1, 20))[5:15]
 
     for i in range(len(cluster_plot_data)):
-        y = list(cluster_plot_data[display_columns].iloc[i].values)
+        y = list(cluster_plot_data[feature_grids].iloc[i].values)
         ax.plot(x, y, linewidth=1, c=colors[i % 10])
 
 

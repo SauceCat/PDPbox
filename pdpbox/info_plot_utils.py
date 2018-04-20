@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 import copy
-import pdp_plot_utils, pdp_calc_utils
+from pdp_plot_utils import _axis_modify
+from pdp_calc_utils import _get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual, _find_closest
 
 
 def _actual_plot_title(feature_name, ax, figsize, multi_flag, which_class, plot_params):
@@ -93,8 +94,8 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
         if 'xticks_rotation' in plot_params.keys():
             xticks_rotation = plot_params['xticks_rotation']
 
-    pdp_plot_utils._axis_modify(font_family, ax1)
-    pdp_plot_utils._axis_modify(font_family, ax2)
+    _axis_modify(font_family, ax1)
+    _axis_modify(font_family, ax2)
 
     df = copy.deepcopy(pdp_isolate_out.ice_lines)
     actual_columns = pdp_isolate_out.actual_columns
@@ -104,12 +105,12 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
     if pdp_isolate_out.feature_type == 'binary':
         df['x'] = df[actual_columns[0]]
     elif pdp_isolate_out.feature_type == 'onehot':
-        df['x'] = df[actual_columns].apply(lambda x: pdp_calc_utils._find_onehot_actual(x), axis=1)
+        df['x'] = df[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
         df = df[df['x'].isnull() == False].reset_index(drop=True)
     else:
         df = df[(df[actual_columns[0]] >= feature_grids[0])
                 & (df[actual_columns[0]] <= feature_grids[-1])].reset_index(drop=True)
-        df['x'] = df[actual_columns[0]].apply(lambda x: pdp_calc_utils._find_closest(x, feature_grids))
+        df['x'] = df[actual_columns[0]].apply(lambda x: _find_closest(x, feature_grids))
 
     pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
     pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
@@ -137,43 +138,61 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
     _autolabel(rects, ax2, barcolor)
 
 
-def _autolabel(rects, ax, barcolor):
+def _autolabel(rects, ax, bar_color):
     """
     Attach a text label above each bar displaying its height
     """
     for rect in rects:
         height = rect.get_height()
-        bbox_props = {'facecolor': 'white', 'edgecolor': barcolor, 'boxstyle': "square,pad=0.5"}
+        bbox_props = {'facecolor': 'white', 'edgecolor': bar_color, 'boxstyle': "square,pad=0.5"}
         ax.text(rect.get_x() + rect.get_width() / 2., height, '%d' % int(height),
-                ha='center', va='center', bbox=bbox_props, color=barcolor, weight='bold')
+                ha='center', va='center', bbox=bbox_props, color=bar_color)
 
 
-def _target_plot_title(feature_name, ax, figsize, plot_params):
+def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
+                    grid_range, cust_grid_points):
+    display_columns = []
+    data_x = data.copy()
+    if feature_type == 'binary':
+        feature_grids = display_columns = np.array([0, 1])
+        data_x['x'] = data_x[feature]
+    if feature_type == 'numeric':
+        percentile_info = None
+        if cust_grid_points is None:
+            feature_grids, percentile_info = _get_grids(data_x[feature], num_grid_points, grid_type, percentile_range, grid_range)
+        else:
+            feature_grids = np.array(sorted(cust_grid_points))
+
+        data_x = data_x[(data_x[feature] >= feature_grids[0])
+                        & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
+        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x, feature_grids))
+        display_columns = _make_bucket_column_names(feature_grids, percentile_info)
+
+    if feature_type == 'onehot':
+        feature_grids = display_columns = np.array(feature)
+        data_x['x'] = data_x[feature].apply(lambda x: _find_onehot_actual(x), axis=1)
+        data_x = data_x[~data_x['x'].isnull()].reset_index(drop=True)
+
+    return data_x, display_columns
+
+
+def _target_plot_title(feature_name, ax, plot_params):
     """
     Draw target plot title
 
     :param feature_name: feature name
     :param ax: axes to plot on
-    :param figsize: figure size
     :param plot_params: values of plot parameters
     """
 
-    font_family = 'Arial'
-    title = 'Real target plot for %s' % feature_name
-    subtitle = 'Each point is clustered to the closest grid point.'
+    if plot_params is None:
+        plot_params = dict()
 
-    title_fontsize = 15
-    subtitle_fontsize = 12
-
-    if plot_params is not None:
-        if 'font_family' in plot_params.keys():
-            font_family = plot_params['font_family']
-        if 'title' in plot_params.keys():
-            title = plot_params['title']
-        if 'title_fontsize' in plot_params.keys():
-            title_fontsize = plot_params['title_fontsize']
-        if 'subtitle_fontsize' in plot_params.keys():
-            subtitle_fontsize = plot_params['subtitle_fontsize']
+    font_family = plot_params.get('font_family', 'Arial')
+    title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
+    subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
+    title_fontsize = plot_params.get('title_fontsize', 15)
+    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
 
     ax.set_facecolor('white')
     ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
@@ -181,82 +200,76 @@ def _target_plot_title(feature_name, ax, figsize, plot_params):
     ax.axis('off')
 
 
-def _target_plot(feature_name, feature_grids, target, bar_counts_gp, target_lines, figsize, plot_params):
+def _target_plot(feature_name, display_columns, target, bar_data, target_lines, figsize, plot_params):
     """
     Plot target distribution through feature grids
 
     :param feature_name: feature name
-    :param feature_grids: feature grids
+    :param display_columns: column names to display
     :param target: target columns
-    :param bar_counts_gp: bar counts data
+    :param bar_data: bar counts data
     :param target_lines: target lines data
     :param figsize: figure size
     :param plot_params: values of plot parameters
     """
 
-    if figsize is None:
-        figwidth = 16
-        figheight = 7
-    else:
-        figwidth = figsize[0]
-        figheight = figsize[1]
+    width, height = 16, 7
+    if figsize is not None:
+        width, height = figsize
 
-    font_family = 'Arial'
-    linecolor = '#1A4E5D'
-    barcolor = '#5BB573'
-    linewidth = 2
-    xticks_rotation = 0
+    if plot_params is None:
+        plot_params = dict()
 
-    if plot_params is not None:
-        if 'font_family' in plot_params.keys():
-            font_family = plot_params['font_family']
-        if 'linecolor' in plot_params.keys():
-            linecolor = plot_params['linecolor']
-        if 'barcolor' in plot_params.keys():
-            barcolor = plot_params['barcolor']
-        if 'linewidth' in plot_params.keys():
-            linewidth = plot_params['linewidth']
-        if 'xticks_rotation' in plot_params.keys():
-            xticks_rotation = plot_params['xticks_rotation']
+    font_family = plot_params.get('font_family', 'Arial')
+    line_color = plot_params.get('line_color', '#1A4E5D')
+    bar_color = plot_params.get('bar_color', '#5BB573')
+    line_width = plot_params.get('line_width', 1)
+    xticks_rotation = plot_params.get('xticks_rotation', 0)
 
-    plt.figure(figsize=(figwidth, figwidth / 6.7))
-    ax1 = plt.subplot(111)
-    _target_plot_title(feature_name=feature_name, ax=ax1, figsize=figsize, plot_params=plot_params)
+    # graph title
+    plt.figure(figsize=(width, width / 6.7))
+    title_ax = plt.subplot(111)
+    _target_plot_title(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
 
-    boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
-    plt.figure(figsize=(figwidth, figheight))
-    ax1 = plt.subplot(111)
-    rects = ax1.bar(bar_counts_gp['x'], bar_counts_gp['fake_count'], width=boxwith, color=barcolor, alpha=0.5)
-    ax1.set_xlabel(feature_name)
-    ax1.set_ylabel('count')
-    plt.xticks(range(len(feature_grids)), feature_grids, rotation=xticks_rotation)
-    _autolabel(rects, ax1, barcolor)
+    # bar plot
+    plt.figure(figsize=(width, height))
+    bar_ax = plt.subplot(111)
+    box_width = np.min([0.5, 0.5 / (10.0 / len(display_columns))])
 
-    ax2 = ax1.twinx()
+    rects = bar_ax.bar(bar_data['x'], bar_data['fake_count'], width=box_width, color=bar_color, alpha=0.5)
+    bar_ax.set_xlabel(feature_name)
+    bar_ax.set_ylabel('count')
+
+    plt.xticks(range(len(display_columns)), display_columns, rotation=xticks_rotation)
+    plt.xlim(-0.5, len(display_columns) - 0.5)
+    _autolabel(rects, bar_ax, bar_color)
+    _axis_modify(font_family, bar_ax)
+
+    # target lines
+    line_ax = bar_ax.twinx()
     if len(target_lines) == 1:
-        target_line = target_lines[0]
-        ax2.plot(target_line['x'], target_line[target], linewidth=linewidth, c=linecolor, marker='o')
-        for idx in range(target_line.shape[0]):
-            bbox_props = {'facecolor': linecolor, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
-            ax2.text(idx, target_line.iloc[idx][target], '%.3f' % (round(target_line.iloc[idx][target], 3)),
-                     ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
+        target_line = target_lines[0].sort_values('x', ascending=True).set_index('x')
+        line_ax.plot(target_line.index.values, target_line[target], linewidth=line_width, c=line_color, marker='o')
+        for idx in target_line.index.values:
+            bbox_props = {'facecolor': line_color, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
+            line_ax.text(idx, target_line.loc[idx, target], '%.3f' % target_line.loc[idx, target],
+                         ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff')
     else:
-        linecolors = plt.get_cmap('tab10')(range(10))
+        line_colors = plt.get_cmap('tab20')(range(20))
         for target_idx in range(len(target)):
-            linecolor = linecolors[target_idx]
-            target_line = target_lines[target_idx]
-            ax2.plot(target_line['x'], target_line[target[target_idx]], linewidth=linewidth, c=linecolor, marker='o',
-                     label=target[target_idx])
-            for idx in range(target_line.shape[0]):
-                bbox_props = {'facecolor': linecolor, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
-                ax2.text(idx, target_line.iloc[idx][target[target_idx]],
-                         '%.3f' % (round(target_line.iloc[idx][target[target_idx]], 3)),
-                         ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff', weight='bold')
-            plt.legend()
+            line_color = line_colors[target_idx]
+            target_line = target_lines[target_idx].sort_values('x', ascending=True).set_index('x')
+            line_ax.plot(target_line.index.values, target_line[target[target_idx]], linewidth=line_width,
+                         c=line_color, marker='o', label=target[target_idx])
+            for idx in target_line.index.values:
+                bbox_props = {'facecolor': line_color, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
+                line_ax.text(idx, target_line.loc[idx, target[target_idx]],
+                             '%.3f' % target_line.loc[idx, target[target_idx]],
+                             ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff')
+            plt.legend(loc="upper left", ncol=5, bbox_to_anchor=(0, 1.2), frameon=False)
 
-    pdp_plot_utils._axis_modify(font_family, ax2)
-    ax2.get_yaxis().tick_right()
-    ax2.grid(False)
-    ax2.set_ylabel('target_avg')
+    _axis_modify(font_family, line_ax)
+    line_ax.get_yaxis().tick_right()
+    line_ax.grid(False)
+    line_ax.set_ylabel('target_avg')
 
-    pdp_plot_utils._axis_modify(font_family, ax1)

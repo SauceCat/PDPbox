@@ -1,10 +1,10 @@
-import pandas as pd
+
 import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-import info_plot_utils, pdp_calc_utils
+from info_plot_utils import _target_plot, _prepare_data_x, _actual_plot, _actual_plot_title
 
 
 def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
@@ -43,7 +43,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
     if type(pdp_isolate_out) == dict and not multi_flag:
         n_classes = len(pdp_isolate_out.keys())
-        info_plot_utils._actual_plot_title(feature_name=feature_name, ax=ax1, figsize=figsize,
+        _actual_plot_title(feature_name=feature_name, ax=ax1, figsize=figsize,
                                            multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
 
         if ncols is None:
@@ -54,7 +54,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
         outer = GridSpec(nrows, ncols, wspace=0.2, hspace=0.2)
 
         for n_class in range(n_classes):
-            info_plot_utils._actual_plot(pdp_isolate_out=pdp_isolate_out['class_%d' % n_class],
+            _actual_plot(pdp_isolate_out=pdp_isolate_out['class_%d' % n_class],
                                          feature_name=feature_name + ' class_%d' % n_class,
                                          figwidth=figwidth, plot_params=plot_params, outer=outer[n_class])
     else:
@@ -63,10 +63,10 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
         else:
             _pdp_isolate_out = pdp_isolate_out
 
-        info_plot_utils._actual_plot_title(feature_name=feature_name, ax=ax1,
+        _actual_plot_title(feature_name=feature_name, ax=ax1,
                                            figsize=figsize, multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
 
-        info_plot_utils._actual_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name,
+        _actual_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name,
                                      figwidth=figwidth, plot_params=plot_params, outer=None)
 
 
@@ -100,14 +100,10 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         values of plot parameters
     """
 
-    # check input dataset
-    if type(df) != pd.core.frame.DataFrame:
-        raise ValueError('df: only accept pandas DataFrame')
-
     # check feature
     if type(feature) == str:
         if feature not in df.columns.values:
-            raise ValueError('feature does not exist: %s' % (feature))
+            raise ValueError('feature does not exist: %s' % feature)
         if sorted(list(np.unique(df[feature]))) == [0, 1]:
             feature_type = 'binary'
         else:
@@ -116,7 +112,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         if len(feature) < 2:
             raise ValueError('one-hot encoding feature should contain more than 1 element')
         if not set(feature) < set(df.columns.values):
-            raise ValueError('feature does not exist: %s' % (str(feature)))
+            raise ValueError('feature does not exist: %s' % str(feature))
         feature_type = 'onehot'
     else:
         raise ValueError('feature: please pass a string or a list (for onehot encoding feature)')
@@ -128,14 +124,10 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
             raise ValueError('percentile_range: should be between 0 and 100')
 
-    # check cust_grid_points
-    if (feature_type != 'numeric') and (cust_grid_points is not None):
-        raise ValueError('only numeric feature can accept cust_grid_points')
-
     # check target values and calculate target rate through feature grids
     if type(target) == str:
         if target not in df.columns.values:
-            raise ValueError('target does not exist: %s' % (target))
+            raise ValueError('target does not exist: %s' % target)
         if sorted(list(np.unique(df[target]))) == [0, 1]:
             target_type = 'binary'
         else:
@@ -164,39 +156,27 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         useful_features.append(target)
 
     # prepare data for bar plot
-    bar_counts = df[useful_features].copy()
-    if feature_type == 'binary':
-        feature_grids = np.array([0, 1])
-        bar_counts['x'] = bar_counts[feature]
-    if feature_type == 'numeric':
-        if cust_grid_points is None:
-            feature_grids = pdp_calc_utils._get_grids(df[feature], num_grid_points, grid_type,
-                                                      percentile_range, grid_range)
-        else:
-            feature_grids = np.array(sorted(cust_grid_points))
-        bar_counts = bar_counts[(bar_counts[feature] >= feature_grids[0])
-                                & (bar_counts[feature] <= feature_grids[-1])].reset_index(drop=True)
-        bar_counts['x'] = bar_counts[feature].apply(lambda x: pdp_calc_utils._find_closest(x, feature_grids))
-    if feature_type == 'onehot':
-        feature_grids = np.array(feature)
-        bar_counts['x'] = bar_counts[feature].apply(lambda x: pdp_calc_utils._find_onehot_actual(x), axis=1)
-        bar_counts = bar_counts[bar_counts['x'].isnull() == False].reset_index(drop=True)
+    data = df[useful_features].copy()
+    data_x, display_columns = _prepare_data_x(feature=feature, feature_type=feature_type, data=data,
+                                              num_grid_points=num_grid_points, grid_type=grid_type,
+                                              percentile_range=percentile_range, grid_range=grid_range,
+                                              cust_grid_points=cust_grid_points)
 
-    bar_counts['fake_count'] = 1
-    bar_counts_gp = bar_counts.groupby('x', as_index=False).agg({'fake_count': 'count'})
+    data_x['fake_count'] = 1
+    bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'})
 
     # prepare data for target lines
     target_lines = []
     if target_type in ['binary', 'regression']:
-        target_line = bar_counts.groupby('x', as_index=False).agg({target: 'mean'})
+        target_line = data_x.groupby('x', as_index=False).agg({target: 'mean'})
         target_lines.append(target_line)
     else:
         for target_idx in range(len(target)):
-            target_line = bar_counts.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
+            target_line = data_x.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
             target_lines.append(target_line)
 
-    info_plot_utils._target_plot(feature_name=feature_name, feature_grids=feature_grids, target=target,
-                                 bar_counts_gp=bar_counts_gp, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
+    _target_plot(feature_name=feature_name, display_columns=display_columns, target=target,
+                 bar_data=bar_data, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
 
 
 
