@@ -1,4 +1,7 @@
 
+import pdp_calc_utils
+import pdp_plot_utils
+
 import pandas as pd
 import numpy as np
 
@@ -6,12 +9,10 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 from joblib import Parallel, delayed
+import psutil
 
 import warnings
 warnings.filterwarnings('ignore')
-
-import pdp_calc_utils, pdp_plot_utils
-import psutil
 
 
 class pdp_isolate_obj:
