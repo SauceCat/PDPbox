@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-from sklearn.externals.joblib import Parallel, delayed
+from joblib import Parallel, delayed
 
 import warnings
 warnings.filterwarnings('ignore')
