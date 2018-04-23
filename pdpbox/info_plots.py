@@ -71,7 +71,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
-                percentile_range=None, grid_range=None, cust_grid_points=None, figsize=None, plot_params=None):
+                percentile_range=None, grid_range=None, cust_grid_points=None, figsize=None, ax=None, plot_params=None):
     """
     Plot target distribution through feature grids
 
@@ -94,6 +94,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         value range to consider for numeric features
     :param cust_grid_points: list, default=None
         customized grid points
+    :param ax:
     :param figsize: (width, height), default=None
         figure size
     :param plot_params: dict, default=None
@@ -175,8 +176,9 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
             target_line = data_x.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
             target_lines.append(target_line)
 
-    _target_plot(feature_name=feature_name, display_columns=display_columns, target=target,
-                 bar_data=bar_data, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
+    axes = _target_plot(feature_name=feature_name, display_columns=display_columns, target=target,
+                        bar_data=bar_data, target_lines=target_lines, figsize=figsize, ax=ax, plot_params=plot_params)
+    return axes
 
 
 

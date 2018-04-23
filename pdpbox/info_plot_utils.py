@@ -200,7 +200,23 @@ def _target_plot_title(feature_name, ax, plot_params):
     ax.axis('off')
 
 
-def _target_plot(feature_name, display_columns, target, bar_data, target_lines, figsize, plot_params):
+def _target_plot_title_ax(feature_name, ax, plot_params):
+
+    if plot_params is None:
+        plot_params = dict()
+
+    font_family = plot_params.get('font_family', 'Arial')
+    title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
+    subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
+    title_fontsize = plot_params.get('title_fontsize', 12)
+    subtitle_fontsize = plot_params.get('subtitle_fontsize', 10)
+
+    ax.set_title(title + '\n', fontdict={'fontsize': title_fontsize, 'fontname': font_family})
+    ax.text(np.mean(ax.get_xlim()), ax.get_ylim()[1], subtitle, fontsize=subtitle_fontsize, fontname=font_family,
+            color='grey', va='bottom', ha='center')
+
+
+def _target_plot(feature_name, display_columns, target, bar_data, target_lines, figsize, ax, plot_params):
     """
     Plot target distribution through feature grids
 
@@ -210,6 +226,7 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     :param bar_data: bar counts data
     :param target_lines: target lines data
     :param figsize: figure size
+    :param ax:
     :param plot_params: values of plot parameters
     """
 
@@ -227,13 +244,19 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
     # graph title
-    plt.figure(figsize=(width, width / 6.7))
-    title_ax = plt.subplot(111)
-    _target_plot_title(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
+    if ax is None:
+        plt.figure(figsize=(width, width / 6.7))
+        title_ax = plt.subplot(111)
+        _target_plot_title(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
+
+        plt.figure(figsize=(width, height))
+        bar_ax = plt.subplot(111)
+        line_ax = bar_ax.twinx()
+    else:
+        title_ax = bar_ax = ax
+        line_ax = ax.twinx()
 
     # bar plot
-    plt.figure(figsize=(width, height))
-    bar_ax = plt.subplot(111)
     box_width = np.min([0.5, 0.5 / (10.0 / len(display_columns))])
 
     rects = bar_ax.bar(bar_data['x'], bar_data['fake_count'], width=box_width, color=bar_color, alpha=0.5)
@@ -246,7 +269,7 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     _axis_modify(font_family, bar_ax)
 
     # target lines
-    line_ax = bar_ax.twinx()
+
     if len(target_lines) == 1:
         target_line = target_lines[0].sort_values('x', ascending=True).set_index('x')
         line_ax.plot(target_line.index.values, target_line[target], linewidth=line_width, c=line_color, marker='o')
@@ -272,4 +295,11 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     line_ax.get_yaxis().tick_right()
     line_ax.grid(False)
     line_ax.set_ylabel('target_avg')
+
+    if ax is None:
+        return [title_ax, bar_ax, line_ax]
+    else:
+        _target_plot_title_ax(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
+        _axis_modify(font_family, ax)
+        return ax
 
