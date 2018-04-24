@@ -62,15 +62,32 @@ def _axis_modify(font_family, ax):
 
     ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
     ax.set_facecolor('white')
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+
+    for d in ['top', 'bottom', 'right', 'left']:
+        ax.spines[d].set_visible(False)
 
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
     ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
     ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
+
+
+def _axis_modify_top(font_family, ax):
+    """
+    Modify axes
+    """
+
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
+    ax.set_facecolor('white')
+    for d in ['top', 'bottom', 'right', 'left']:
+        ax.spines[d].set_visible(False)
+
+    ax.get_xaxis().tick_top()
 
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, frac_to_plot,

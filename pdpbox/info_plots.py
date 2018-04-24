@@ -71,35 +71,51 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
-                percentile_range=None, grid_range=None, cust_grid_points=None, figsize=None, ax=None, plot_params=None):
-    """
-    Plot target distribution through feature grids
+                percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
+                figsize=None, ax=None, plot_params=None):
+    """Plot average target value across different feature values (feature grids)
+
+    Parameters:
+    -----------
 
     :param df: pandas DataFrame
-        the whole dataset to investigate, including at least the feature to investigate as well as the target values
+        data set to investigate on, should contain at least
+        the feature to investigate as well as the target
     :param feature: string or list
-        column to investigate (for one-hot encoding features, a list of columns should be provided)
+        feature or feature list to investigate
+        for one-hot encoding features, feature list is required
     :param feature_name: string
-        name of the feature, not necessary the same as the column name
+        name of the feature, not necessary a column name
     :param target: string or list
-        the column name of the target value
-        for multi-class problem, a list of one-hot encoding target values could be provided
-    :param num_grid_points: integer, default=10
-        number of grid points for numeric features
-    :param grid_type, default='percentile'
-        can be 'percentile' or 'equal'
-    :param percentile_range: (low, high), default=None
-        percentile range to consider for numeric features
-    :param grid_range: (low, high), default=None
-        value range to consider for numeric features
-    :param cust_grid_points: list, default=None
-        customized grid points
-    :param ax:
-    :param figsize: (width, height), default=None
-        figure size
-    :param plot_params: dict, default=None
-        values of plot parameters
+        column name or column name list for target value
+        for multi-class problem, a list of one-hot encoding target column
+    :param num_grid_points: integer, optional, default=10
+        number of grid points for numeric feature
+    :param grid_type: string, optional, default='percentile'
+        type of grid points for numeric feature
+        could be one of ['percentile', 'equal']
+    :param percentile_range: tuple or None, optional, default=None
+        percentile range to investigate
+        for numeric feature when grid_type='percentile'
+    :param grid_range: tuple or None, optional, default=None
+        value range to investigate
+        for numeric feature when grid_type='equal'
+    :param cust_grid_points: Series, 1d-array, list or None, optional, default=None
+        customized list of grid points
+        for numeric feature
+    :param show_percentile: bool, optional, default=False
+        whether to display the percentile buckets
+        for numeric feature when grid_type='percentile'
+    :param figsize: tuple or None, optional, default=None
+        size of the figure, (width, height)
+    :param ax: matplotlib Axes or None, optional, default=None
+        if provided, plot on this Axes
+    :param plot_params: dict or None, optional, default=None
+        parameters for the plot
+
+    :return:
     """
+    
 
     # check feature
     if type(feature) == str:
@@ -158,10 +174,10 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     # prepare data for bar plot
     data = df[useful_features].copy()
-    data_x, display_columns = _prepare_data_x(feature=feature, feature_type=feature_type, data=data,
-                                              num_grid_points=num_grid_points, grid_type=grid_type,
-                                              percentile_range=percentile_range, grid_range=grid_range,
-                                              cust_grid_points=cust_grid_points)
+    data_x, display_columns, percentile_columns = _prepare_data_x(
+        feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
+        percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
+        show_percentile=show_percentile)
 
     data_x['fake_count'] = 1
     bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'})
@@ -176,8 +192,9 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
             target_line = data_x.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
             target_lines.append(target_line)
 
-    axes = _target_plot(feature_name=feature_name, display_columns=display_columns, target=target,
-                        bar_data=bar_data, target_lines=target_lines, figsize=figsize, ax=ax, plot_params=plot_params)
+    axes = _target_plot(
+        feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
+        target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, ax=ax, plot_params=plot_params)
     return axes
 
 

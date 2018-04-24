@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 import copy
-from pdp_plot_utils import _axis_modify
-from pdp_calc_utils import _get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual, _find_closest
+from pdp_plot_utils import _axis_modify, _axis_modify_top
+from pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
+                            _find_closest, _make_bucket_column_names_percentile)
 
 
 def _actual_plot_title(feature_name, ax, figsize, multi_flag, which_class, plot_params):
@@ -150,30 +151,35 @@ def _autolabel(rects, ax, bar_color):
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
-                    grid_range, cust_grid_points):
+                    grid_range, cust_grid_points, show_percentile):
     display_columns = []
+    percentile_columns = []
     data_x = data.copy()
+
     if feature_type == 'binary':
         feature_grids = display_columns = np.array([0, 1])
         data_x['x'] = data_x[feature]
     if feature_type == 'numeric':
         percentile_info = None
         if cust_grid_points is None:
-            feature_grids, percentile_info = _get_grids(data_x[feature], num_grid_points, grid_type, percentile_range, grid_range)
+            feature_grids, percentile_info = _get_grids(data_x[feature], num_grid_points, grid_type,
+                                                        percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
 
         data_x = data_x[(data_x[feature] >= feature_grids[0])
                         & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
         data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x, feature_grids))
-        display_columns = _make_bucket_column_names(feature_grids, percentile_info)
+        display_columns = _make_bucket_column_names(feature_grids)
+        if show_percentile and grid_type == 'percentile':
+            percentile_columns = _make_bucket_column_names_percentile(percentile_info)
 
     if feature_type == 'onehot':
         feature_grids = display_columns = np.array(feature)
         data_x['x'] = data_x[feature].apply(lambda x: _find_onehot_actual(x), axis=1)
         data_x = data_x[~data_x['x'].isnull()].reset_index(drop=True)
 
-    return data_x, display_columns
+    return data_x, display_columns, percentile_columns
 
 
 def _target_plot_title(feature_name, ax, plot_params):
@@ -196,32 +202,33 @@ def _target_plot_title(feature_name, ax, plot_params):
 
     ax.set_facecolor('white')
     ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
-    ax.text(0, 0.4, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
+    ax.text(0, 0.5, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
     ax.axis('off')
 
 
-def _target_plot_title_ax(feature_name, ax, plot_params):
+def _target_plot_title_ax(feature_name, ax, plot_params, percentile_column):
 
     if plot_params is None:
         plot_params = dict()
 
     font_family = plot_params.get('font_family', 'Arial')
-    title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
-    subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
+    title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name) + '\n'
     title_fontsize = plot_params.get('title_fontsize', 12)
-    subtitle_fontsize = plot_params.get('subtitle_fontsize', 10)
 
-    ax.set_title(title + '\n', fontdict={'fontsize': title_fontsize, 'fontname': font_family})
-    ax.text(np.mean(ax.get_xlim()), ax.get_ylim()[1], subtitle, fontsize=subtitle_fontsize, fontname=font_family,
-            color='grey', va='bottom', ha='center')
+    if len(percentile_column) > 0:
+        title += '\n\n'
+
+    ax.set_title(title, fontdict={'fontsize': title_fontsize, 'fontname': font_family})
 
 
-def _target_plot(feature_name, display_columns, target, bar_data, target_lines, figsize, ax, plot_params):
+def _target_plot(feature_name, display_columns, percentile_columns, target, bar_data,
+                 target_lines, figsize, ax, plot_params):
     """
     Plot target distribution through feature grids
 
     :param feature_name: feature name
     :param display_columns: column names to display
+    :param percentile_columns
     :param target: target columns
     :param bar_data: bar counts data
     :param target_lines: target lines data
@@ -243,7 +250,6 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     line_width = plot_params.get('line_width', 1)
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
-    # graph title
     if ax is None:
         plt.figure(figsize=(width, width / 6.7))
         title_ax = plt.subplot(111)
@@ -254,22 +260,33 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
         line_ax = bar_ax.twinx()
     else:
         title_ax = bar_ax = ax
+        _target_plot_title_ax(feature_name=feature_name, ax=title_ax, plot_params=plot_params,
+                              percentile_column=percentile_columns)
         line_ax = ax.twinx()
 
     # bar plot
     box_width = np.min([0.5, 0.5 / (10.0 / len(display_columns))])
-
     rects = bar_ax.bar(bar_data['x'], bar_data['fake_count'], width=box_width, color=bar_color, alpha=0.5)
+
     bar_ax.set_xlabel(feature_name)
     bar_ax.set_ylabel('count')
 
-    plt.xticks(range(len(display_columns)), display_columns, rotation=xticks_rotation)
-    plt.xlim(-0.5, len(display_columns) - 0.5)
+    bar_ax.set_xticks(range(len(display_columns)))
+    bar_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
+    bar_ax.set_xlim(-0.5, len(display_columns) - 0.5)
+
+    if len(percentile_columns) > 0:
+        percentile_ax = bar_ax.twiny()
+        percentile_ax.set_xticks(bar_ax.get_xticks())
+        percentile_ax.set_xbound(bar_ax.get_xbound())
+        percentile_ax.set_xticklabels(percentile_columns, rotation=xticks_rotation)
+        percentile_ax.set_xlabel('percentile buckets')
+        _axis_modify_top(font_family, percentile_ax)
+
     _autolabel(rects, bar_ax, bar_color)
     _axis_modify(font_family, bar_ax)
 
     # target lines
-
     if len(target_lines) == 1:
         target_line = target_lines[0].sort_values('x', ascending=True).set_index('x')
         line_ax.plot(target_line.index.values, target_line[target], linewidth=line_width, c=line_color, marker='o')
@@ -292,6 +309,7 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
             plt.legend(loc="upper left", ncol=5, bbox_to_anchor=(0, 1.2), frameon=False)
 
     _axis_modify(font_family, line_ax)
+
     line_ax.get_yaxis().tick_right()
     line_ax.grid(False)
     line_ax.set_ylabel('target_avg')
@@ -299,7 +317,7 @@ def _target_plot(feature_name, display_columns, target, bar_data, target_lines, 
     if ax is None:
         return [title_ax, bar_ax, line_ax]
     else:
-        _target_plot_title_ax(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
         _axis_modify(font_family, ax)
+        ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[1] * 1.1)
         return ax
 

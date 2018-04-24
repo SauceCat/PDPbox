@@ -42,7 +42,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
         else:
             value_grids = np.linspace(np.min(x), np.max(x), num_grid_points)
 
-        return value_grids, None
+        return value_grids, []
 
 
 def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
@@ -139,24 +139,53 @@ def _find_bucket(x, feature_grids):
     return bucket
 
 
-def _make_bucket_column_names(feature_grids, percentile_info):
+def _make_bucket_column_names(feature_grids):
+    column_names = []
+
+    for i in range(len(feature_grids) - 1):
+        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+        if i == len(feature_grids) - 2:
+            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+        column_names.append(column_name)
+
+    return column_names
+
+
+def _make_bucket_column_names_percentile(percentile_info):
+    percentile_column_names = []
+
+    for i in range(len(percentile_info) - 1):
+        low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        percentile_column_name = '[%.2f, %.2f)' % (low, high)
+
+        if i == len(percentile_info) - 2:
+            percentile_column_name = '[%.2f, %.2f]' % (low, high)
+
+        percentile_column_names.append(percentile_column_name)
+
+    return percentile_column_names
+
+
+'''
+def _make_bucket_column_names(feature_grids, percentile_info, show_percentile):
     column_names = []
 
     for i in range(len(feature_grids) - 1):
         column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
         low = high = None
 
-        if percentile_info is not None:
+        if percentile_info is not None and show_percentile:
             low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
             high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
             column_name += ('\n' + '[%.2f, %.2f)' % (low, high))
         if i == len(feature_grids) - 2:
             column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
-            if percentile_info is not None:
+            if percentile_info is not None and show_percentile:
                 column_name += ('\n' + '[%.2f, %.2f]' % (low, high))
         column_names.append(column_name)
 
-    return column_names
+    return column_names'''
 
 
 def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
