@@ -92,8 +92,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     :param num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
     :param grid_type: string, optional, default='percentile'
+        'percentile' or 'equal'
         type of grid points for numeric feature
-        could be one of ['percentile', 'equal']
     :param percentile_range: tuple or None, optional, default=None
         percentile range to investigate
         for numeric feature when grid_type='percentile'
@@ -113,9 +113,13 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     :param plot_params: dict or None, optional, default=None
         parameters for the plot
 
-    :return:
+
+    Return:
+    -------
+
+    :return axes: matplotlib Axes
+        Returns the Axes object with the plot for further tweaking
     """
-    
 
     # check feature
     if type(feature) == str:
@@ -180,16 +184,17 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         show_percentile=show_percentile)
 
     data_x['fake_count'] = 1
-    bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'})
+    bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
 
     # prepare data for target lines
     target_lines = []
     if target_type in ['binary', 'regression']:
-        target_line = data_x.groupby('x', as_index=False).agg({target: 'mean'})
+        target_line = data_x.groupby('x', as_index=False).agg({target: 'mean'}).sort_values('x', ascending=True)
         target_lines.append(target_line)
     else:
         for target_idx in range(len(target)):
-            target_line = data_x.groupby('x', as_index=False).agg({target[target_idx]: 'mean'})
+            target_line = data_x.groupby('x', as_index=False).agg(
+                {target[target_idx]: 'mean'}).sort_values('x', ascending=True)
             target_lines.append(target_line)
 
     axes = _target_plot(

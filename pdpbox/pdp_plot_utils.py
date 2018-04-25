@@ -50,9 +50,15 @@ def _pdp_plot_title(n_grids, feature_name, ax, multi_flag, which_class, plot_par
     ax.axis('off')
 
 
-def _axis_modify(font_family, ax):
-    """
-    Modify axes
+def _axes_modify(font_family, ax, top=False):
+    """format axes
+    
+    :param font_family: string
+        font family
+    :param ax: matplotlib Axes
+        axes to format
+    :param top: bool, optional, default=False
+        whether the axes need xticks on the top
     """
 
     for tick in ax.get_xticklabels():
@@ -66,28 +72,13 @@ def _axis_modify(font_family, ax):
     for d in ['top', 'bottom', 'right', 'left']:
         ax.spines[d].set_visible(False)
 
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-    ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-    ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
-
-
-def _axis_modify_top(font_family, ax):
-    """
-    Modify axes
-    """
-
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
-    ax.set_facecolor('white')
-    for d in ['top', 'bottom', 'right', 'left']:
-        ax.spines[d].set_visible(False)
-
-    ax.get_xaxis().tick_top()
+    if top:
+        ax.get_xaxis().tick_top()
+    else:
+        ax.get_xaxis().tick_bottom()
+        ax.get_yaxis().tick_left()
+        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
 
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, frac_to_plot,
@@ -130,7 +121,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
             xticks_rotation = plot_params['xticks_rotation']
 
     # modify axes
-    _axis_modify(font_family, ax)
+    _axes_modify(font_family, ax)
     ax.set_xlabel(feature_name, fontsize=10)
 
     feature_type = pdp_isolate_out.feature_type
@@ -521,7 +512,7 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
             if 'xticks_rotation' in plot_params.keys():
                 xticks_rotation = plot_params['xticks_rotation']
 
-    _axis_modify(font_family, ax)
+    _axes_modify(font_family, ax)
 
     feature_types = pdp_interact_out.feature_types
     pdp = copy.deepcopy(pdp_interact_out.pdp)
