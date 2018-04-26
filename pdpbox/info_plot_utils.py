@@ -6,6 +6,7 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 import copy
 from pdp_plot_utils import _axes_modify
+from other_utils import _make_list
 from pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
                             _find_closest, _make_bucket_column_names_percentile)
 
@@ -411,6 +412,88 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
 
     if ax is None:
         return [title_ax, bar_ax, line_ax]
+    else:
+        _axes_modify(font_family, ax)
+        ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[1] * 1.1)
+        return ax
+
+
+def _target_plot_interact(feature_names, display_columns, percentile_columns, target, count_data, target_values,
+                          target_value_range, figsize, ax, ncols, plot_params):
+
+    nrows = int(np.ceil(len(target_values) * 1.0 / ncols))
+    ncols = np.min([len(target_values), ncols])
+    width = np.min([7.5 * len(target_values), 15])
+    height = width * 1.0 / ncols * nrows
+
+    if figsize is not None:
+        width, height = figsize
+
+    # set up graph parameters
+    if plot_params is None:
+        plot_params = dict()
+
+    font_family = plot_params.get('font_family', 'Arial')
+    cmap = plot_params.get('cmap', 'Blues')
+    line_width = plot_params.get('line_width', 1)
+    xticks_rotation = plot_params.get('xticks_rotation', 0)
+
+    # draw title and values
+    title_ax = value_ax = ax
+    if (ax is None) or (len(target_values) > 1):
+        plt.figure(figsize=(width, width / 7.))
+        title_ax = plt.subplot(111)
+
+        plt.figure(figsize=(width, height))
+        _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, sharex='col', sharey='row')
+
+    _target_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
+
+    marker_size_min, marker_size_max = 50, 500
+    count_min, count_max = count_data['fake_count'].min(), count_data['fake_count'].max()
+
+    marker_sizes = []
+    for count in count_data['fake_count'].values:
+        size = (count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
+        marker_sizes.append(size)
+
+    if len(target_values) == 1:
+        target_value = target_values[0]
+        colors = [plt.get_cmap(cmap)(v * 1.0 / (target_value_range[1] - target_value_range[0]))
+                  for v in target_value[target].values]
+        value_ax.scatter(target_value['x1'].values, target_value['x2'].values,
+                         s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.0))
+        value_ax.set_xlabel(feature_names[0])
+        value_ax.set_ylabel(feature_names[1])
+
+        value_ax.set_xticks(range(len(display_columns[0])))
+        value_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
+        value_ax.set_yticks(range(len(display_columns[1])))
+        value_ax.set_yticklabels(display_columns[1])
+        _axes_modify(font_family=font_family, ax=value_ax)
+    else:
+        for r in range(nrows):
+            for c in range(ncols):
+                idx = r * ncols + ncols
+                target_value = target_values[idx]
+
+                colors = [plt.get_cmap(cmap)(v * 1.0 / (target_value_range[1] - target_value_range[0]))
+                          for v in target_value[target].values]
+                plot_ax = value_ax[r][c]
+                plot_ax.scatter(target_value['x1'].values, target_value['x2'].values,
+                                s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.0))
+                plot_ax.set_xlabel(feature_names[0])
+                plot_ax.set_ylabel(feature_names[1])
+                plot_ax.set_title(target[idx])
+
+                plot_ax.set_xticks(range(len(display_columns[0])))
+                plot_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
+                plot_ax.set_yticks(range(len(display_columns[1])))
+                plot_ax.set_yticklabels(display_columns[1])
+                _axes_modify(font_family=font_family, ax=plot_ax)
+
+    if ax is None:
+        return [title_ax, value_ax]
     else:
         _axes_modify(font_family, ax)
         ax.set_ylim(ax.get_ylim()[0], ax.get_ylim()[1] * 1.1)

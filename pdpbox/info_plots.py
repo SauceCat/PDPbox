@@ -1,10 +1,12 @@
 
 import numpy as np
+import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-from info_plot_utils import _target_plot, _prepare_data_x, _actual_plot, _actual_plot_title
+from info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_title
+from other_utils import _check_feature, _check_percentile_range, _check_target, _make_list, _expand_default
 
 
 def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
@@ -113,7 +115,6 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     :param plot_params: dict or None, optional, default=None
         parameters for the plot
 
-
     Return:
     -------
 
@@ -122,59 +123,16 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     """
 
     # check feature
-    if type(feature) == str:
-        if feature not in df.columns.values:
-            raise ValueError('feature does not exist: %s' % feature)
-        if sorted(list(np.unique(df[feature]))) == [0, 1]:
-            feature_type = 'binary'
-        else:
-            feature_type = 'numeric'
-    elif type(feature) == list:
-        if len(feature) < 2:
-            raise ValueError('one-hot encoding feature should contain more than 1 element')
-        if not set(feature) < set(df.columns.values):
-            raise ValueError('feature does not exist: %s' % str(feature))
-        feature_type = 'onehot'
-    else:
-        raise ValueError('feature: please pass a string or a list (for onehot encoding feature)')
+    feature_type = _check_feature(feature=feature, df=df)
 
     # check percentile_range
-    if percentile_range is not None:
-        if len(percentile_range) != 2:
-            raise ValueError('percentile_range: should contain 2 elements')
-        if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
-            raise ValueError('percentile_range: should be between 0 and 100')
+    _check_percentile_range(percentile_range=percentile_range)
 
     # check target values and calculate target rate through feature grids
-    if type(target) == str:
-        if target not in df.columns.values:
-            raise ValueError('target does not exist: %s' % target)
-        if sorted(list(np.unique(df[target]))) == [0, 1]:
-            target_type = 'binary'
-        else:
-            target_type = 'regression'
-    elif type(target) == list:
-        if len(target) < 2:
-            raise ValueError('multi-class target should contain more than 1 element')
-        if not set(target) < set(df.columns.values):
-            raise ValueError('target does not exist: %s' % (str(target)))
-        for target_idx in range(len(target)):
-            if sorted(list(np.unique(df[target[target_idx]]))) != [0, 1]:
-                raise ValueError('multi-class targets should be one-hot encoded: %s' % (str(target[target_idx])))
-        target_type = 'multi-class'
-    else:
-        raise ValueError('target: please pass a string or a list (for multi-class targets)')
+    target_type = _check_target(target=target, df=df)
 
     # create feature grids and bar counts
-    useful_features = []
-    if type(feature) == list:
-        useful_features += feature
-    else:
-        useful_features.append(feature)
-    if type(target) == list:
-        useful_features += target
-    else:
-        useful_features.append(target)
+    useful_features = [] + _make_list(feature) + _make_list(target)
 
     # prepare data for bar plot
     data = df[useful_features].copy()
@@ -203,7 +161,68 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     return axes
 
 
+def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
+                         percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
+                         figsize=None, ax=None, ncols=2, plot_params=None):
 
+    num_grid_points = _expand_default(num_grid_points, 10)
+    grid_types = _expand_default(grid_types, 'percentile')
+    percentile_ranges = _expand_default(percentile_ranges, None)
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+
+    # check features
+    feature_types = [_check_feature(feature=features[0], df=df), _check_feature(feature=features[1], df=df)]
+
+    # check percentile_range
+    _check_percentile_range(percentile_range=percentile_ranges[0])
+    _check_percentile_range(percentile_range=percentile_ranges[1])
+
+    # check target values and calculate target rate through feature grids
+    target_type = _check_target(target=target, df=df)
+
+    # create feature grids and bar counts
+    useful_features = [] + _make_list(features[0]) + _make_list(features[1]) + _make_list(target)
+
+    # prepare data for bar plot
+    data = df[useful_features].copy()
+
+    # (data_x, display_columns, percentile_columns)
+    results = []
+    for i in range(2):
+        result = _prepare_data_x(
+            feature=features[i], feature_type=feature_types[i], data=data[_make_list(features[i])],
+            num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
+            grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i], show_percentile=show_percentile)
+        results.append(result)
+
+    data_x = pd.concat([results[0][0].rename(columns={'x': 'x1'}),
+                        results[1][0].rename(columns={'x': 'x2'}),
+                        data[_make_list(target)]], axis=1).reset_index(drop=True)
+
+    data_x['fake_count'] = 1
+    count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg({'fake_count': 'count'})
+
+    # prepare data for target values
+    target_values = []
+    if target_type in ['binary', 'regression']:
+        target_value = data_x.groupby(['x1', 'x2'], as_index=False).agg({target: 'mean'})
+        target_values.append(target_value)
+    else:
+        for target_idx in range(len(target)):
+            target_value = data_x.groupby(['x1', 'x2'], as_index=False).agg({target[target_idx]: 'mean'})
+            target_values.append(target_value)
+
+    target_value_range = [0, 1]
+    if target_type == 'regression':
+        target_value_range = [data[target].min(), data[target].max()]
+
+    axes = _target_plot_interact(
+        feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
+        percentile_columns=[results[0][2], results[1][2]], target=target, count_data=count_data,
+        target_values=target_values, target_value_range=target_value_range, figsize=figsize,
+        ax=ax, ncols=ncols, plot_params=plot_params)
+    return axes
 
 
 
