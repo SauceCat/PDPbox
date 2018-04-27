@@ -201,17 +201,11 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
                         data[_make_list(target)]], axis=1).reset_index(drop=True)
 
     data_x['fake_count'] = 1
-    count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg({'fake_count': 'count'})
-
-    # prepare data for target values
-    target_values = []
-    if target_type in ['binary', 'regression']:
-        target_value = data_x.groupby(['x1', 'x2'], as_index=False).agg({target: 'mean'})
-        target_values.append(target_value)
-    else:
-        for target_idx in range(len(target)):
-            target_value = data_x.groupby(['x1', 'x2'], as_index=False).agg({target[target_idx]: 'mean'})
-            target_values.append(target_value)
+    agg_dict = {}
+    for t in _make_list(target):
+        agg_dict[t] = 'mean'
+    agg_dict['fake_count'] = 'count'
+    target_count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
 
     target_value_range = [0, 1]
     if target_type == 'regression':
@@ -219,9 +213,8 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 
     axes = _target_plot_interact(
         feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
-        percentile_columns=[results[0][2], results[1][2]], target=target, count_data=count_data,
-        target_values=target_values, target_value_range=target_value_range, figsize=figsize,
-        ax=ax, ncols=ncols, plot_params=plot_params)
+        percentile_columns=[results[0][2], results[1][2]], target=target, target_count_data=target_count_data,
+        target_value_range=target_value_range, figsize=figsize, ax=ax, ncols=ncols, plot_params=plot_params)
     return axes
 
 

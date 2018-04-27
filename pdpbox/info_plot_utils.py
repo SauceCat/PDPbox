@@ -418,12 +418,13 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         return ax
 
 
-def _target_plot_interact(feature_names, display_columns, percentile_columns, target, count_data, target_values,
+def _target_plot_interact(feature_names, display_columns, percentile_columns, target, target_count_data,
                           target_value_range, figsize, ax, ncols, plot_params):
 
-    nrows = int(np.ceil(len(target_values) * 1.0 / ncols))
-    ncols = np.min([len(target_values), ncols])
-    width = np.min([7.5 * len(target_values), 15])
+    target = _make_list(target)
+    nrows = int(np.ceil(len(target) * 1.0 / ncols))
+    ncols = np.min([len(target), ncols])
+    width = np.min([8 * len(target), 16])
     height = width * 1.0 / ncols * nrows
 
     if figsize is not None:
@@ -437,60 +438,75 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
     cmap = plot_params.get('cmap', 'Blues')
     line_width = plot_params.get('line_width', 1)
     xticks_rotation = plot_params.get('xticks_rotation', 0)
+    line_color = plt.get_cmap(cmap)(1.0)
 
     # draw title and values
     title_ax = value_ax = ax
-    if (ax is None) or (len(target_values) > 1):
-        plt.figure(figsize=(width, width / 7.))
+    if (ax is None) or (len(target) > 1):
+        plt.figure(figsize=(width, 2.4))
         title_ax = plt.subplot(111)
 
-        plt.figure(figsize=(width, height))
-        _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, sharex='col', sharey='row')
+        _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, sharex='col', sharey='row', figsize=(width, height))
 
-    _target_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
+    if ax is None:
+        _target_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
+    else:
+        _target_plot_title_ax(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params,
+                              percentile_columns=percentile_columns[0])
 
-    marker_size_min, marker_size_max = 50, 500
-    count_min, count_max = count_data['fake_count'].min(), count_data['fake_count'].max()
+    marker_size_min, marker_size_max = 100, 1000
+    count_min, count_max = target_count_data['fake_count'].min(), target_count_data['fake_count'].max()
 
     marker_sizes = []
-    for count in count_data['fake_count'].values:
+    for count in target_count_data['fake_count'].values:
         size = (count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
 
-    if len(target_values) == 1:
-        target_value = target_values[0]
-        colors = [plt.get_cmap(cmap)(v * 1.0 / (target_value_range[1] - target_value_range[0]))
-                  for v in target_value[target].values]
-        value_ax.scatter(target_value['x1'].values, target_value['x2'].values,
-                         s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.0))
-        value_ax.set_xlabel(feature_names[0])
-        value_ax.set_ylabel(feature_names[1])
-
-        value_ax.set_xticks(range(len(display_columns[0])))
-        value_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
-        value_ax.set_yticks(range(len(display_columns[1])))
-        value_ax.set_yticklabels(display_columns[1])
-        _axes_modify(font_family=font_family, ax=value_ax)
+    plot_ax = []
+    if len(target) == 1:
+        plot_ax.append(value_ax)
     else:
-        for r in range(nrows):
-            for c in range(ncols):
-                idx = r * ncols + ncols
-                target_value = target_values[idx]
+        plot_ax = value_ax.flatten()
 
-                colors = [plt.get_cmap(cmap)(v * 1.0 / (target_value_range[1] - target_value_range[0]))
-                          for v in target_value[target].values]
-                plot_ax = value_ax[r][c]
-                plot_ax.scatter(target_value['x1'].values, target_value['x2'].values,
-                                s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.0))
-                plot_ax.set_xlabel(feature_names[0])
-                plot_ax.set_ylabel(feature_names[1])
-                plot_ax.set_title(target[idx])
+    for idx in range(len(plot_ax)):
+        plot_ax[idx].set_xticks(range(len(display_columns[0])))
+        plot_ax[idx].set_xticklabels(display_columns[0], rotation=xticks_rotation)
+        plot_ax[idx].set_yticks(range(len(display_columns[1])))
+        plot_ax[idx].set_yticklabels(display_columns[1])
+        plot_ax[idx].set_xlim(-0.5, len(display_columns[0]) - 0.5)
+        plot_ax[idx].set_ylim(-0.5, len(display_columns[1]) - 0.5)
 
-                plot_ax.set_xticks(range(len(display_columns[0])))
-                plot_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
-                plot_ax.set_yticks(range(len(display_columns[1])))
-                plot_ax.set_yticklabels(display_columns[1])
-                _axes_modify(font_family=font_family, ax=plot_ax)
+        # display percentile
+        if len(percentile_columns[0]) > 0:
+            percentile_ax = plot_ax[idx].twiny()
+            percentile_ax.set_xticks(plot_ax[idx].get_xticks())
+            percentile_ax.set_xbound(plot_ax[idx].get_xbound())
+            percentile_ax.set_xticklabels(percentile_columns[0], rotation=xticks_rotation)
+            percentile_ax.set_xlabel('percentile buckets')
+            _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+
+        # display percentile
+        if len(percentile_columns[1]) > 0:
+            percentile_ay = plot_ax[idx].twinx()
+            percentile_ay.set_yticks(plot_ax[idx].get_yticks())
+            percentile_ay.set_ybound(plot_ax[idx].get_ybound())
+            percentile_ay.set_yticklabels(percentile_columns[1])
+            percentile_ay.set_ylabel('percentile buckets')
+            _axes_modify(font_family=font_family, ax=percentile_ay, right=True)
+
+        colors = [plt.get_cmap(cmap)(v * 1.0 / (target_value_range[1] - target_value_range[0]))
+                  for v in target_count_data[target[idx]].values]
+        plot_ax[idx].scatter(target_count_data['x1'].values, target_count_data['x2'].values,
+                             s=marker_sizes, c=colors, linewidth=line_width, edgecolors=line_color)
+        plot_ax[idx].set_xlabel(feature_names[0])
+        plot_ax[idx].set_ylabel(feature_names[1])
+        if len(target) > 1:
+            if len(percentile_columns[0]) > 0:
+                plot_ax[idx].set_title(target[idx] + '\n\n', fontsize=12)
+            else:
+                plot_ax[idx].set_title(target[idx], fontsize=12)
+
+        _axes_modify(font_family=font_family, ax=plot_ax[idx])
 
     if ax is None:
         return [title_ax, value_ax]

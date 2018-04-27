@@ -50,7 +50,7 @@ def _pdp_plot_title(n_grids, feature_name, ax, multi_flag, which_class, plot_par
     ax.axis('off')
 
 
-def _axes_modify(font_family, ax, top=False):
+def _axes_modify(font_family, ax, top=False, right=False):
     """format axes
     
     :param font_family: string
@@ -74,6 +74,8 @@ def _axes_modify(font_family, ax, top=False):
 
     if top:
         ax.get_xaxis().tick_top()
+    elif right:
+        ax.get_yaxis().tick_right()
     else:
         ax.get_xaxis().tick_bottom()
         ax.get_yaxis().tick_left()
