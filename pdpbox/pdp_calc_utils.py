@@ -144,7 +144,7 @@ def _find_closest(x, feature_grids):
     return values.index(min(values, key=lambda y: abs(y-x)))
 
 
-def _find_bucket(x, feature_grids):
+def _find_bucket(x, feature_grids, show_outliers):
     """map value into value bucket
 
     Parameters:
@@ -154,6 +154,9 @@ def _find_bucket(x, feature_grids):
         value to map
     :param feature_grids: 1d-array
         array of grid points
+    :param show_outliers: bool
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
 
     Returns:
     --------
@@ -162,24 +165,38 @@ def _find_bucket(x, feature_grids):
         the mapped bucket number
     """
 
-    # bucket is count from 0
-    # so the largest bucket number is len(feature_grids) - 2
-    # example:
-    # if there are 10 grid points, there are 9 buckets
-    # the 9th bucket is indexed as 8
-    bucket = len(feature_grids) - 2
-    for i in range(len(feature_grids) - 1):
-        if feature_grids[i] <= x < feature_grids[i + 1]:
-            bucket = i
-            break
-    return bucket
+    if show_outliers:
+        if x < feature_grids[0]:
+            return 0
+        elif x >= feature_grids[-1]:
+            return len(feature_grids)
+        else:
+            for i in range(len(feature_grids) - 1):
+                if feature_grids[i] <= x < feature_grids[i + 1]:
+                    return i + 1
+    else:
+        if x >= feature_grids[-2]:
+            return len(feature_grids) - 2
+        else:
+            for i in range(len(feature_grids) - 1):
+                if feature_grids[i] <= x < feature_grids[i + 1]:
+                    return i
 
 
-def _make_bucket_column_names(feature_grids):
+def _make_bucket_column_names(feature_grids, show_outliers):
     """create bucket names
+
+    Parameters:
+    -----------
 
     :param feature_grids: 1d-array
         array of grid points
+    :param show_outliers: bool
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
+
+    Returns:
+    --------
 
     :return column_names: list
         list of bucket names
@@ -191,18 +208,30 @@ def _make_bucket_column_names(feature_grids):
     for i in range(len(feature_grids) - 1):
         column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
         # for the last bucket
-        if i == len(feature_grids) - 2:
+        if (i == len(feature_grids) - 2) and not show_outliers:
             column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
         column_names.append(column_name)
+
+    if show_outliers:
+        return ['< %.2f' % feature_grids[0]] + column_names + ['>= %.2f' % feature_grids[-1]]
 
     return column_names
 
 
-def _make_bucket_column_names_percentile(percentile_info):
+def _make_bucket_column_names_percentile(percentile_info, show_outliers):
     """create percentile bucket names
+
+    Parameters:
+    -----------
 
     :param percentile_info: 1d-array
         array of percentile information for grid points
+    :param show_outliers: bool
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
+
+    Returns:
+    --------
 
     :return percentile_column_names: list
         list of percentile bucket names
@@ -218,10 +247,14 @@ def _make_bucket_column_names_percentile(percentile_info):
         high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
         percentile_column_name = '[%.2f, %.2f)' % (low, high)
 
-        if i == len(percentile_info) - 2:
+        if (i == len(percentile_info) - 2) and not show_outliers:
             percentile_column_name = '[%.2f, %.2f]' % (low, high)
-
         percentile_column_names.append(percentile_column_name)
+
+    if show_outliers:
+        low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        return ['< %.2f' % low] + percentile_column_names + ['>= %.2f' % high]
 
     return percentile_column_names
 

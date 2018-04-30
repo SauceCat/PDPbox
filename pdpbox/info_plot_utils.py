@@ -164,7 +164,7 @@ def _autolabel(rects, ax, bar_color):
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
-                    grid_range, cust_grid_points, show_percentile):
+                    grid_range, cust_grid_points, show_percentile, show_outliers):
     """map feature values to grid points
 
     Parameters:
@@ -196,6 +196,9 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
     :param show_percentile: bool
         whether to display the percentile buckets
         for numeric feature when grid_type='percentile'
+    :param show_outliers: bool
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
 
     Returns:
     --------
@@ -224,18 +227,21 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         else:
             feature_grids = np.array(sorted(cust_grid_points))
 
-        data_x = data_x[(data_x[feature] >= feature_grids[0])
-                        & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
+        if not show_outliers:
+            data_x = data_x[(data_x[feature] >= feature_grids[0])
+                            & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
 
         # map feature value into value buckets
-        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x=x, feature_grids=feature_grids))
+        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(
+            x=x, feature_grids=feature_grids, show_outliers=show_outliers))
 
         # create bucket names
-        display_columns = _make_bucket_column_names(feature_grids=feature_grids)
+        display_columns = _make_bucket_column_names(feature_grids=feature_grids, show_outliers=show_outliers)
 
         # create percentile bucket names
         if show_percentile and grid_type == 'percentile':
-            percentile_columns = _make_bucket_column_names_percentile(percentile_info=percentile_info)
+            percentile_columns = _make_bucket_column_names_percentile(
+                percentile_info=percentile_info, show_outliers=show_outliers)
 
     if feature_type == 'onehot':
         feature_grids = display_columns = np.array(feature)
@@ -414,7 +420,7 @@ def _plot_legend(value_min, value_max, count_min, count_max, legend_axes, cmap, 
     # colorbar
     cax = inset_axes(legend_axes[0], height="20%", width="100%", loc=10)
     cb = mpl.colorbar.ColorbarBase(cax, cmap=plt.get_cmap(cmap), norm=norm, orientation='horizontal')
-    legend_axes[0].set_xlabel('Average target value')
+    legend_axes[0].set_xlabel('Average target value', color='#424242')
     cb.outline.set_linewidth(0)
     cb.set_ticks([])
 
@@ -425,7 +431,7 @@ def _plot_legend(value_min, value_max, count_min, count_max, legend_axes, cmap, 
     legend_axes[1].scatter([-0.5, 0.75, 2], [1] * 3, s=[100, 500, 1000],
                            edgecolors=plt.get_cmap(cmap)(1.), color='white')
     legend_axes[1].set_xlim(-1, 3)
-    legend_axes[1].set_xlabel('Counts')
+    legend_axes[1].set_xlabel('Counts', color='#424242')
 
     legend_axes[1].set_xticks([-1, 3])
     legend_axes[1].set_xticklabels([count_min, count_max])
@@ -433,13 +439,15 @@ def _plot_legend(value_min, value_max, count_min, count_max, legend_axes, cmap, 
     for i in range(2):
         for d in ['top', 'right', 'left']:
             legend_axes[i].spines[d].set_visible(False)
+        legend_axes[i].spines['bottom'].set_edgecolor('#424242')
+
         for tick in legend_axes[i].get_xticklabels():
             tick.set_fontname(font_family)
         for tick in legend_axes[i].get_yticklabels():
             tick.set_fontname(font_family)
 
         legend_axes[i].set_facecolor('white')
-        legend_axes[i].tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
+        legend_axes[i].tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#424242')
         legend_axes[i].set_yticks([])
 
 
@@ -477,12 +485,12 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
 
     _target_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
 
-    marker_size_min, marker_size_max = 100, 1000
+    marker_size_min, marker_size_max = 50, 2000
     count_min, count_max = target_count_data['fake_count'].min(), target_count_data['fake_count'].max()
 
     marker_sizes = []
     for count in target_count_data['fake_count'].values:
-        size = (count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
+        size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
 
     plot_ax = []
@@ -551,7 +559,7 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
             anno_x, anno_y = pt['x1'], pt['x2']
             text_x, text_y = anno_x + 0.2, anno_y + 0.2
             plot_ax[idx].annotate(anno_text, xy=(anno_x, anno_y), xytext=(text_x, text_y),
-                                  arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=6))
+                                  arrowprops=dict(facecolor='black', arrowstyle="->"))
 
         for i in range(value_max_pts.shape[0]):
             pt = value_max_pts.iloc[i]
@@ -559,7 +567,7 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
             anno_x, anno_y = pt['x1'], pt['x2']
             text_x, text_y = anno_x + 0.2, anno_y + 0.2
             plot_ax[idx].annotate(anno_text, xy=(anno_x, anno_y), xytext=(text_x, text_y),
-                                  arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=6))
+                                  arrowprops=dict(facecolor='black', arrowstyle="->"))
 
         _axes_modify(font_family=font_family, ax=plot_ax[idx])
 

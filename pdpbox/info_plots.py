@@ -75,7 +75,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
-                show_outliers=True, figsize=None, plot_params=None):
+                show_outliers=False, figsize=None, plot_params=None):
     """Plot average target value across different feature values (feature grids)
 
     Parameters:
@@ -133,6 +133,10 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     # check target values and calculate target rate through feature grids
     target_type = _check_target(target=target, df=df)
 
+    # check show_outliers
+    if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
+        show_outliers = False
+
     # create feature grids and bar counts
     useful_features = [] + _make_list(feature) + _make_list(target)
 
@@ -141,7 +145,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     data_x, display_columns, percentile_columns = _prepare_data_x(
         feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
         percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile)
+        show_percentile=show_percentile, show_outliers=show_outliers)
 
     data_x['fake_count'] = 1
     bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
@@ -165,13 +169,22 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         show_outliers=True, figsize=None, ncols=2, plot_params=None):
+                         show_outliers=False, figsize=None, ncols=2, plot_params=None):
 
+    # check show_outliers
     num_grid_points = _expand_default(num_grid_points, 10)
     grid_types = _expand_default(grid_types, 'percentile')
     percentile_ranges = _expand_default(percentile_ranges, None)
     grid_ranges = _expand_default(grid_ranges, None)
     cust_grid_points = _expand_default(cust_grid_points, None)
+
+    if not show_outliers:
+        show_outliers = [False, False]
+    else:
+        show_outliers = [True, True]
+        for i in range(2):
+            if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
+                show_outliers[i] = False
 
     # check features
     feature_types = [_check_feature(feature=features[0], df=df), _check_feature(feature=features[1], df=df)]
@@ -179,9 +192,6 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     # check percentile_range
     _check_percentile_range(percentile_range=percentile_ranges[0])
     _check_percentile_range(percentile_range=percentile_ranges[1])
-
-    # check target values and calculate target rate through feature grids
-    target_type = _check_target(target=target, df=df)
 
     # create feature grids and bar counts
     useful_features = [] + _make_list(features[0]) + _make_list(features[1]) + _make_list(target)
@@ -195,7 +205,8 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         result = _prepare_data_x(
             feature=features[i], feature_type=feature_types[i], data=data[_make_list(features[i])],
             num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
-            grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i], show_percentile=show_percentile)
+            grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
+            show_percentile=show_percentile, show_outliers=show_outliers[i])
         results.append(result)
 
     data_x = pd.concat([results[0][0].rename(columns={'x': 'x1'}),
