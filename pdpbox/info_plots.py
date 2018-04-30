@@ -4,6 +4,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+import seaborn as sns
 
 from info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_title
 from other_utils import _check_feature, _check_percentile_range, _check_target, _make_list, _expand_default
@@ -74,7 +75,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
-                figsize=None, ax=None, plot_params=None):
+                show_outliers=True, figsize=None, plot_params=None):
     """Plot average target value across different feature values (feature grids)
 
     Parameters:
@@ -108,10 +109,11 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     :param show_percentile: bool, optional, default=False
         whether to display the percentile buckets
         for numeric feature when grid_type='percentile'
+    :param show_outliers: bool, optional, default=False
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
     :param figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
-    :param ax: matplotlib Axes or None, optional, default=None
-        if provided, plot on this Axes
     :param plot_params: dict or None, optional, default=None
         parameters for the plot
 
@@ -157,13 +159,13 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     axes = _target_plot(
         feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
-        target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, ax=ax, plot_params=plot_params)
+        target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
     return axes
 
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         figsize=None, ax=None, ncols=2, plot_params=None):
+                         show_outliers=True, figsize=None, ncols=2, plot_params=None):
 
     num_grid_points = _expand_default(num_grid_points, 10)
     grid_types = _expand_default(grid_types, 'percentile')
@@ -207,14 +209,10 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     agg_dict['fake_count'] = 'count'
     target_count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
 
-    target_value_range = [0, 1]
-    if target_type == 'regression':
-        target_value_range = [data[target].min(), data[target].max()]
-
     axes = _target_plot_interact(
         feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
         percentile_columns=[results[0][2], results[1][2]], target=target, target_count_data=target_count_data,
-        target_value_range=target_value_range, figsize=figsize, ax=ax, ncols=ncols, plot_params=plot_params)
+        figsize=figsize, ncols=ncols, plot_params=plot_params)
     return axes
 
 

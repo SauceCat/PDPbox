@@ -50,7 +50,7 @@ def _pdp_plot_title(n_grids, feature_name, ax, multi_flag, which_class, plot_par
     ax.axis('off')
 
 
-def _axes_modify(font_family, ax, top=False, right=False):
+def _axes_modify(font_family, ax, top=False, right=False, legend=False):
     """format axes
     
     :param font_family: string
@@ -66,21 +66,25 @@ def _axes_modify(font_family, ax, top=False, right=False):
     for tick in ax.get_yticklabels():
         tick.set_fontname(font_family)
 
-    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
     ax.set_facecolor('white')
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
 
     for d in ['top', 'bottom', 'right', 'left']:
         ax.spines[d].set_visible(False)
 
-    if top:
-        ax.get_xaxis().tick_top()
-    elif right:
-        ax.get_yaxis().tick_right()
+    if not legend:
+        if top:
+            ax.get_xaxis().tick_top()
+        elif right:
+            ax.get_yaxis().tick_right()
+        else:
+            ax.get_xaxis().tick_bottom()
+            ax.get_yaxis().tick_left()
+            ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+            ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
     else:
-        ax.get_xaxis().tick_bottom()
-        ax.get_yaxis().tick_left()
-        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
+        ax.set_xticks([])
+        ax.set_yticks([])
 
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, frac_to_plot,
