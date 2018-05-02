@@ -599,7 +599,7 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
 
     else:
         fig = plt.figure(figsize=(width, height))
-        outer = GridSpec(nrows, ncols, wspace=0.05, hspace=0.05)
+        outer = GridSpec(nrows, ncols, wspace=0.1, hspace=0.1)
         for target_idx in range(len(target)):
             cmap = cmaps[target_idx % len(cmaps)]
             inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer[target_idx],
@@ -615,8 +615,8 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
             _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=inner_legend_ax,
                                   cmap=cmap, font_family=font_family)
 
-            fig.add_subplot(inner[0])
-            fig.add_subplot(inner[1])
+            fig.add_subplot(inner_value_ax)
+            fig.add_subplot(inner_legend_ax)
 
         value_ax = fig.axes
         plt.figure(figsize=(legend_width / 3., 1))
