@@ -130,15 +130,13 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     # check percentile_range
     _check_percentile_range(percentile_range=percentile_range)
 
-    # check target values and calculate target rate through feature grids
-    target_type = _check_target(target=target, df=df)
-
     # check show_outliers
     if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
         show_outliers = False
 
     # create feature grids and bar counts
-    useful_features = [] + _make_list(feature) + _make_list(target)
+    target = _make_list(target)
+    useful_features = [] + _make_list(feature) + target
 
     # prepare data for bar plot
     data = df[useful_features].copy()
@@ -149,22 +147,27 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     data_x['fake_count'] = 1
     bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
+    summary_df = bar_data.rename(columns={'fake_count': 'count'})
 
     # prepare data for target lines
     target_lines = []
-    if target_type in ['binary', 'regression']:
-        target_line = data_x.groupby('x', as_index=False).agg({target: 'mean'}).sort_values('x', ascending=True)
+    for target_idx in range(len(target)):
+        target_line = data_x.groupby('x', as_index=False).agg(
+            {target[target_idx]: 'mean'}).sort_values('x', ascending=True)
         target_lines.append(target_line)
-    else:
-        for target_idx in range(len(target)):
-            target_line = data_x.groupby('x', as_index=False).agg(
-                {target[target_idx]: 'mean'}).sort_values('x', ascending=True)
-            target_lines.append(target_line)
+        summary_df = summary_df.merge(target_line, on='x', how='outer').fillna(0)
+
+    summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[x])
+    info_cols = ['x', 'display_column']
+    if len(percentile_columns) != 0:
+        summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[x])
+        info_cols.append('percentile_column')
+    summary_df = summary_df[info_cols + ['count'] + target]
 
     axes = _target_plot(
         feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
         target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
-    return axes
+    return axes, summary_df
 
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
@@ -194,7 +197,8 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     _check_percentile_range(percentile_range=percentile_ranges[1])
 
     # create feature grids and bar counts
-    useful_features = [] + _make_list(features[0]) + _make_list(features[1]) + _make_list(target)
+    target = _make_list(target)
+    useful_features = [] + _make_list(features[0]) + _make_list(features[1]) + target
 
     # prepare data for bar plot
     data = df[useful_features].copy()
@@ -211,20 +215,29 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 
     data_x = pd.concat([results[0][0].rename(columns={'x': 'x1'}),
                         results[1][0].rename(columns={'x': 'x2'}),
-                        data[_make_list(target)]], axis=1).reset_index(drop=True)
+                        data[target]], axis=1).reset_index(drop=True)
 
     data_x['fake_count'] = 1
     agg_dict = {}
-    for t in _make_list(target):
+    for t in target:
         agg_dict[t] = 'mean'
     agg_dict['fake_count'] = 'count'
     target_count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
+    summary_df = target_count_data.rename(columns={'fake_count': 'count'})
+
+    info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
+    for i in range(2):
+        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][1][x])
+        if len(results[i][2]) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][x])
+            info_cols.append('percentile_column_%d' % (i + 1))
+    summary_df = summary_df[info_cols + ['count'] + target]
 
     axes = _target_plot_interact(
         feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
         percentile_columns=[results[0][2], results[1][2]], target=target, target_count_data=target_count_data,
         figsize=figsize, ncols=ncols, plot_params=plot_params)
-    return axes
+    return axes, summary_df
 
 
 

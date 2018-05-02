@@ -216,7 +216,8 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
     data_x = data.copy()
 
     if feature_type == 'binary':
-        feature_grids = display_columns = np.array([0, 1])
+        feature_grids = np.array([0, 1])
+        display_columns = ['%s_0' % feature, '%s_1' % feature]
         data_x['x'] = data_x[feature]
     if feature_type == 'numeric':
         percentile_info = None
@@ -232,16 +233,20 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
                             & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
 
         # map feature value into value buckets
-        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(
-            x=x, feature_grids=feature_grids, show_outliers=show_outliers))
+        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x=x, feature_grids=feature_grids))
+        uni_xs = sorted(data_x['x'].unique())
 
         # create bucket names
-        display_columns = _make_bucket_column_names(feature_grids=feature_grids, show_outliers=show_outliers)
+        display_columns = _make_bucket_column_names(feature_grids=feature_grids)
+        display_columns = np.array(display_columns)[range(uni_xs[0], uni_xs[-1]+1)]
 
         # create percentile bucket names
         if show_percentile and grid_type == 'percentile':
-            percentile_columns = _make_bucket_column_names_percentile(
-                percentile_info=percentile_info, show_outliers=show_outliers)
+            percentile_columns = _make_bucket_column_names_percentile(percentile_info=percentile_info)
+            percentile_columns = np.array(percentile_columns)[range(uni_xs[0], uni_xs[-1]+1)]
+
+        # adjust results
+        data_x['x'] = data_x['x'] - data_x['x'].min()
 
     if feature_type == 'onehot':
         feature_grids = display_columns = np.array(feature)
@@ -344,9 +349,12 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         plot_params = dict()
 
     font_family = plot_params.get('font_family', 'Arial')
-    line_color = plot_params.get('line_color', '#1A4E5D')
-    bar_color = plot_params.get('bar_color', '#5BB573')
     line_width = plot_params.get('line_width', 1)
+    line_color = plot_params.get('line_color', '#1A4E5D')
+    line_colors_cmap = plot_params.get('line_colors_cmap', 'tab20')
+    line_colors = plot_params.get('line_colors', plt.get_cmap(line_colors_cmap)(range(20)))
+    bar_color = plot_params.get('bar_color', '#5BB573')
+    bar_width = plot_params.get('bar_width', np.min([0.4, 0.4 / (10.0 / len(display_columns))]))
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
     # Axes for title
@@ -360,7 +368,6 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     line_ax = bar_ax.twinx()
 
     # bar plot
-    box_width = np.min([0.5, 0.5 / (10.0 / len(display_columns))])
     bar_ax.set_xlabel(feature_name)
     bar_ax.set_ylabel('count')
 
@@ -378,32 +385,25 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
 
     # add value label for bar plot
-    rects = bar_ax.bar(x=bar_data['x'], height=bar_data['fake_count'], width=box_width, color=bar_color, alpha=0.5)
+    rects = bar_ax.bar(x=bar_data['x'], height=bar_data['fake_count'], width=bar_width, color=bar_color, alpha=0.5)
     _autolabel(rects=rects, ax=bar_ax, bar_color=bar_color)
     _axes_modify(font_family=font_family, ax=bar_ax)
 
     # target lines
-    if len(target_lines) == 1:
-        target_line = target_lines[0].sort_values('x', ascending=True).set_index('x')
-        line_ax.plot(target_line.index.values, target_line[target].values,
-                     linewidth=line_width, c=line_color, marker='o')
+    for target_idx in range(len(target)):
+        if len(target) > 1:
+            line_color = line_colors[target_idx % len(target)]
+        target_line = target_lines[target_idx].sort_values('x', ascending=True).set_index('x')
+        line_ax.plot(target_line.index.values, target_line[target[target_idx]], linewidth=line_width,
+                     c=line_color, marker='o', label=target[target_idx])
         for idx in target_line.index.values:
             bbox_props = {'facecolor': line_color, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
-            line_ax.text(idx, target_line.loc[idx, target], '%.3f' % target_line.loc[idx, target],
-                         ha="center", va="bottom", size=10, bbox=bbox_props, color='#ffffff')
-    else:
-        line_colors = plt.get_cmap('tab20')(range(20))
-        for target_idx in range(len(target)):
-            line_color = line_colors[target_idx]
-            target_line = target_lines[target_idx].sort_values('x', ascending=True).set_index('x')
-            line_ax.plot(target_line.index.values, target_line[target[target_idx]], linewidth=line_width,
-                         c=line_color, marker='o', label=target[target_idx])
-            for idx in target_line.index.values:
-                bbox_props = {'facecolor': line_color, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
-                line_ax.text(idx, target_line.loc[idx, target[target_idx]],
-                             '%.3f' % target_line.loc[idx, target[target_idx]],
-                             ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff')
-            line_ax.legend(loc="upper left", ncol=5, bbox_to_anchor=(0, 1.2), frameon=False)
+            line_ax.text(idx, target_line.loc[idx, target[target_idx]],
+                         '%.3f' % target_line.loc[idx, target[target_idx]],
+                         ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff')
+
+    if len(target) > 1:
+        line_ax.legend(loc="upper left", ncol=5, bbox_to_anchor=(0, 1.2), frameon=False)
 
     _axes_modify(font_family=font_family, ax=line_ax)
 
@@ -414,47 +414,141 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     return [title_ax, bar_ax, line_ax]
 
 
-def _plot_legend(value_min, value_max, count_min, count_max, legend_axes, cmap, font_family):
+def _plot_legend(value_min, value_max, count_min, count_max, legend_ax, cmap, font_family):
     norm = mpl.colors.Normalize(vmin=float(value_min), vmax=float(value_max))
 
     # colorbar
-    cax = inset_axes(legend_axes[0], height="20%", width="100%", loc=10)
+    cax = inset_axes(legend_ax[0], height="20%", width="100%", loc=10)
     cb = mpl.colorbar.ColorbarBase(cax, cmap=plt.get_cmap(cmap), norm=norm, orientation='horizontal')
-    legend_axes[0].set_xlabel('Average target value', color='#424242')
+    legend_ax[0].set_xlabel('Average target value', color='#424242')
     cb.outline.set_linewidth(0)
     cb.set_ticks([])
 
-    legend_axes[0].set_xticks(range(2))
-    legend_axes[0].set_xticklabels([round(value_min, 3), round(value_max, 3)])
+    legend_ax[0].set_xticks(range(2))
+    legend_ax[0].set_xticklabels([round(value_min, 3), round(value_max, 3)])
 
     # circle size
-    legend_axes[1].scatter([-0.5, 0.75, 2], [1] * 3, s=[100, 500, 1000],
+    legend_ax[1].scatter([-0.5, 0.75, 2], [1] * 3, s=[100, 500, 1000],
                            edgecolors=plt.get_cmap(cmap)(1.), color='white')
-    legend_axes[1].set_xlim(-1, 3)
-    legend_axes[1].set_xlabel('Counts', color='#424242')
+    legend_ax[1].set_xlim(-1, 3)
+    legend_ax[1].set_xlabel('Counts', color='#424242')
 
-    legend_axes[1].set_xticks([-1, 3])
-    legend_axes[1].set_xticklabels([count_min, count_max])
+    legend_ax[1].set_xticks([-1, 3])
+    legend_ax[1].set_xticklabels([count_min, count_max])
 
     for i in range(2):
         for d in ['top', 'right', 'left']:
-            legend_axes[i].spines[d].set_visible(False)
-        legend_axes[i].spines['bottom'].set_edgecolor('#424242')
+            legend_ax[i].spines[d].set_visible(False)
+        legend_ax[i].spines['bottom'].set_edgecolor('#424242')
 
-        for tick in legend_axes[i].get_xticklabels():
+        for tick in legend_ax[i].get_xticklabels():
             tick.set_fontname(font_family)
-        for tick in legend_axes[i].get_yticklabels():
+        for tick in legend_ax[i].get_yticklabels():
             tick.set_fontname(font_family)
 
-        legend_axes[i].set_facecolor('white')
-        legend_axes[i].tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#424242')
-        legend_axes[i].set_yticks([])
+        legend_ax[i].set_facecolor('white')
+        legend_ax[i].tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#424242')
+        legend_ax[i].set_yticks([])
+
+
+def _modify_legend_ax(ax, font_family):
+    for d in ['top', 'right', 'left']:
+        ax.spines[d].set_visible(False)
+    ax.spines['bottom'].set_edgecolor('#424242')
+
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.set_facecolor('white')
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#424242')
+    ax.set_yticks([])
+
+
+def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family):
+    norm = mpl.colors.Normalize(vmin=float(value_min), vmax=float(value_max))
+
+    # colorbar
+    cax = inset_axes(colorbar_ax, height="20%", width="100%", loc=10)
+    cb = mpl.colorbar.ColorbarBase(cax, cmap=plt.get_cmap(cmap), norm=norm, orientation='horizontal')
+    colorbar_ax.set_xlabel('Average target value', color='#424242')
+    cb.outline.set_linewidth(0)
+    cb.set_ticks([])
+
+    colorbar_ax.set_xticks(range(2))
+    colorbar_ax.set_xticklabels([round(value_min, 3), round(value_max, 3)])
+    _modify_legend_ax(colorbar_ax, font_family)
+
+
+def _plot_legend_circles(count_min, count_max, circle_ax, cmap, font_family):
+
+    # circle size
+    circle_ax.scatter([-0.5, 0.75, 2], [1] * 3, s=[100, 500, 1000],
+                      edgecolors=plt.get_cmap(cmap)(1.), color='white')
+    circle_ax.set_xlim(-1, 3)
+    circle_ax.set_xlabel('Counts', color='#424242')
+
+    circle_ax.set_xticks([-1, 3])
+    circle_ax.set_xticklabels([count_min, count_max])
+    _modify_legend_ax(circle_ax, font_family)
+
+
+def _plot_interact(target_count_data, _target, plot_ax, feature_names, display_columns, percentile_columns,
+                   marker_sizes, cmap, line_width, xticks_rotation, font_family):
+    plot_ax.set_xticks(range(len(display_columns[0])))
+    plot_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
+    plot_ax.set_yticks(range(len(display_columns[1])))
+    plot_ax.set_yticklabels(display_columns[1])
+    plot_ax.set_xlim(-0.5, len(display_columns[0]) - 0.5)
+    plot_ax.set_ylim(-0.5, len(display_columns[1]) - 0.5)
+
+    # display percentile
+    if len(percentile_columns[0]) > 0:
+        percentile_ax = plot_ax.twiny()
+        percentile_ax.set_xticks(plot_ax.get_xticks())
+        percentile_ax.set_xbound(plot_ax.get_xbound())
+        percentile_ax.set_xticklabels(percentile_columns[0], rotation=xticks_rotation)
+        percentile_ax.set_xlabel('percentile buckets')
+        _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+
+    # display percentile
+    if len(percentile_columns[1]) > 0:
+        percentile_ay = plot_ax.twinx()
+        percentile_ay.set_yticks(plot_ax.get_yticks())
+        percentile_ay.set_ybound(plot_ax.get_ybound())
+        percentile_ay.set_yticklabels(percentile_columns[1])
+        percentile_ay.set_ylabel('percentile buckets')
+        _axes_modify(font_family=font_family, ax=percentile_ay, right=True)
+
+    value_min, value_max = target_count_data[_target].min(), target_count_data[_target].max()
+    value_min_pts = target_count_data[target_count_data[_target] == value_min].reset_index(drop=True)
+    value_max_pts = target_count_data[target_count_data[_target] == value_max].reset_index(drop=True)
+    colors = [plt.get_cmap(cmap)(float(v - value_min) / value_max - value_min)
+              for v in target_count_data[_target].values]
+
+    plot_ax.scatter(target_count_data['x1'].values, target_count_data['x2'].values,
+                    s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.))
+    plot_ax.set_xlabel(feature_names[0])
+    plot_ax.set_ylabel(feature_names[1])
+
+    # add annotation
+    for pts in [value_min_pts, value_max_pts]:
+        for i in range(pts.shape[0]):
+            pt = pts.iloc[i]
+            anno_text = '%.3f\n count: %d' % (pt[_target], pt['fake_count'])
+            anno_x, anno_y = pt['x1'], pt['x2']
+            text_x, text_y = anno_x + 0.2, anno_y + 0.2
+            plot_ax.annotate(anno_text, xy=(anno_x, anno_y), xytext=(text_x, text_y),
+                             arrowprops=dict(facecolor='black', arrowstyle="->"))
+
+    _axes_modify(font_family=font_family, ax=plot_ax)
+    return value_min, value_max
 
 
 def _target_plot_interact(feature_names, display_columns, percentile_columns, target, target_count_data,
                           figsize, ncols, plot_params):
 
-    target = _make_list(target)
     nrows = int(np.ceil(len(target) * 1.0 / ncols))
     ncols = np.min([len(target), ncols])
     width = np.min([8 * len(target), 16])
@@ -469,107 +563,67 @@ def _target_plot_interact(feature_names, display_columns, percentile_columns, ta
 
     font_family = plot_params.get('font_family', 'Arial')
     cmap = plot_params.get('cmap', 'Blues')
+    cmaps = plot_params.get('cmaps', ['Blues', 'Greens', 'Oranges', 'Reds', 'Purples', 'Greys'])
     line_width = plot_params.get('line_width', 1)
     xticks_rotation = plot_params.get('xticks_rotation', 0)
-    line_color = plt.get_cmap(cmap)(1.0)
+    marker_size_min = plot_params.get('marker_size_min', 50)
+    marker_size_max = plot_params.get('marker_size_max', 1500)
 
-    # draw title and values
+    # plot title
     plt.figure(figsize=(width, 2))
     title_ax = plt.subplot(111)
-
-    _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, sharex='col', sharey='row', figsize=(width, height))
-
-    # draw legend
-    legend_width = np.max([8, np.min([width, 12])])
-    _, legend_axes = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
-
     _target_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
 
-    marker_size_min, marker_size_max = 50, 2000
+    # draw value plots and legend
     count_min, count_max = target_count_data['fake_count'].min(), target_count_data['fake_count'].max()
-
     marker_sizes = []
     for count in target_count_data['fake_count'].values:
         size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
-
-    plot_ax = []
-    # recreate target value range here
-    value_min, value_max = target_count_data[target[0]].min(), target_count_data[target[0]].max()
-    value_min_pts = target_count_data[target_count_data[target[0]] == value_min].reset_index(drop=True)
-    value_max_pts = target_count_data[target_count_data[target[0]] == value_max].reset_index(drop=True)
+    legend_width = np.max([8, np.min([width, 12])])
 
     if len(target) == 1:
-        plot_ax.append(value_ax)
+        _, value_ax = plt.subplots(nrows=1, ncols=1, figsize=(width, height))
+        value_min, value_max = _plot_interact(
+            target_count_data=target_count_data, _target=target[0], plot_ax=value_ax,
+            feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+            marker_sizes=marker_sizes, cmap=cmap, line_width=line_width, xticks_rotation=xticks_rotation,
+            font_family=font_family)
+
+        # draw legend
+        _, legend_ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
+        _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=legend_ax[0],
+                              cmap=cmap, font_family=font_family)
+        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax[1],
+                             cmap=cmap, font_family=font_family)
+
     else:
-        plot_ax = value_ax.flatten()
-        for idx in range(1, len(target)):
-            if target_count_data[target[idx]].min() < value_min:
-                value_min = target_count_data[target[idx]].min()
-                value_min_pts = target_count_data[target_count_data[target[idx]] == value_min].reset_index(drop=True)
-            if target_count_data[target[idx]].max() > value_max:
-                value_max = target_count_data[target[idx]].max()
-                value_max_pts = target_count_data[target_count_data[target[idx]] == value_max].reset_index(drop=True)
-    target_value_range = [value_min, value_max]
+        fig = plt.figure(figsize=(width, height))
+        outer = GridSpec(nrows, ncols, wspace=0.05, hspace=0.05)
+        for target_idx in range(len(target)):
+            cmap = cmaps[target_idx % len(cmaps)]
+            inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer[target_idx],
+                                            wspace=0, hspace=0, height_ratios=[7., 1.])
+            inner_value_ax = plt.Subplot(fig, inner[0])
+            value_min, value_max = _plot_interact(
+                target_count_data=target_count_data, _target=target[target_idx], plot_ax=inner_value_ax,
+                feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+                marker_sizes=marker_sizes, cmap=cmap, line_width=line_width,
+                xticks_rotation=xticks_rotation, font_family=font_family)
 
-    _plot_legend(value_min, value_max, count_min, count_max, legend_axes, cmap, font_family)
+            inner_legend_ax = plt.Subplot(fig, inner[1])
+            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=inner_legend_ax,
+                                  cmap=cmap, font_family=font_family)
 
-    for idx in range(len(plot_ax)):
-        plot_ax[idx].set_xticks(range(len(display_columns[0])))
-        plot_ax[idx].set_xticklabels(display_columns[0], rotation=xticks_rotation)
-        plot_ax[idx].set_yticks(range(len(display_columns[1])))
-        plot_ax[idx].set_yticklabels(display_columns[1])
-        plot_ax[idx].set_xlim(-0.5, len(display_columns[0]) - 0.5)
-        plot_ax[idx].set_ylim(-0.5, len(display_columns[1]) - 0.5)
+            fig.add_subplot(inner[0])
+            fig.add_subplot(inner[1])
 
-        # display percentile
-        if len(percentile_columns[0]) > 0:
-            percentile_ax = plot_ax[idx].twiny()
-            percentile_ax.set_xticks(plot_ax[idx].get_xticks())
-            percentile_ax.set_xbound(plot_ax[idx].get_xbound())
-            percentile_ax.set_xticklabels(percentile_columns[0], rotation=xticks_rotation)
-            percentile_ax.set_xlabel('percentile buckets')
-            _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+        value_ax = fig.axes
+        plt.figure(figsize=(legend_width / 3., 1))
+        legend_ax = plt.subplot(111)
 
-        # display percentile
-        if len(percentile_columns[1]) > 0:
-            percentile_ay = plot_ax[idx].twinx()
-            percentile_ay.set_yticks(plot_ax[idx].get_yticks())
-            percentile_ay.set_ybound(plot_ax[idx].get_ybound())
-            percentile_ay.set_yticklabels(percentile_columns[1])
-            percentile_ay.set_ylabel('percentile buckets')
-            _axes_modify(font_family=font_family, ax=percentile_ay, right=True)
-
-        colors = [plt.get_cmap(cmap)(float(v - target_value_range[0]) / (target_value_range[1] - target_value_range[0]))
-                  for v in target_count_data[target[idx]].values]
-        plot_ax[idx].scatter(target_count_data['x1'].values, target_count_data['x2'].values,
-                             s=marker_sizes, c=colors, linewidth=line_width, edgecolors=line_color)
-        plot_ax[idx].set_xlabel(feature_names[0])
-        plot_ax[idx].set_ylabel(feature_names[1])
-        if len(target) > 1:
-            if len(percentile_columns[0]) > 0:
-                plot_ax[idx].set_title(target[idx] + '\n\n', fontsize=12)
-            else:
-                plot_ax[idx].set_title(target[idx], fontsize=12)
-
-        # add annotation
-        for i in range(value_min_pts.shape[0]):
-            pt = value_min_pts.iloc[i]
-            anno_text = '%.3f\ncount: %d' %(value_min, pt['fake_count'])
-            anno_x, anno_y = pt['x1'], pt['x2']
-            text_x, text_y = anno_x + 0.2, anno_y + 0.2
-            plot_ax[idx].annotate(anno_text, xy=(anno_x, anno_y), xytext=(text_x, text_y),
-                                  arrowprops=dict(facecolor='black', arrowstyle="->"))
-
-        for i in range(value_max_pts.shape[0]):
-            pt = value_max_pts.iloc[i]
-            anno_text = '%.3f\ncount: %d' %(value_max, pt['fake_count'])
-            anno_x, anno_y = pt['x1'], pt['x2']
-            text_x, text_y = anno_x + 0.2, anno_y + 0.2
-            plot_ax[idx].annotate(anno_text, xy=(anno_x, anno_y), xytext=(text_x, text_y),
-                                  arrowprops=dict(facecolor='black', arrowstyle="->"))
-
-        _axes_modify(font_family=font_family, ax=plot_ax[idx])
+        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax,
+                             cmap=cmap, font_family=font_family)
 
     return [title_ax, value_ax]
 
