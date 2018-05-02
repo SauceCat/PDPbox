@@ -75,7 +75,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
-                show_outliers=False, figsize=None, plot_params=None):
+                show_outliers=False, figsize=None, ncols=2, plot_params=None):
     """Plot average target value across different feature values (feature grids)
 
     Parameters:
@@ -166,7 +166,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     axes = _target_plot(
         feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
-        target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, plot_params=plot_params)
+        target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, ncols=ncols,
+        plot_params=plot_params)
     return axes, summary_df
 
 
