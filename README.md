@@ -36,14 +36,6 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
 
 ## Examples
 
-### target_plot
-Plot average target value across different feature values (grid buckets)  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png" width="80%"><br>
-
-### target_plot_interact
-Plot average target value across different feature value combinations  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png" width="80%"><br>
-
 ### Binary feature
 - single variable plot with original points and individual lines    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/binary_03.png" width="80%"><br>
@@ -77,3 +69,12 @@ Plot average target value across different feature value combinations
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/inter_01.png"><br>
 - multiclass with only contour plots    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/multi_03.png"><br>
+  
+### infomation plots (pdpbox.info_plots)
+- **target_plot**
+Plot average target value across different feature values (grid buckets)  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png" width="80%"><br>
+
+- **target_plot_interact**
+Plot average target value across different feature value combinations  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png" width="80%"><br>
