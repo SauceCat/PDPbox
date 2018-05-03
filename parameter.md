@@ -456,3 +456,64 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     """
 ```
 ----
+### pdpbox.info_plots.target_plot_interact
+```python
+def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
+                         percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
+                         show_outliers=False, figsize=None, ncols=2, plot_params=None):
+    """Plot average target value across different feature value combinations (feature grid combinations)
+
+    Parameters:
+    -----------
+
+    :param df: pandas DataFrame
+        data set to investigate on, should contain at least
+        the feature to investigate as well as the target
+    :param features: list
+        two features to investigate
+    :param feature_names: list
+        feature names
+    :param target: string or list
+        column name or column name list for target value
+        for multi-class problem, a list of one-hot encoding target column
+    :param num_grid_points: list, optional, default=None
+        number of grid points for each feature
+    :param grid_types: list, optional, default=None
+        type of grid points for each feature
+    :param percentile_ranges: list of tuple, optional, default=None
+        percentile range to investigate for each feature
+    :param grid_ranges: list of tuple, optional, default=None
+        value range to investigate for each feature
+    :param cust_grid_points: list of (Series, 1d-array, list), optional, default=None
+        customized list of grid points for each feature
+    :param show_percentile: bool, optional, default=False
+        whether to display the percentile buckets for both feature
+    :param show_outliers: bool, optional, default=False
+        whether to display the out of range buckets for both features
+    :param figsize: tuple or None, optional, default=None
+        size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
+    :param plot_params: dict or None, optional, default=None
+        parameters for the plot
+
+    Notes:
+    ------
+    Parameters are consistent with the ones for function target_plot
+    But for this function, you need to specify parameter value for both features
+    in list format
+    For example:
+    percentile_ranges = [(0, 90), (5, 95)] means
+    percentile_range = (0, 90) for feature 1
+    percentile_range = (5, 95) for feature 2
+
+    Return:
+    -------
+
+    :return axes: matplotlib Axes
+        Returns the Axes object with the plot for further tweaking
+    :return summary_df: pandas DataFrame
+        Graph data in data frame format
+    """
+```
+----
