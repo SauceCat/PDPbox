@@ -4,10 +4,9 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-import seaborn as sns
 
-from info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_title
-from other_utils import _check_feature, _check_percentile_range, _check_target, _make_list, _expand_default
+from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_title
+from .other_utils import _check_feature, _check_percentile_range, _make_list, _expand_default
 
 
 def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
@@ -17,14 +16,14 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
 
     :param pdp_isolate_out: instance of pdp_isolate_obj
         a calculated pdp_isolate_obj instance
-    :param feature_name: tring
+    :param feature_name: string
         name of the feature, not necessary the same as the column name
     :param figsize: (width, height), default=None
         figure size
     :param plot_params: dict, default=None
         values of plot parameters
     :param multi_flag: boolean, default=False
-        whether it is a subplot of a multiclass plot
+        whether it is a subplot of a multi-class plot
     :param which_class: integer, default=None
         which class to plot
     :param ncols: integer, default=None

@@ -8,10 +8,9 @@ from mpl_toolkits.axes_grid.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import copy
-from pdp_plot_utils import _axes_modify
-from other_utils import _make_list
-from pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
-                            _find_closest, _make_bucket_column_names_percentile)
+from .pdp_plot_utils import _axes_modify
+from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
+                             _find_closest, _make_bucket_column_names_percentile)
 
 
 def _actual_plot_title(feature_name, ax, figsize, multi_flag, which_class, plot_params):

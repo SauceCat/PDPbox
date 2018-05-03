@@ -6,7 +6,7 @@ from matplotlib.gridspec import GridSpec
 
 import copy
 
-import pdp_calc_utils
+from .pdp_calc_utils import _sample_data, _find_onehot_actual, _find_closest
 from sklearn.cluster import MiniBatchKMeans, KMeans
 
 
@@ -158,26 +158,26 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_org_pts, plot_lines, f
             _ice_cluster_plot(x=x, ice_lines=ice_lines, feature_grids=feature_grids, n_cluster_centers=n_cluster_centers,
                               cluster_method=cluster_method, ax=ax, plot_params=plot_params)
         else:
-            ice_plot_data = pdp_calc_utils._sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
+            ice_plot_data = _sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
             _ice_line_plot(x=x, ice_plot_data=ice_plot_data, feature_grids=feature_grids, ax=ax, plot_params=plot_params)
 
     if plot_org_pts:
         ice_lines_temp = ice_lines.copy()
         if feature_type == 'onehot':
-            ice_lines_temp['x'] = ice_lines_temp[actual_columns].apply(lambda x: pdp_calc_utils._find_onehot_actual(x), axis=1)
-            ice_lines_temp = ice_lines_temp[ice_lines_temp['x'].isnull() == False].reset_index(drop=True)
+            ice_lines_temp['x'] = ice_lines_temp[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
+            ice_lines_temp = ice_lines_temp[~ice_lines_temp['x'].isnull()].reset_index(drop=True)
         elif feature_type == 'numeric':
             feature_grids = pdp_isolate_out.feature_grids
             ice_lines_temp = ice_lines_temp[(ice_lines_temp[actual_columns[0]] >= feature_grids[0])
                                             & (ice_lines_temp[actual_columns[0]] <= feature_grids[-1])]
             if x_quantile:
-                ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]].apply(lambda x : pdp_calc_utils._find_closest(x, feature_grids))
+                ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]].apply(lambda x: _find_closest(x, feature_grids))
             else:
                 ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]]
         else:
             ice_lines_temp['x'] = ice_lines_temp[actual_columns[0]]
 
-        ice_plot_data_pts = pdp_calc_utils._sample_data(ice_lines=ice_lines_temp, frac_to_plot=frac_to_plot)
+        ice_plot_data_pts = _sample_data(ice_lines=ice_lines_temp, frac_to_plot=frac_to_plot)
         _ice_plot_pts(ice_plot_data_pts=ice_plot_data_pts, ax=ax, plot_params=plot_params)
 
     std = ice_lines[feature_grids].std().values
