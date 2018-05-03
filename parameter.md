@@ -396,55 +396,63 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_pts=True, plot_lines=True, frac_to_plot=0.01, multi_flag=False, which_class=5, x_quantile=True, only_inter=True, ncols=3)
 ```
 ----------------------------------------------------------------------------------------
-#### pdpbox.info_plots.target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False, figsize=None, ncols=2, plot_params=None)
-```
-Parameters:
------------
+### pdpbox.info_plots.target_plot
 
-:param df: pandas DataFrame
-    data set to investigate on, should contain at least
-    the feature to investigate as well as the target
-:param feature: string or list
-    feature or feature list to investigate
-    for one-hot encoding features, feature list is required
-:param feature_name: string
-    name of the feature, not necessary a column name
-:param target: string or list
-    column name or column name list for target value
-    for multi-class problem, a list of one-hot encoding target column
-:param num_grid_points: integer, optional, default=10
-    number of grid points for numeric feature
-:param grid_type: string, optional, default='percentile'
-    'percentile' or 'equal'
-    type of grid points for numeric feature
-:param percentile_range: tuple or None, optional, default=None
-    percentile range to investigate
-    for numeric feature when grid_type='percentile'
-:param grid_range: tuple or None, optional, default=None
-    value range to investigate
-    for numeric feature when grid_type='equal'
-:param cust_grid_points: Series, 1d-array, list or None, optional, default=None
-    customized list of grid points
-    for numeric feature
-:param show_percentile: bool, optional, default=False
-    whether to display the percentile buckets
-    for numeric feature when grid_type='percentile'
-:param show_outliers: bool, optional, default=False
-    whether to display the out of range buckets
-    for numeric feature when percentile_range or grid_range is not None
-:param figsize: tuple or None, optional, default=None
-    size of the figure, (width, height)
-:param ncols: integer, optional, default=2
-    number subplot columns, used when it is multi-class problem
-:param plot_params: dict or None, optional, default=None
-    parameters for the plot
+```python
+def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
+                percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
+                show_outliers=False, figsize=None, ncols=2, plot_params=None):
+		
+    """Plot average target value across different feature values (feature grids)
 
-Return:
--------
+    Parameters:
+    -----------
 
-:return axes: matplotlib Axes
-    Returns the Axes object with the plot for further tweaking
-:return summary_df: pandas DataFrame
-    Graph data in data frame format
+    :param df: pandas DataFrame
+        data set to investigate on, should contain at least
+        the feature to investigate as well as the target
+    :param feature: string or list
+        feature or feature list to investigate
+        for one-hot encoding features, feature list is required
+    :param feature_name: string
+        name of the feature, not necessary a column name
+    :param target: string or list
+        column name or column name list for target value
+        for multi-class problem, a list of one-hot encoding target column
+    :param num_grid_points: integer, optional, default=10
+        number of grid points for numeric feature
+    :param grid_type: string, optional, default='percentile'
+        'percentile' or 'equal'
+        type of grid points for numeric feature
+    :param percentile_range: tuple or None, optional, default=None
+        percentile range to investigate
+        for numeric feature when grid_type='percentile'
+    :param grid_range: tuple or None, optional, default=None
+        value range to investigate
+        for numeric feature when grid_type='equal'
+    :param cust_grid_points: Series, 1d-array, list or None, optional, default=None
+        customized list of grid points
+        for numeric feature
+    :param show_percentile: bool, optional, default=False
+        whether to display the percentile buckets
+        for numeric feature when grid_type='percentile'
+    :param show_outliers: bool, optional, default=False
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
+    :param figsize: tuple or None, optional, default=None
+        size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
+    :param plot_params: dict or None, optional, default=None
+        parameters for the plot
+
+    Return:
+    -------
+
+    :return axes: matplotlib Axes
+        Returns the Axes object with the plot for further tweaking
+    :return summary_df: pandas DataFrame
+        Graph data in data frame format
+    """
 ```
 ----
