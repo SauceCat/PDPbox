@@ -35,6 +35,15 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
   ```
 
 ## Examples
+
+### target_plot
+Plot average target value across different feature values (grid buckets)  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png" width="80%"><br>
+
+### target_plot_interact
+Plot average target value across different feature value combinations  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png" width="80%"><br>
+
 ### Binary feature
 - single variable plot with original points and individual lines    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/binary_03.png" width="80%"><br>
@@ -42,8 +51,6 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/binary_04.png" width="80%"><br>
 - actual predictions plot for a single variable  
   <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_01.PNG" width="80%"><br>
-- target plot for a single variable (true survived rate through different values of a variable)   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_01.png" width="80%"><br>
 
 ### Numeric feature 
 - single variable plot with percentile_range=(5, 95)    
@@ -52,8 +59,6 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/numeric_06.png" width="80%"><br>
 - actual predictions plot for a single variable   
   <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_03.PNG" width="80%">
-- target plot for a single variable (true survived rate through different values of a variable)   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_02.png" width="80%"><br>
 
 ### One-hot encoding feature
 - single variable plot with individual lines and original points    
@@ -62,14 +67,10 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/onehot_02.png" width="80%"><br>
 - actual predictions plot for a single variable   
   <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_02.PNG" width="80%"><br>
-- target plot for a single variable (true survived rate through different values of a variable)   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_03.png" width="80%"><br>
 
 ### Multiclass
 - single variable plot with individual lines and original points  
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/multi_02.png" width="80%"><br>
-- target plot for a single variable   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_04.png" width="80%"><br>
 
 ### Interaction between two variables
 - the complete plot   
