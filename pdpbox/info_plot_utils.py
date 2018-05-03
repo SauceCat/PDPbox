@@ -144,19 +144,6 @@ def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
 
 
 def _autolabel(rects, ax, bar_color):
-    """add annotation for bar plot
-
-    Parameters:
-    -----------
-
-    :param rects: list of matplotlib Axes
-        list of axes returned by bar plot
-    :param ax: matplotlib Axes
-        axes to plot on
-    :param bar_color: string
-        color for the bars
-    """
-
     for rect in rects:
         height = rect.get_height()
         bbox_props = {'facecolor': 'white', 'edgecolor': bar_color, 'boxstyle': "square,pad=0.5"}
@@ -254,23 +241,12 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         data_x['x'] = data_x[feature].apply(lambda x: _find_onehot_actual(x=x), axis=1)
         data_x = data_x[~data_x['x'].isnull()].reset_index(drop=True)
 
+    data_x['x'] = data_x['x'].map(int)
+
     return data_x, display_columns, percentile_columns
 
 
 def _target_plot_title(feature_name, ax, plot_params):
-    """title for target plot
-
-    Parameters:
-    -----------
-
-    :param feature_name: string
-        name of the feature, not necessary a column name
-    :param ax: matplotlib Axes
-        axes to plot on
-    :param plot_params: dict
-        parameters for the plot
-    """
-
     font_family = plot_params.get('font_family', 'Arial')
     title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
     subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
@@ -308,11 +284,10 @@ def _plot_bar_line(_target, bar_data, bar_ax, bar_width, bar_color, target_line,
     _axes_modify(font_family=font_family, ax=bar_ax)
 
     # target lines
-    line_ax.plot(target_line.index.values, target_line[_target], linewidth=line_width,
-                 c=line_color, marker='o')
+    line_ax.plot(target_line['x'], target_line[_target], linewidth=line_width, c=line_color, marker='o')
     for idx in target_line.index.values:
         bbox_props = {'facecolor': line_color, 'edgecolor': 'none', 'boxstyle': "square,pad=0.5"}
-        line_ax.text(idx, target_line.loc[idx, _target],
+        line_ax.text(target_line.loc[idx, 'x'], target_line.loc[idx, _target],
                      '%.3f' % target_line.loc[idx, _target],
                      ha="center", va="top", size=10, bbox=bbox_props, color='#ffffff')
 
@@ -336,24 +311,25 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         list of xticklabels
     :param percentile_columns: list
         list of xticklabels in percentile format
-    :param target: string or list
-        column name or column name list for target value
-        for multi-class problem, a list of one-hot encoding target column
+    :param target: list
+        list of target columns to investigate
+        if it is not multi-classes, the list would only contain 1 element
     :param bar_data: pandas DataFrame
         data for bar plot
     :param target_lines: list of pandas DataFrame
         data for target lines
     :param figsize: tuple or None
         size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
     :param plot_params: dict or None
         parameters for the plot
 
     Returns:
     --------
 
-    :return: matplotlib Axes or list of matplotlib Axes
-        if Axes is provided, return provided Axes
-        if not, return [axes for title, axes for bar, axes for line]
+    :return: list of matplotlib Axes
+        [axes for title, axes for bar, axes for line]
     """
 
     # set up graph parameters
@@ -402,6 +378,12 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         bar_ax = []
         line_ax = []
 
+        # get max average target value
+        ys = []
+        for target_idx in range(len(target)):
+            ys += list(target_lines[target_idx][target[target_idx]].values)
+        y_max = np.max(ys)
+
         for target_idx in range(len(target)):
             line_color_idx = line_colors[target_idx % len(line_colors)]
             bar_ax_idx = plot_axes[target_idx]
@@ -419,6 +401,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
                 subplot_title += '\n\n\n'
             plot_axes[target_idx].set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
 
+            line_ax_idx.set_ylim(0., y_max)
             bar_ax.append(bar_ax_idx)
             line_ax.append(line_ax_idx)
 
@@ -531,6 +514,29 @@ def _plot_interact(target_count_data, _target, plot_ax, feature_names, display_c
 
 def _target_plot_interact(feature_names, display_columns, percentile_columns, target, target_count_data,
                           figsize, ncols, plot_params):
+    """inner call for function target_plot_interact
+
+    :param feature_names: list
+        feature names
+    :param display_columns: list
+        xticklabels for both features
+    :param percentile_columns: list
+        xticklabels in percentile format for both features
+    :param target: list
+        list of target columns to investigate
+        if it is not multi-classes, the list would only contain 1 element
+    :param target_count_data: pandas DataFrame
+        data for the graph
+    :param figsize: tuple or None
+        size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
+    :param plot_params: dict or None
+        parameters for the plot
+
+    :return: list of matplotlib Axes
+        [axes for title, axes for value]
+    """
 
     nrows = int(np.ceil(len(target) * 1.0 / ncols))
     ncols = np.min([len(target), ncols])

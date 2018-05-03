@@ -51,15 +51,7 @@ def _pdp_plot_title(n_grids, feature_name, ax, multi_flag, which_class, plot_par
 
 
 def _axes_modify(font_family, ax, top=False, right=False, legend=False):
-    """format axes
-    
-    :param font_family: string
-        font family
-    :param ax: matplotlib Axes
-        axes to format
-    :param top: bool, optional, default=False
-        whether the axes need xticks on the top
-    """
+    # modify the axes
 
     for tick in ax.get_xticklabels():
         tick.set_fontname(font_family)

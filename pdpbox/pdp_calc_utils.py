@@ -44,7 +44,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
 
         grids_df = pd.DataFrame()
         grids_df['percentile_grids'] = percentile_grids
-        grids_df['value_grids'] = value_grids
+        grids_df['value_grids'] = [round(value, 2) for value in value_grids]
         grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
             {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
 
@@ -54,6 +54,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
             value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
         else:
             value_grids = np.linspace(np.min(x), np.max(x), num_grid_points)
+            value_grids = [round(value, 2) for value in value_grids]
 
         return value_grids, []
 
@@ -145,23 +146,7 @@ def _find_closest(x, feature_grids):
 
 
 def _find_bucket(x, feature_grids):
-    """map value into value bucket
-
-    Parameters:
-    -----------
-
-    :param x: numeric
-        value to map
-    :param feature_grids: 1d-array
-        array of grid points
-
-    Returns:
-    --------
-
-    :return bucket: integer
-        the mapped bucket number
-    """
-
+    # map value into value bucket
     if x < feature_grids[0]:
         bucket = 0
     elif x > feature_grids[-1]:
@@ -175,21 +160,7 @@ def _find_bucket(x, feature_grids):
 
 
 def _make_bucket_column_names(feature_grids):
-    """create bucket names
-
-    Parameters:
-    -----------
-
-    :param feature_grids: 1d-array
-        array of grid points
-
-    Returns:
-    --------
-
-    :return column_names: list
-        list of bucket names
-    """
-
+    # create bucket names
     column_names = []
 
     # number of buckets: len(feature_grids) - 1
@@ -204,21 +175,7 @@ def _make_bucket_column_names(feature_grids):
 
 
 def _make_bucket_column_names_percentile(percentile_info):
-    """create percentile bucket names
-
-    Parameters:
-    -----------
-
-    :param percentile_info: 1d-array
-        array of percentile information for grid points
-
-    Returns:
-    --------
-
-    :return percentile_column_names: list
-        list of percentile bucket names
-    """
-
+    # create percentile bucket names
     percentile_column_names = []
 
     for i in range(len(percentile_info) - 1):
