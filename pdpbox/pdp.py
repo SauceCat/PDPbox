@@ -145,6 +145,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
                                                         percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
+            percentile_info = None
 
         display_columns = feature_grids
         if percentile_info is not None:
