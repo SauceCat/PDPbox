@@ -1,6 +1,7 @@
 
-import pdp_calc_utils
-import pdp_plot_utils
+from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter
+from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_interact_plot_title,
+                             _pdp_contour_plot, _pdp_interact_plot)
 
 import pandas as pd
 import numpy as np
@@ -140,11 +141,15 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
                 if np.min(grid_range) < np.min(_train_X[feature].values) \
                         or np.max(grid_range) > np.max(_train_X[feature].values):
                     warnings.warn('grid_range: out of bound.')
-            feature_grids = pdp_calc_utils._get_grids(_train_X[feature].values, num_grid_points, grid_type,
-                                                      percentile_range, grid_range)
+            feature_grids, percentile_info = _get_grids(_train_X[feature].values, num_grid_points, grid_type,
+                                                        percentile_range, grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
+            percentile_info = None
+
         display_columns = feature_grids
+        if percentile_info is not None:
+            display_columns = [str(feature_grids[i]) + '\n' + str(percentile_info[i]) for i in range(len(percentile_info))]
 
     # get the actual prediction and actual values
     actual_columns = []
@@ -176,9 +181,9 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     true_n_jobs = np.min([num_units, n_jobs])
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
-        delayed(pdp_calc_utils._calc_ice_lines)(_train_X.copy(), model, classifier, model_features, n_classes,
-                                                feature, feature_type, feature_grids[i], display_columns[i],
-                                                predict_kwds, data_transformer) for i in range(len(feature_grids)))
+        delayed(_calc_ice_lines)(_train_X.copy(), model, classifier, model_features, n_classes,
+                                 feature, feature_type, feature_grids[i], predict_kwds,
+                                 data_transformer) for i in range(len(feature_grids)))
 
     if n_classes > 2:
         ice_lines = []
@@ -197,13 +202,13 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     if n_classes > 2:
         pdp_isolate_out = {}
         for n_class in range(n_classes):
-            pdp = ice_lines[n_class][display_columns].mean().values
+            pdp = ice_lines[n_class][feature_grids].mean().values
             pdp_isolate_out['class_%d' % n_class] = \
                 pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                 feature=feature, feature_type=feature_type, feature_grids=feature_grids,
                                 actual_columns=actual_columns, display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp)
     else:
-        pdp = ice_lines[display_columns].mean().values
+        pdp = ice_lines[feature_grids].mean().values
         pdp_isolate_out = pdp_isolate_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
                                           feature=feature, feature_type=feature_type, feature_grids=feature_grids,
                                           actual_columns=actual_columns, display_columns=display_columns,
@@ -290,18 +295,18 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
         plt.figure(figsize=(figwidth, figwidth / 8.))
         ax1 = plt.subplot(111)
         n_grids = len(pdp_isolate_out['class_0'].feature_grids)
-        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
-                                       multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
+        _pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
+                        multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
 
         # PDP plots for each class
         plt.figure(figsize=(figwidth, (figwidth / ncols) * nrows))
         for n_class in range(n_classes):
             ax2 = plt.subplot(nrows, ncols, n_class + 1)
-            pdp_plot_utils._pdp_plot(pdp_isolate_out=pdp_isolate_out['class_%d' % (n_class)],
-                                     feature_name=feature_name + ' class_%d' % (n_class), center=center,
-                                     plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
-                                     cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                                     x_quantile=x_quantile, ax=ax2, plot_params=plot_params)
+            _pdp_plot(pdp_isolate_out=pdp_isolate_out['class_%d' % (n_class)],
+                      feature_name=feature_name + ' class_%d' % (n_class), center=center,
+                      plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
+                      cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
+                      x_quantile=x_quantile, ax=ax2, plot_params=plot_params)
     else:
         if figsize is None:
             plt.figure(figsize=(16, 9))
@@ -317,14 +322,14 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
         else:
             n_grids = len(pdp_isolate_out.feature_grids)
             _pdp_isolate_out = pdp_isolate_out
-        pdp_plot_utils._pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
-                                       multi_flag=False, which_class=None, plot_params=plot_params)
+        _pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=ax1,
+                        multi_flag=False, which_class=None, plot_params=plot_params)
 
         ax2 = plt.subplot(gs[1:, :])
-        pdp_plot_utils._pdp_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name, center=center,
-                                 plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
-                                 cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                                 x_quantile=x_quantile, ax=ax2, plot_params=plot_params)
+        _pdp_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name, center=center,
+                  plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
+                  cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
+                  x_quantile=x_quantile, ax=ax2, plot_params=plot_params)
 
 
 class pdp_interact_obj:
@@ -446,8 +451,9 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
     grids_combo = np.array(np.concatenate((grids_combo1, grids_combo2), axis=1))
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
-        delayed(pdp_calc_utils._calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes,
-                                                      feature_list, grids_combo[i], predict_kwds, data_transformer) for i in range(len(grids_combo)))
+        delayed(_calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes,
+                                       feature_list, grids_combo[i], predict_kwds, data_transformer)
+        for i in range(len(grids_combo)))
 
     ice_lines = pd.concat(grid_results, axis=0).reset_index(drop=True)
     pdp = ice_lines.groupby(feature_list, as_index=False).mean()
@@ -551,17 +557,17 @@ def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts
             # draw graph title
             plt.figure(figsize=(figwidth, figwidth / 7.5))
             ax0 = plt.subplot(111)
-            pdp_plot_utils._pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names,
-                                                    ax=ax0, multi_flag=multi_flag, which_class=which_class,
-                                                    only_inter=only_inter, plot_params=plot_params)
+            _pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names,
+                                     ax=ax0, multi_flag=multi_flag, which_class=which_class,
+                                     only_inter=only_inter, plot_params=plot_params)
 
             plt.figure(figsize=(figwidth, (figwidth / ncols) * nrows))
             for n_class in range(n_classes):
                 ax1 = plt.subplot(nrows, ncols, n_class + 1)
-                pdp_plot_utils._pdp_contour_plot(pdp_interact_out['class_%d' % n_class],
-                                                 feature_names=[feature_names[0] + ' class_%d' % n_class,
-                                                                feature_names[1] + ' class_%d' % n_class],
-                                                 x_quantile=x_quantile, ax=ax1, fig=None, plot_params=plot_params)
+                _pdp_contour_plot(pdp_interact_out['class_%d' % n_class],
+                                  feature_names=[feature_names[0] + ' class_%d' % n_class,
+                                                 feature_names[1] + ' class_%d' % n_class],
+                                  x_quantile=x_quantile, ax=ax1, fig=None, plot_params=plot_params)
         else:
             if figsize is None:
                 fig = plt.figure(figsize=(8, 10))
@@ -577,32 +583,32 @@ def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts
             else:
                 _pdp_interact_out = pdp_interact_out
 
-            pdp_plot_utils._pdp_interact_plot_title(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
-                                                    ax=ax0, multi_flag=multi_flag, which_class=which_class,
-                                                    only_inter=only_inter, plot_params=plot_params)
+            _pdp_interact_plot_title(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
+                                     ax=ax0, multi_flag=multi_flag, which_class=which_class,
+                                     only_inter=only_inter, plot_params=plot_params)
 
             ax1 = plt.subplot(gs[1:, :])
-            pdp_plot_utils._pdp_contour_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
-                                             x_quantile=x_quantile, ax=ax1, fig=fig, plot_params=plot_params)
+            _pdp_contour_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
+                              x_quantile=x_quantile, ax=ax1, fig=fig, plot_params=plot_params)
     else:
         if type(pdp_interact_out) == dict and not multi_flag:
             n_classes = len(pdp_interact_out.keys())
             for n_class in range(n_classes):
-                pdp_plot_utils._pdp_interact_plot(pdp_interact_out=pdp_interact_out['class_%d' % n_class],
-                                                  feature_names=feature_names, center=center, plot_org_pts=plot_org_pts,
-                                                  plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
-                                                  n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                                                  x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
-                                                  multi_flag=True, which_class=n_class)
+                _pdp_interact_plot(pdp_interact_out=pdp_interact_out['class_%d' % n_class],
+                                   feature_names=feature_names, center=center, plot_org_pts=plot_org_pts,
+                                   plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
+                                   n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
+                                   x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
+                                   multi_flag=True, which_class=n_class)
         else:
             if multi_flag:
                 _pdp_interact_out = pdp_interact_out['class_%d' % which_class]
             else:
                 _pdp_interact_out = pdp_interact_out
 
-            pdp_plot_utils._pdp_interact_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names, center=center,
-                                              plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
-                                              cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                                              x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
-                                              multi_flag=False, which_class=None)
+            _pdp_interact_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names, center=center,
+                               plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
+                               cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
+                               x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
+                               multi_flag=False, which_class=None)
 

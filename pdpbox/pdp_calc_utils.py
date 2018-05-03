@@ -3,44 +3,64 @@ import numpy as np
 
 
 def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
-    """
-    Calculate grid points for numeric features
+    """calculate grid points for numeric feature
 
-    :param x: array of feature values
-    :param num_grid_points: number of grid points to calculate
-    :param grid_type, default='percentile'
-        can be 'percentile' or 'equal'
-    :param percentile_range: (low, high), default=None
-        percentile range to consider for numeric features
-    :param grid_range: (low, high), default=None
-        value range to consider for numeric features
+    Parameters:
+    -----------
 
-    :return:
-        array of calculated grid points
+    :param x: Series, 1d-array, or list.
+        values to calculate grid points
+    :param num_grid_points: integer
+        number of grid points for numeric feature
+    :param grid_type: string
+        'percentile' or 'equal'
+        type of grid points for numeric feature
+    :param percentile_range: tuple or None
+        percentile range to investigate
+        for numeric feature when grid_type='percentile'
+    :param grid_range: tuple or None
+        value range to investigate
+        for numeric feature when grid_type='equal'
+
+    Returns:
+    --------
+
+    :return feature_grids: 1d-array
+        calculated grid points
+    :return percentile_info: 1d-array or []
+        percentile information for feature_grids
+        exists when grid_type='percentile'
     """
 
     if grid_type == 'percentile':
-        if num_grid_points >= np.unique(x).size:
-            grids = np.unique(x)
-        else:
-            # grid points are calculated based on percentile in unique level
-            # thus the final number of grid points might be smaller than num_grid_points
-            if percentile_range is not None:
-                grids = np.unique(
-                    np.percentile(x, np.linspace(np.min(percentile_range), np.max(percentile_range), num_grid_points)))
-            else:
-                grids = np.unique(np.percentile(x, np.linspace(0, 100, num_grid_points)))
+        # grid points are calculated based on percentile in unique level
+        # thus the final number of grid points might be smaller than num_grid_points
+        start, end = 0, 100
+        if percentile_range is not None:
+            start, end = np.min(percentile_range), np.max(percentile_range)
+
+        percentile_grids = np.linspace(start=start, stop=end, num=num_grid_points)
+        value_grids = np.percentile(x, percentile_grids)
+
+        grids_df = pd.DataFrame()
+        grids_df['percentile_grids'] = [round(p, 2) for p in percentile_grids]
+        grids_df['value_grids'] = [round(value, 2) for value in value_grids]
+        grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
+            {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
+
+        return grids_df['value_grids'].values, grids_df['percentile_grids'].values
     else:
         if grid_range is not None:
-            grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
+            value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
         else:
-            grids = np.linspace(np.min(x), np.max(x), num_grid_points)
+            value_grids = np.linspace(np.min(x), np.max(x), num_grid_points)
+            value_grids = [round(value, 2) for value in value_grids]
 
-    return np.array([round(val, 2) for val in grids])
+        return value_grids, []
 
 
 def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
-                    feature_grid, display_column, predict_kwds, data_transformer):
+                    feature_grid, predict_kwds, data_transformer):
     if feature_type == 'onehot':
         other_grids = list(set(feature) - set([feature_grid]))
         data[feature_grid] = 1
@@ -63,13 +83,13 @@ def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature,
     if n_classes > 2:
         grid_results = []
         for n_class in range(n_classes):
-            grid_result = pd.DataFrame(preds[:, n_class], columns=[display_column])
+            grid_result = pd.DataFrame(preds[:, n_class], columns=[feature_grid])
             grid_results.append(grid_result)
     else:
         if classifier:
-            grid_results = pd.DataFrame(preds[:, 1], columns=[display_column])
+            grid_results = pd.DataFrame(preds[:, 1], columns=[feature_grid])
         else:
-            grid_results = pd.DataFrame(preds, columns=[display_column])
+            grid_results = pd.DataFrame(preds, columns=[feature_grid])
 
     return grid_results
 
@@ -96,12 +116,13 @@ def _sample_data(ice_lines, frac_to_plot):
 
 
 def _find_onehot_actual(x):
-    """
-    Find the actual value for one-hot encoding feature
+    """map one-hot value to one-hot name
 
-    :param x: all related one-hot encoding values
+    :param x: 1-d array
+        example: [0, 1, 0, 0]
 
-    :return: index of the actual value
+    :return value: string
+        index of the mapped one-hot name
     """
 
     try:
@@ -122,6 +143,58 @@ def _find_closest(x, feature_grids):
     """
     values = list(feature_grids)
     return values.index(min(values, key=lambda y: abs(y-x)))
+
+
+def _find_bucket(x, feature_grids):
+    # map value into value bucket
+    if x < feature_grids[0]:
+        bucket = 0
+    elif x > feature_grids[-1]:
+        bucket = len(feature_grids)
+    else:
+        bucket = len(feature_grids) - 1
+        for i in range(len(feature_grids) - 2):
+            if feature_grids[i] <= x < feature_grids[i + 1]:
+                bucket = i + 1
+    return bucket
+
+
+def _make_bucket_column_names(feature_grids):
+    # create bucket names
+    column_names = []
+
+    # number of buckets: len(feature_grids) - 1
+    for i in range(len(feature_grids) - 1):
+        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+        if i == len(feature_grids) - 2:
+            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+        column_names.append(column_name)
+
+    column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
+    return column_names
+
+
+def _make_bucket_column_names_percentile(percentile_info):
+    # create percentile bucket names
+    percentile_column_names = []
+
+    for i in range(len(percentile_info) - 1):
+        # for each grid point, percentile information is in tuple format
+        # (percentile1, percentile2, ...)
+        # some grid points would belong to multiple percentiles
+        low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        percentile_column_name = '[%.2f, %.2f)' % (low, high)
+        if i == len(percentile_info) - 2:
+            percentile_column_name = '[%.2f, %.2f]' % (low, high)
+
+        percentile_column_names.append(percentile_column_name)
+
+    low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+    high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+    percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+
+    return percentile_column_names
 
 
 def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
