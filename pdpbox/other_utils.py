@@ -64,3 +64,16 @@ def _expand_default(x, default):
 	if x is None:
 		return [default] * 2
 	return x
+
+
+def _check_model(model):
+	try:
+		n_classes = len(model.classes_)
+		classifier = True
+		predict = model.predict_proba
+	except:
+		n_classes = 0
+		classifier = False
+		predict = model.predict
+
+	return n_classes, classifier, predict

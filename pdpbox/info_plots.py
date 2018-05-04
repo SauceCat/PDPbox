@@ -5,35 +5,56 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_title
-from .other_utils import _check_feature, _check_percentile_range, _make_list, _expand_default
+from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot_new, _actual_plot_title
+from .other_utils import _check_feature, _check_percentile_range, _make_list, _expand_default, _check_model
 
 
-def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
-                multi_flag=False, which_class=None, ncols=None):
-    """
-    Plot actual prediction distribution through feature grids
+def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='percentile', percentile_range=None,
+                grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False,
+                which_classes=None, predict_kwds={}, ncols=2, figsize=None, plot_params=None):
 
-    :param pdp_isolate_out: instance of pdp_isolate_obj
-        a calculated pdp_isolate_obj instance
-    :param feature_name: string
-        name of the feature, not necessary the same as the column name
-    :param figsize: (width, height), default=None
-        figure size
-    :param plot_params: dict, default=None
-        values of plot parameters
-    :param multi_flag: boolean, default=False
-        whether it is a subplot of a multi-class plot
-    :param which_class: integer, default=None
-        which class to plot
-    :param ncols: integer, default=None
-        used under multi-class mode
-    """
+    # check model
+    n_classes, classifier, predict = _check_model(model=model)
 
-    # check which_class
-    if multi_flag and which_class >= len(pdp_isolate_out.keys()):
-        raise ValueError('which_class: class does not exist')
+    # check input data set
+    if type(X) != pd.core.frame.DataFrame:
+        raise ValueError('X: only accept pandas DataFrame')
 
+    # check percentile_range
+    _check_percentile_range(percentile_range=percentile_range)
+
+    # prediction
+    _X = X.copy()
+    prediction = predict(_X, **predict_kwds)
+
+    info_df = _X[_make_list(feature)]
+    actual_prediction_columns = ['actual_prediction']
+    if n_classes == 0:
+        info_df['actual_prediction'] = prediction
+    elif n_classes == 2:
+        info_df['actual_prediction'] = prediction[:, 1]
+    else:
+        plot_classes = range(n_classes)
+        if which_classes is not None:
+            plot_classes = sorted(which_classes)
+
+        actual_prediction_columns = []
+        for class_idx in plot_classes:
+            info_df['actual_prediction_%d' % class_idx] = prediction[:, class_idx]
+            actual_prediction_columns.append('actual_prediction_%d' % class_idx)
+
+    # check feature
+    feature_type = _check_feature(feature=feature, df=_X)
+    info_df_x, display_columns, percentile_columns = _prepare_data_x(
+        feature=feature, feature_type=feature_type, data=info_df, num_grid_points=num_grid_points, grid_type=grid_type,
+        percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
+        show_percentile=show_percentile, show_outliers=show_outliers)
+
+    _actual_plot_new(plot_data=info_df_x, actual_prediction_columns=actual_prediction_columns,
+                     feature_name=feature_name, display_columns=display_columns,
+                     percentile_columns=percentile_columns, figsize=figsize, ncols=ncols, plot_params=plot_params)
+
+'''
     if figsize is None:
         figwidth = 16
     else:
@@ -69,7 +90,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None,
                                            figsize=figsize, multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
 
         _actual_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name,
-                                     figwidth=figwidth, plot_params=plot_params, outer=None)
+                                     figwidth=figwidth, plot_params=plot_params, outer=None)'''
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
@@ -301,6 +322,4 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         figsize=figsize, ncols=ncols, plot_params=plot_params)
 
     return axes, summary_df
-
-
 
