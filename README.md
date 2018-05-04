@@ -73,8 +73,8 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
 ### information plots (pdpbox.info_plots)
 - **target_plot**  
 Plot average target value across different feature values (grid buckets)  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png"><br>
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png"><br>
 
 - **target_plot_interact**  
 Plot average target value across different feature value combinations  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png"><br>
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png"><br>
