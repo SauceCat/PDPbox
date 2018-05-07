@@ -7,55 +7,66 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-import copy
 from .pdp_plot_utils import _axes_modify
 from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
                              _find_closest, _make_bucket_column_names_percentile)
 
 
 def _actual_plot_title(feature_name, ax, plot_params):
-    font_family = 'Arial'
-    title = 'Actual predictions plot for %s' % feature_name
-    # subtitle = 'Each point is clustered to the closest grid point.'
-
-    title_fontsize = 15
-    subtitle_fontsize = 12
-
-    if plot_params is not None:
-        if 'font_family' in plot_params.keys():
-            font_family = plot_params['font_family']
-        if 'title' in plot_params.keys():
-            title = plot_params['title']
-        if 'title_fontsize' in plot_params.keys():
-            title_fontsize = plot_params['title_fontsize']
-        if 'subtitle_fontsize' in plot_params.keys():
-            subtitle_fontsize = plot_params['subtitle_fontsize']
+    font_family = plot_params.get('font_family', 'Arial')
+    title = plot_params.get('title', 'Actual predictions plot for %s' % feature_name)
+    subtitle = plot_params.get('subtitle', 'Distribution of actual prediction through feature grids.')
+    title_fontsize = plot_params.get('title_fontsize', 15)
+    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
 
     ax.set_facecolor('white')
     ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
-    # ax.text(0, 0.4, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
+    ax.text(0, 0.5, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
     ax.axis('off')
 
 
-def _draw_boxplot(box_data, box_ax, plot_params):
+def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, plot_params):
     font_family = plot_params.get('font_family', 'Arial')
+    box_line_width = plot_params.get('box_line_width', 1)
+    box_line_color = plot_params.get('box_line_color', '#1A4E5D')
+    box_color = plot_params.get('box_color', '#66C2D7')
+    box_width = plot_params.get('box_width', np.min([0.4, 0.4 / (10.0 / len(display_columns))]))
+
     xs = sorted(box_data['x'].unique())
     ys = []
     for x in xs:
         ys.append(box_data[box_data['x'] == x]['y'].values)
 
-    box_ax.boxplot(ys, positions=xs, showfliers=False)
+    boxprops = dict(linewidth=box_line_width, color=box_line_color)
+    medianprops = dict(linewidth=0)
+    whiskerprops = dict(linewidth=box_line_width, color=box_line_color)
+    capprops = dict(linewidth=box_line_width, color=box_line_color)
+
+    bplot = box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width, patch_artist=True,
+                           whiskerprops=whiskerprops, capprops=capprops, boxprops=boxprops, medianprops=medianprops)
+    for box in bplot['boxes']:
+        box.set_facecolor(box_color)
+
     _axes_modify(font_family=font_family, ax=box_ax)
 
+    box_ax.plot(box_line_data['x'], box_line_data['y'], linewidth=box_line_width, c=box_line_color, linestyle='--')
+    for idx in box_line_data.index.values:
+        bbox_props = {'facecolor': 'white', 'edgecolor': box_line_color,
+                      'boxstyle': "square,pad=0.5", 'lw': box_line_width}
+        box_ax.text(box_line_data.loc[idx, 'x'], box_line_data.loc[idx, 'y'], '%.3f' % box_line_data.loc[idx, 'y'],
+                    ha="center", va="top", size=10, bbox=bbox_props, color=box_line_color)
 
-def _draw_box_bar(bar_data, bar_ax, box_data, box_ax,
+
+def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_ax,
                   feature_name, display_columns, percentile_columns, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
-    _draw_boxplot(box_data=box_data, box_ax=box_ax, plot_params=plot_params)
+    _draw_boxplot(box_data=box_data, box_line_data=box_line_data, box_ax=box_ax,
+                  display_columns=display_columns, plot_params=plot_params)
     box_ax.set_ylabel('actual_prediction')
+    box_ax.set_xticklabels([])
 
     _draw_barplot(bar_data=bar_data, bar_ax=bar_ax, display_columns=display_columns, plot_params=plot_params)
 
@@ -67,6 +78,8 @@ def _draw_box_bar(bar_data, bar_ax, box_data, box_ax,
     bar_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
     bar_ax.set_xlim(-0.5, len(display_columns) - 0.5)
 
+    plt.setp(box_ax.get_xticklabels(), visible=False)
+
     # display percentile
     if len(percentile_columns) > 0:
         percentile_ax = box_ax.twiny()
@@ -77,8 +90,8 @@ def _draw_box_bar(bar_data, bar_ax, box_data, box_ax,
         _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
 
 
-def _actual_plot_new(plot_data, actual_prediction_columns, feature_name, display_columns, percentile_columns,
-                     figsize, ncols, plot_params):
+def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feature_name,
+                 display_columns, percentile_columns, figsize, ncols, plot_params):
     # set up graph parameters
     width, height = 16, 7
     nrows = 1
@@ -105,9 +118,6 @@ def _actual_plot_new(plot_data, actual_prediction_columns, feature_name, display
     title_ax = plt.subplot(111)
     _actual_plot_title(feature_name=feature_name, ax=title_ax, plot_params=plot_params)
 
-    plot_data['fake_count'] = 1
-    bar_data = plot_data.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
-
     if len(actual_prediction_columns) == 1:
         plt.figure(figsize=(width, height))
         gs = GridSpec(2, 1)
@@ -115,8 +125,9 @@ def _actual_plot_new(plot_data, actual_prediction_columns, feature_name, display
         bar_ax = plt.subplot(gs[1], sharex=box_ax)
 
         box_data = plot_data[['x', actual_prediction_columns[0]]].rename(columns={actual_prediction_columns[0]: 'y'})
-        _draw_box_bar(bar_data=bar_data, bar_ax=bar_ax, box_data=box_data, box_ax=box_ax,
-                      feature_name=feature_name, display_columns=display_columns,
+        box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0]: 'y'})
+        _draw_box_bar(bar_data=bar_data, bar_ax=bar_ax, box_data=box_data, box_line_data=box_line_data,
+                      box_ax=box_ax, feature_name=feature_name, display_columns=display_columns,
                       percentile_columns=percentile_columns, plot_params=plot_params)
     else:
         plt.figure(figsize=(width, height))
@@ -131,9 +142,11 @@ def _actual_plot_new(plot_data, actual_prediction_columns, feature_name, display
 
             inner_box_data = plot_data[['x', actual_prediction_columns[idx]]].rename(
                 columns={actual_prediction_columns[0]: 'y'})
-            _draw_box_bar(bar_data=bar_data, bar_ax=inner_bar_ax, box_data=inner_box_data, box_ax=inner_box_ax,
-                          feature_name=feature_name, display_columns=display_columns,
-                          percentile_columns=percentile_columns, plot_params=plot_params)
+            inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[0]: 'y'})
+            _draw_box_bar(bar_data=bar_data, bar_ax=inner_bar_ax, box_data=inner_box_data,
+                          box_line_data=inner_box_line_data, box_ax=inner_box_ax, feature_name=feature_name,
+                          display_columns=display_columns, percentile_columns=percentile_columns,
+                          plot_params=plot_params)
 
             subplot_title = 'target_%s' % actual_prediction_columns[idx].split('_')[-1]
             if len(percentile_columns) > 0:
@@ -143,94 +156,7 @@ def _actual_plot_new(plot_data, actual_prediction_columns, feature_name, display
             box_ax.append(inner_box_ax)
             bar_ax.append(inner_bar_ax)
 
-
-def _actual_plot(pdp_isolate_out, feature_name, figwidth, plot_params, outer):
-    """
-    Plot actual prediction distribution
-
-    :param pdp_isolate_out: instance of pdp_isolate_obj
-        a calculated pdp_isolate_obj instance
-    :param feature_name: feature name
-    :param figwidth: figure width
-    :param plot_params: values of plot parameters
-    :param outer: outer GridSpec
-    """
-
-    try:
-        import seaborn as sns
-    except:
-        raise RuntimeError('seaborn is necessary for the actual plot.')
-
-    if outer is None:
-        plt.figure(figsize=(figwidth, figwidth / 1.6))
-        gs = GridSpec(2, 1)
-        ax1 = plt.subplot(gs[0])
-        ax2 = plt.subplot(gs[1], sharex=ax1)
-    else:
-        inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer, wspace=0, hspace=0)
-        ax1 = plt.subplot(inner[0])
-        ax2 = plt.subplot(inner[1], sharex=ax1)
-
-    font_family = 'Arial'
-    boxcolor = '#66C2D7'
-    linecolor = '#1A4E5D'
-    barcolor = '#5BB573'
-    xticks_rotation = 0
-
-    if plot_params is not None:
-        if 'font_family' in plot_params.keys():
-            font_family = plot_params['font_family']
-        if 'boxcolor' in plot_params.keys():
-            boxcolor = plot_params['boxcolor']
-        if 'linecolor' in plot_params.keys():
-            linecolor = plot_params['linecolor']
-        if 'barcolor' in plot_params.keys():
-            barcolor = plot_params['barcolor']
-        if 'xticks_rotation' in plot_params.keys():
-            xticks_rotation = plot_params['xticks_rotation']
-
-    _axes_modify(font_family, ax1)
-    _axes_modify(font_family, ax2)
-
-    df = copy.deepcopy(pdp_isolate_out.ice_lines)
-    actual_columns = pdp_isolate_out.actual_columns
-    feature_grids = pdp_isolate_out.feature_grids
-    df = df[actual_columns + ['actual_preds']]
-
-    if pdp_isolate_out.feature_type == 'binary':
-        df['x'] = df[actual_columns[0]]
-    elif pdp_isolate_out.feature_type == 'onehot':
-        df['x'] = df[actual_columns].apply(lambda x: _find_onehot_actual(x), axis=1)
-        df = df[df['x'].isnull() == False].reset_index(drop=True)
-    else:
-        df = df[(df[actual_columns[0]] >= feature_grids[0])
-                & (df[actual_columns[0]] <= feature_grids[-1])].reset_index(drop=True)
-        df['x'] = df[actual_columns[0]].apply(lambda x: _find_closest(x, feature_grids))
-
-    pred_median_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'median'})
-    pred_count_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'count'})
-    pred_mean_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'mean'}).rename(columns={'actual_preds': 'preds_mean'})
-    pred_std_gp = df.groupby('x', as_index=False).agg({'actual_preds': 'std'}).rename(columns={'actual_preds': 'preds_std'})
-
-    pred_outlier_gp = pred_mean_gp.merge(pred_std_gp, on='x', how='left')
-    pred_outlier_gp['outlier_upper'] = pred_outlier_gp['preds_mean'] + 3 * pred_outlier_gp['preds_std']
-    pred_outlier_gp['outlier_lower'] = pred_outlier_gp['preds_mean'] - 3 * pred_outlier_gp['preds_std']
-
-    # draw boxplot: prediction distribution
-    boxwith = np.min([0.5, 0.5 / (10.0 / len(feature_grids))])
-    sns.boxplot(x=df['x'], y=df['actual_preds'], width=boxwith, ax=ax1, color=boxcolor, linewidth=1, saturation=1)
-    sns.pointplot(x=pred_median_gp['x'], y=pred_median_gp['actual_preds'], ax=ax1, color=linecolor)
-    ax1.set_xlabel('')
-    ax1.set_ylabel('actual_preds')
-    ax1.set_ylim(pred_outlier_gp['outlier_lower'].min(), pred_outlier_gp['outlier_upper'].max())
-
-    # draw bar plot
-    rects = ax2.bar(pred_count_gp['x'], pred_count_gp['actual_preds'], width=boxwith, color=barcolor, alpha=0.5)
-    ax2.set_xlabel(feature_name)
-    ax2.set_ylabel('count')
-    plt.xticks(range(len(feature_grids)), pdp_isolate_out.feature_grids, rotation=xticks_rotation)
-
-    _autolabel(rects, ax2, barcolor)
+    return [title_ax, box_ax, bar_ax]
 
 
 def _autolabel(rects, ax, bar_color):

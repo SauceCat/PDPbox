@@ -1,11 +1,7 @@
 
-import numpy as np
 import pandas as pd
 
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-
-from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot_new, _actual_plot_title
+from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot
 from .other_utils import _check_feature, _check_percentile_range, _make_list, _expand_default, _check_model
 
 
@@ -50,47 +46,31 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
         percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
         show_percentile=show_percentile, show_outliers=show_outliers)
 
-    _actual_plot_new(plot_data=info_df_x, actual_prediction_columns=actual_prediction_columns,
-                     feature_name=feature_name, display_columns=display_columns,
-                     percentile_columns=percentile_columns, figsize=figsize, ncols=ncols, plot_params=plot_params)
+    info_df_x['fake_count'] = 1
+    bar_data = info_df_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
+    summary_df = pd.DataFrame(range(info_df_x['x'].min(), info_df_x['x'].max() + 1), columns=['x'])
+    summary_df = summary_df.merge(bar_data.rename(columns={'fake_count': 'count'}), on='x', how='left').fillna(0)
 
-'''
-    if figsize is None:
-        figwidth = 16
-    else:
-        figwidth = figsize[0]
+    # prepare data for target lines
+    box_lines = []
+    for pred_idx in range(len(actual_prediction_columns)):
+        box_line = info_df_x.groupby('x', as_index=False).agg(
+            {actual_prediction_columns[pred_idx]: 'mean'}).sort_values('x', ascending=True)
+        box_lines.append(box_line)
+        summary_df = summary_df.merge(box_line, on='x', how='outer').fillna(0)
 
-    # draw graph title
-    plt.figure(figsize=(figwidth, figwidth / 6.7))
-    ax1 = plt.subplot(111)
+    summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
+    info_cols = ['x', 'display_column']
+    if len(percentile_columns) != 0:
+        summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[int(x)])
+        info_cols.append('percentile_column')
+    summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns]
 
-    if type(pdp_isolate_out) == dict and not multi_flag:
-        n_classes = len(pdp_isolate_out.keys())
-        _actual_plot_title(feature_name=feature_name, ax=ax1, figsize=figsize,
-                                           multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
-
-        if ncols is None:
-            ncols = 2
-        nrows = int(np.ceil(float(n_classes) / ncols))
-
-        plt.figure(figsize=(figwidth, (figwidth / ncols) * nrows))
-        outer = GridSpec(nrows, ncols, wspace=0.2, hspace=0.2)
-
-        for n_class in range(n_classes):
-            _actual_plot(pdp_isolate_out=pdp_isolate_out['class_%d' % n_class],
-                                         feature_name=feature_name + ' class_%d' % n_class,
-                                         figwidth=figwidth, plot_params=plot_params, outer=outer[n_class])
-    else:
-        if multi_flag:
-            _pdp_isolate_out = pdp_isolate_out['class_%d' % which_class]
-        else:
-            _pdp_isolate_out = pdp_isolate_out
-
-        _actual_plot_title(feature_name=feature_name, ax=ax1,
-                                           figsize=figsize, multi_flag=multi_flag, which_class=which_class, plot_params=plot_params)
-
-        _actual_plot(pdp_isolate_out=_pdp_isolate_out, feature_name=feature_name,
-                                     figwidth=figwidth, plot_params=plot_params, outer=None)'''
+    axes = _actual_plot(plot_data=info_df_x, bar_data=bar_data, box_lines=box_lines,
+                        actual_prediction_columns=actual_prediction_columns,
+                        feature_name=feature_name, display_columns=display_columns,
+                        percentile_columns=percentile_columns, figsize=figsize, ncols=ncols, plot_params=plot_params)
+    return axes, summary_df
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
