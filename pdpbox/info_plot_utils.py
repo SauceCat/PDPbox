@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import ListedColormap
 
 from .pdp_plot_utils import _axes_modify
 from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
-                             _find_closest, _make_bucket_column_names_percentile)
+                             _make_bucket_column_names_percentile)
 
 
 def _actual_plot_title(feature_name, ax, plot_params):
@@ -25,11 +26,9 @@ def _actual_plot_title(feature_name, ax, plot_params):
     ax.axis('off')
 
 
-def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, plot_params):
+def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, box_color, box_line_color, plot_params):
     font_family = plot_params.get('font_family', 'Arial')
-    box_line_width = plot_params.get('box_line_width', 1)
-    box_line_color = plot_params.get('box_line_color', '#1A4E5D')
-    box_color = plot_params.get('box_color', '#66C2D7')
+    box_line_width = plot_params.get('box_line_width', 1.5)
     box_width = plot_params.get('box_width', np.min([0.4, 0.4 / (10.0 / len(display_columns))]))
 
     xs = sorted(box_data['x'].unique())
@@ -37,15 +36,13 @@ def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, plot_params)
     for x in xs:
         ys.append(box_data[box_data['x'] == x]['y'].values)
 
-    boxprops = dict(linewidth=box_line_width, color=box_line_color)
+    boxprops = dict(linewidth=box_line_width, color=box_color)
     medianprops = dict(linewidth=0)
-    whiskerprops = dict(linewidth=box_line_width, color=box_line_color)
-    capprops = dict(linewidth=box_line_width, color=box_line_color)
+    whiskerprops = dict(linewidth=box_line_width, color=box_color)
+    capprops = dict(linewidth=box_line_width, color=box_color)
 
-    bplot = box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width, patch_artist=True,
-                           whiskerprops=whiskerprops, capprops=capprops, boxprops=boxprops, medianprops=medianprops)
-    for box in bplot['boxes']:
-        box.set_facecolor(box_color)
+    box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width,
+                   whiskerprops=whiskerprops, capprops=capprops, boxprops=boxprops, medianprops=medianprops)
 
     _axes_modify(font_family=font_family, ax=box_ax)
 
@@ -57,14 +54,15 @@ def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, plot_params)
                     ha="center", va="top", size=10, bbox=bbox_props, color=box_line_color)
 
 
-def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_ax,
+def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_color, box_line_color, box_ax,
                   feature_name, display_columns, percentile_columns, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
     _draw_boxplot(box_data=box_data, box_line_data=box_line_data, box_ax=box_ax,
-                  display_columns=display_columns, plot_params=plot_params)
+                  display_columns=display_columns, box_color=box_color,
+                  box_line_color=box_line_color, plot_params=plot_params)
     box_ax.set_ylabel('actual_prediction')
     box_ax.set_xticklabels([])
 
@@ -100,6 +98,10 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         plot_params = dict()
 
     font_family = plot_params.get('font_family', 'Arial')
+    box_line_color = plot_params.get('box_line_color', '#66C2D7')
+    box_color = plot_params.get('box_color', '#3288bd')
+    box_colors_cmap = plot_params.get('box_colors_cmap', 'tab20')
+    box_colors = plot_params.get('box_colors', plt.get_cmap(box_colors_cmap)(range(20)))
 
     if len(actual_prediction_columns) > 1:
         nrows = int(np.ceil(len(actual_prediction_columns) * 1.0 / ncols))
@@ -127,7 +129,8 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         box_data = plot_data[['x', actual_prediction_columns[0]]].rename(columns={actual_prediction_columns[0]: 'y'})
         box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0]: 'y'})
         _draw_box_bar(bar_data=bar_data, bar_ax=bar_ax, box_data=box_data, box_line_data=box_line_data,
-                      box_ax=box_ax, feature_name=feature_name, display_columns=display_columns,
+                      box_color=box_color, box_line_color=box_line_color, box_ax=box_ax,
+                      feature_name=feature_name, display_columns=display_columns,
                       percentile_columns=percentile_columns, plot_params=plot_params)
     else:
         plt.figure(figsize=(width, height))
@@ -135,23 +138,33 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
 
         box_ax = []
         bar_ax = []
+
+        # get max average target value
+        ys = []
+        for idx in range(len(box_lines)):
+            ys += list(box_lines[idx][actual_prediction_columns[idx]].values)
+        y_max = np.max(ys)
+
         for idx in range(len(actual_prediction_columns)):
-            inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer[idx], wspace=0, hspace=0)
+            box_color = box_line_color = box_colors[idx % len(box_colors)]
+
+            inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer[idx], wspace=0, hspace=0.1)
             inner_box_ax = plt.subplot(inner[0])
             inner_bar_ax = plt.subplot(inner[1], sharex=inner_box_ax)
 
             inner_box_data = plot_data[['x', actual_prediction_columns[idx]]].rename(
-                columns={actual_prediction_columns[0]: 'y'})
-            inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[0]: 'y'})
+                columns={actual_prediction_columns[idx]: 'y'})
+            inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[idx]: 'y'})
             _draw_box_bar(bar_data=bar_data, bar_ax=inner_bar_ax, box_data=inner_box_data,
-                          box_line_data=inner_box_line_data, box_ax=inner_box_ax, feature_name=feature_name,
-                          display_columns=display_columns, percentile_columns=percentile_columns,
-                          plot_params=plot_params)
+                          box_line_data=inner_box_line_data, box_color=box_color, box_line_color=box_line_color,
+                          box_ax=inner_box_ax, feature_name=feature_name, display_columns=display_columns,
+                          percentile_columns=percentile_columns, plot_params=plot_params)
 
             subplot_title = 'target_%s' % actual_prediction_columns[idx].split('_')[-1]
             if len(percentile_columns) > 0:
-                subplot_title += '\n\n\n'
+                subplot_title += '\n\n'
             inner_box_ax.set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
+            inner_box_ax.set_ylim(0., y_max)
 
             box_ax.append(inner_box_ax)
             bar_ax.append(inner_bar_ax)
