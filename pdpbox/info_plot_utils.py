@@ -127,7 +127,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         bar_ax = plt.subplot(gs[1], sharex=box_ax)
 
         box_data = plot_data[['x', actual_prediction_columns[0]]].rename(columns={actual_prediction_columns[0]: 'y'})
-        box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0]: 'y'})
+        box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0] + '_q2': 'y'})
         _draw_box_bar(bar_data=bar_data, bar_ax=bar_ax, box_data=box_data, box_line_data=box_line_data,
                       box_color=box_color, box_line_color=box_line_color, box_ax=box_ax,
                       feature_name=feature_name, display_columns=display_columns,
@@ -142,7 +142,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         # get max average target value
         ys = []
         for idx in range(len(box_lines)):
-            ys += list(box_lines[idx][actual_prediction_columns[idx]].values)
+            ys += list(box_lines[idx][actual_prediction_columns[idx] + '_q2'].values)
         y_max = np.max(ys)
 
         for idx in range(len(actual_prediction_columns)):
@@ -154,7 +154,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
 
             inner_box_data = plot_data[['x', actual_prediction_columns[idx]]].rename(
                 columns={actual_prediction_columns[idx]: 'y'})
-            inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[idx]: 'y'})
+            inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[idx] + '_q2': 'y'})
             _draw_box_bar(bar_data=bar_data, bar_ax=inner_bar_ax, box_data=inner_box_data,
                           box_line_data=inner_box_line_data, box_color=box_color, box_line_color=box_line_color,
                           box_ax=inner_box_ax, feature_name=feature_name, display_columns=display_columns,
@@ -170,6 +170,93 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
             bar_ax.append(inner_bar_ax)
 
     return [title_ax, box_ax, bar_ax]
+
+
+def _actual_plot_interact(feature_names, display_columns, percentile_columns, actual_prediction_columns,
+                          actual_plot_data, figsize, ncols, plot_params):
+
+    nrows = int(np.ceil(len(actual_prediction_columns) * 1.0 / ncols))
+    ncols = np.min([len(actual_prediction_columns), ncols])
+    width = np.min([8 * len(actual_prediction_columns), 16])
+    height = width * 1.0 / ncols * nrows
+
+    if figsize is not None:
+        width, height = figsize
+
+    # set up graph parameters
+    if plot_params is None:
+        plot_params = dict()
+
+    font_family = plot_params.get('font_family', 'Arial')
+    cmap = plot_params.get('cmap', 'Blues')
+    cmaps = plot_params.get('cmaps', ['Blues', 'Greens', 'Oranges', 'Reds', 'Purples', 'Greys'])
+    line_width = plot_params.get('line_width', 1)
+    xticks_rotation = plot_params.get('xticks_rotation', 0)
+    marker_size_min = plot_params.get('marker_size_min', 50)
+    marker_size_max = plot_params.get('marker_size_max', 1500)
+
+    # plot title
+    plt.figure(figsize=(width, 2))
+    title_ax = plt.subplot(111)
+    _actual_plot_title(feature_name=' & '.join(feature_names), ax=title_ax, plot_params=plot_params)
+
+    # draw value plots and legend
+    count_min, count_max = actual_plot_data['fake_count'].min(), actual_plot_data['fake_count'].max()
+    marker_sizes = []
+    for count in actual_plot_data['fake_count'].values:
+        size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
+        marker_sizes.append(size)
+    legend_width = np.max([8, np.min([width, 12])])
+
+    if len(actual_prediction_columns) == 1:
+        _, value_ax = plt.subplots(nrows=1, ncols=1, figsize=(width, height))
+        value_min, value_max = _plot_interact(
+            target_count_data=actual_plot_data, _target=actual_prediction_columns[0] + '_q2', plot_ax=value_ax,
+            feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+            marker_sizes=marker_sizes, cmap=cmap, line_width=line_width, xticks_rotation=xticks_rotation,
+            font_family=font_family)
+
+        # draw legend
+        _, legend_ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
+        _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=legend_ax[0],
+                              cmap=cmap, font_family=font_family)
+        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax[1],
+                             cmap=cmap, font_family=font_family)
+
+    else:
+        # value_ax = fig.axes
+        plt.figure(figsize=(width / 3, 1))
+        legend_ax = plt.subplot(111)
+        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax,
+                             cmap=cmap, font_family=font_family)
+
+        _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(width, height), sharex='all', sharey='all')
+        value_ax = value_ax.flatten()
+
+        for idx in range(len(actual_prediction_columns)):
+            cmap_idx = cmaps[idx % len(cmaps)]
+
+            value_min, value_max = _plot_interact(
+                target_count_data=actual_plot_data, _target=actual_prediction_columns[idx] + '_q2',
+                plot_ax=value_ax[idx],
+                feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+                marker_sizes=marker_sizes, cmap=cmap_idx, line_width=line_width,
+                xticks_rotation=xticks_rotation, font_family=font_family)
+
+            colorbar_ax = make_axes_locatable(value_ax[idx]).append_axes('bottom', size='5%', pad=0.5)
+            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=colorbar_ax,
+                                  cmap=cmap_idx, font_family=font_family, height="90%", width="80%")
+
+            subplot_title = actual_prediction_columns[target]
+            if len(percentile_columns[1]) > 0:
+                subplot_title += '\n\n\n'
+            value_ax[idx].set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
+
+        if len(value_ax) > len(actual_prediction_columns):
+            for idx in range(len(actual_prediction_columns), len(value_ax)):
+                value_ax[idx].axis('off')
+
+    return [title_ax, value_ax]
 
 
 def _autolabel(rects, ax, bar_color):

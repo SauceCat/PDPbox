@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot
+from .info_plot_utils import _target_plot, _target_plot_interact, _prepare_data_x, _actual_plot, _actual_plot_interact
 from .other_utils import _check_feature, _check_percentile_range, _make_list, _expand_default, _check_model
 
 
@@ -53,10 +53,13 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
     # prepare data for target lines
     box_lines = []
+    actual_prediction_columns_qs = []
     for pred_idx in range(len(actual_prediction_columns)):
         box_line = info_df_x.groupby('x', as_index=False).agg(
-            {actual_prediction_columns[pred_idx]: 'mean'}).sort_values('x', ascending=True)
+            {actual_prediction_columns[pred_idx]: [q1, q2, q3]}).sort_values('x', ascending=True)
+        box_line.columns = ['_'.join(col) if col[1] != '' else col[0] for col in box_line.columns]
         box_lines.append(box_line)
+        actual_prediction_columns_qs += [actual_prediction_columns[pred_idx] + '_%s' % q for q in ['q1', 'q2', 'q3']]
         summary_df = summary_df.merge(box_line, on='x', how='outer').fillna(0)
 
     summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
@@ -64,13 +67,120 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     if len(percentile_columns) != 0:
         summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[int(x)])
         info_cols.append('percentile_column')
-    summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns]
+    summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns_qs]
 
     axes = _actual_plot(plot_data=info_df_x, bar_data=bar_data, box_lines=box_lines,
                         actual_prediction_columns=actual_prediction_columns,
                         feature_name=feature_name, display_columns=display_columns,
                         percentile_columns=percentile_columns, figsize=figsize, ncols=ncols, plot_params=plot_params)
     return axes, summary_df
+
+
+def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
+                         percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
+                         show_outliers=False, which_classes=None, predict_kwds={}, ncols=2,
+                         figsize=None, plot_params=None):
+    # check model
+    n_classes, classifier, predict = _check_model(model=model)
+
+    # check input data set
+    if type(X) != pd.core.frame.DataFrame:
+        raise ValueError('X: only accept pandas DataFrame')
+
+    num_grid_points = _expand_default(num_grid_points, 10)
+    grid_types = _expand_default(grid_types, 'percentile')
+    percentile_ranges = _expand_default(percentile_ranges, None)
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+
+    if not show_outliers:
+        show_outliers = [False, False]
+    else:
+        show_outliers = [True, True]
+        for i in range(2):
+            if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
+                show_outliers[i] = False
+
+    # check features
+    feature_types = [_check_feature(feature=features[0], df=X), _check_feature(feature=features[1], df=X)]
+
+    # check percentile_range
+    _check_percentile_range(percentile_range=percentile_ranges[0])
+    _check_percentile_range(percentile_range=percentile_ranges[1])
+
+    # prediction
+    _X = X.copy()
+    prediction = predict(_X, **predict_kwds)
+
+    info_df = _X[_make_list(features[0]) + _make_list(features[1])]
+    actual_prediction_columns = ['actual_prediction']
+    if n_classes == 0:
+        info_df['actual_prediction'] = prediction
+    elif n_classes == 2:
+        info_df['actual_prediction'] = prediction[:, 1]
+    else:
+        plot_classes = range(n_classes)
+        if which_classes is not None:
+            plot_classes = sorted(which_classes)
+
+        actual_prediction_columns = []
+        for class_idx in plot_classes:
+            info_df['actual_prediction_%d' % class_idx] = prediction[:, class_idx]
+            actual_prediction_columns.append('actual_prediction_%d' % class_idx)
+
+    # (data_x, display_columns, percentile_columns)
+    results = []
+    data_input = info_df.copy()
+    for i in range(2):
+        result = _prepare_data_x(
+            feature=features[i], feature_type=feature_types[i], data=data_input,
+            num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
+            grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
+            show_percentile=show_percentile, show_outliers=show_outliers[i])
+        results.append(result)
+        if i == 0:
+            data_input = result[0].rename(columns={'x': 'x1'})
+
+    data_x = results[1][0].rename(columns={'x': 'x2'})
+    data_x['fake_count'] = 1
+
+    agg_dict = {}
+    actual_prediction_columns_qs = []
+    for pred_idx in range(len(actual_prediction_columns)):
+        agg_dict[actual_prediction_columns[pred_idx]] = [q1, q2, q3]
+        actual_prediction_columns_qs += [actual_prediction_columns[pred_idx] + '_%s' % q for q in ['q1', 'q2', 'q3']]
+    agg_dict['fake_count'] = 'count'
+    actual_plot_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
+    actual_plot_data.columns = ['_'.join(col) if col[1] != '' else col[0] for col in actual_plot_data.columns]
+    actual_plot_data = actual_plot_data.rename(columns={'fake_count_count': 'fake_count'})
+    summary_df = actual_plot_data.rename(columns={'fake_count': 'count'})
+
+    info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
+    for i in range(2):
+        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][1][int(x)])
+        if len(results[i][2]) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][int(x)])
+            info_cols.append('percentile_column_%d' % (i + 1))
+    summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns_qs]
+
+    axes = _actual_plot_interact(
+        feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
+        percentile_columns=[results[0][2], results[1][2]], actual_prediction_columns=actual_prediction_columns,
+        actual_plot_data=actual_plot_data, figsize=figsize, ncols=ncols, plot_params=plot_params)
+
+    return axes, summary_df
+
+
+def q1(x):
+    return x.quantile(0.25)
+
+
+def q2(x):
+    return x.quantile(0.5)
+
+
+def q3(x):
+    return x.quantile(0.75)
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
