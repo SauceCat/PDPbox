@@ -1,5 +1,6 @@
 
 import numpy as np
+import pandas as pd
 
 
 def _check_feature(feature, df):
@@ -54,6 +55,12 @@ def _check_target(target, df):
 	return target_type
 
 
+def _check_dataset(df):
+	# check input data set
+	if type(df) != pd.core.frame.DataFrame:
+		raise ValueError('only accept pandas DataFrame')
+
+
 def _make_list(x):
 	if type(x) == list:
 		return x
@@ -77,3 +84,16 @@ def _check_model(model):
 		predict = model.predict
 
 	return n_classes, classifier, predict
+
+
+def _check_grid_type(grid_type):
+	if grid_type not in ['percentile', 'equal']:
+		raise ValueError('grid_type should be "percentile" or "equal".')
+
+
+def _check_classes(classes_list, n_classes):
+	if len(classes_list) > 0 and n_classes > 2:
+		if np.min(classes_list) < 0:
+			raise ValueError('class index should be >= 0.')
+		if np.max(classes_list) > n_classes - 1:
+			raise ValueError('class index should be < n_classes.')
