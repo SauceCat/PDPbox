@@ -630,8 +630,9 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
         if len(value_ax) > len(ys):
             for idx in range(len(ys), len(value_ax)):
                 value_ax[idx].axis('off')
-
-    return [title_ax, value_ax]
+    
+    axes = {'title_ax': title_ax, 'value_ax': value_ax}
+    return axes
 
 
 '''
