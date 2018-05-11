@@ -43,8 +43,8 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
         value_grids = np.percentile(x, percentile_grids)
 
         grids_df = pd.DataFrame()
-        grids_df['percentile_grids'] = [round(p, 2) for p in percentile_grids]
-        grids_df['value_grids'] = [round(value, 2) for value in value_grids]
+        grids_df['percentile_grids'] = percentile_grids
+        grids_df['value_grids'] = value_grids
         grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
             {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
 
@@ -54,7 +54,6 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
             value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
         else:
             value_grids = np.linspace(np.min(x), np.max(x), num_grid_points)
-            value_grids = [round(value, 2) for value in value_grids]
 
         return value_grids, []
 
@@ -162,21 +161,31 @@ def _find_bucket(x, feature_grids):
 def _make_bucket_column_names(feature_grids):
     # create bucket names
     column_names = []
+    bound_lows = [np.nan]
+    bound_ups = [feature_grids[0]]
 
     # number of buckets: len(feature_grids) - 1
     for i in range(len(feature_grids) - 1):
         column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+        bound_lows.append(feature_grids[i])
+        bound_ups.append(feature_grids[i + 1])
         if i == len(feature_grids) - 2:
             column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
         column_names.append(column_name)
 
     column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
-    return column_names
+    bound_lows.append(feature_grids[-1])
+    bound_ups.append(np.nan)
+
+    return column_names, bound_lows, bound_ups
 
 
 def _make_bucket_column_names_percentile(percentile_info):
     # create percentile bucket names
     percentile_column_names = []
+    percentile_bound_lows = [0]
+    percentile_bound_ups = [np.min(np.array(percentile_info[0].replace('(', '').replace(
+        ')', '').split(', ')).astype(np.float64))]
 
     for i in range(len(percentile_info) - 1):
         # for each grid point, percentile information is in tuple format
@@ -185,6 +194,9 @@ def _make_bucket_column_names_percentile(percentile_info):
         low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
         high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
         percentile_column_name = '[%.2f, %.2f)' % (low, high)
+        percentile_bound_lows.append(low)
+        percentile_bound_ups.append(high)
+
         if i == len(percentile_info) - 2:
             percentile_column_name = '[%.2f, %.2f]' % (low, high)
 
@@ -193,8 +205,10 @@ def _make_bucket_column_names_percentile(percentile_info):
     low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
     high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
     percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+    percentile_bound_lows.append(high)
+    percentile_bound_ups.append(100)
 
-    return percentile_column_names
+    return percentile_column_names, percentile_bound_lows, percentile_bound_ups
 
 
 def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,

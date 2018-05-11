@@ -61,8 +61,8 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         list of xticklabels in percentile format
     """
 
-    display_columns = []
-    percentile_columns = []
+    display_columns = bound_ups = bound_lows = []
+    percentile_columns = percentile_bound_lows = percentile_bound_ups = []
     data_x = data.copy()
 
     if feature_type == 'binary':
@@ -87,13 +87,18 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         uni_xs = sorted(data_x['x'].unique())
 
         # create bucket names
-        display_columns = _make_bucket_column_names(feature_grids=feature_grids)
+        display_columns, bound_lows, bound_ups = _make_bucket_column_names(feature_grids=feature_grids)
         display_columns = np.array(display_columns)[range(uni_xs[0], uni_xs[-1]+1)]
+        bound_lows = np.array(bound_lows)[range(uni_xs[0], uni_xs[-1] + 1)]
+        bound_ups = np.array(bound_ups)[range(uni_xs[0], uni_xs[-1] + 1)]
 
         # create percentile bucket names
         if show_percentile and grid_type == 'percentile':
-            percentile_columns = _make_bucket_column_names_percentile(percentile_info=percentile_info)
+            percentile_columns, percentile_bound_lows, percentile_bound_ups = \
+                _make_bucket_column_names_percentile(percentile_info=percentile_info)
             percentile_columns = np.array(percentile_columns)[range(uni_xs[0], uni_xs[-1]+1)]
+            percentile_bound_lows = np.array(percentile_bound_lows)[range(uni_xs[0], uni_xs[-1] + 1)]
+            percentile_bound_ups = np.array(percentile_bound_ups)[range(uni_xs[0], uni_xs[-1] + 1)]
 
         # adjust results
         data_x['x'] = data_x['x'] - data_x['x'].min()
@@ -105,7 +110,7 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
 
     data_x['x'] = data_x['x'].map(int)
 
-    return data_x, display_columns, percentile_columns
+    return data_x, display_columns, bound_lows, bound_ups, percentile_columns, percentile_bound_lows, percentile_bound_ups
 
 
 def _autolabel(rects, ax, bar_color):
@@ -240,7 +245,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     line_colors_cmap = plot_params.get('line_colors_cmap', 'tab20')
     line_colors = plot_params.get('line_colors', plt.get_cmap(line_colors_cmap)(range(20)))
     title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
-    subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
+    subtitle = plot_params.get('subtitle', 'Average target value through different feature values.')
 
     # Axes for title
     plt.figure(figsize=(width, 2))
@@ -284,7 +289,8 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
             subplot_title = target[target_idx]
             if len(percentile_columns) > 0:
                 subplot_title += '\n\n\n'
-            plot_axes[target_idx].set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
+            plot_axes[target_idx].set_title(subplot_title,
+                                            fontdict={'fontsize': 13, 'fontname': font_family, 'weight': 'bold'})
 
             inner_line_ax.set_ylim(0., y_max)
             bar_ax.append(inner_bar_ax)
@@ -293,6 +299,8 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         if len(plot_axes) > len(target):
             for idx in range(len(target), len(plot_axes)):
                 plot_axes[idx].axis('off')
+
+        plt.subplots_adjust(hspace=0.3)
 
     axes = {'title_ax': title_ax, 'bar_ax': bar_ax, 'line_ax': line_ax}
     return axes
@@ -559,10 +567,6 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
     if figsize is not None:
         width, height = figsize
 
-    # set up graph parameters
-    if plot_params is None:
-        plot_params = dict()
-
     font_family = plot_params.get('font_family', 'Arial')
     cmap = plot_params.get('cmap', 'Blues')
     cmaps = plot_params.get('cmaps', ['Blues', 'Greens', 'Oranges', 'Reds', 'Purples', 'Greys'])
@@ -630,7 +634,7 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
         if len(value_ax) > len(ys):
             for idx in range(len(ys), len(value_ax)):
                 value_ax[idx].axis('off')
-    
+
     axes = {'title_ax': title_ax, 'value_ax': value_ax}
     return axes
 

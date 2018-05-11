@@ -78,10 +78,10 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     # map feature values to grid point buckets (x)
     data = df[useful_features].copy()
-    data_x, display_columns, percentile_columns = _prepare_data_x(
-        feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
-        percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile, show_outliers=show_outliers)
+    data_x, display_columns, bound_lows, bound_ups, percentile_columns, percentile_bound_lows, percentile_bound_ups = \
+        _prepare_data_x(feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points,
+                        grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
+                        cust_grid_points=cust_grid_points, show_percentile=show_percentile, show_outliers=show_outliers)
 
     # prepare data for bar plot
     data_x['fake_count'] = 1
@@ -103,9 +103,16 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     # map column names back
     summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
     info_cols = ['x', 'display_column']
+    if feature_type == 'numeric':
+        summary_df['value_lower'] = summary_df['x'].apply(lambda x: bound_lows[int(x)])
+        summary_df['value_upper'] = summary_df['x'].apply(lambda x: bound_ups[int(x)])
+        info_cols += ['value_lower', 'value_upper']
+
     if len(percentile_columns) != 0:
         summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[int(x)])
-        info_cols.append('percentile_column')
+        summary_df['percentile_lower'] = summary_df['x'].apply(lambda x: percentile_bound_lows[int(x)])
+        summary_df['percentile_upper'] = summary_df['x'].apply(lambda x: percentile_bound_ups[int(x)])
+        info_cols += ['percentile_column', 'percentile_lower', 'percentile_upper']
     summary_df = summary_df[info_cols + ['count'] + target]
 
     # inner call target plot
@@ -271,6 +278,11 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     _check_percentile_range(percentile_range=percentile_ranges[0])
     _check_percentile_range(percentile_range=percentile_ranges[1])
 
+    # expand some inputs
+    num_grid_points = _expand_default(num_grid_points, 10)
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+
     if not show_outliers:
         show_outliers = [False, False]
     else:
@@ -279,10 +291,9 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
             if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
                 show_outliers[i] = False
 
-    # expand some inputs
-    num_grid_points = _expand_default(num_grid_points, 10)
-    grid_ranges = _expand_default(grid_ranges, None)
-    cust_grid_points = _expand_default(cust_grid_points, None)
+    # set up graph parameters
+    if plot_params is None:
+        plot_params = dict()
 
     # create feature grids and bar counts
     target = _make_list(target)
@@ -318,18 +329,24 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
     for i in range(2):
         summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][1][int(x)])
-        if len(results[i][2]) != 0:
-            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][int(x)])
-            info_cols.append('percentile_column_%d' % (i + 1))
+        if feature_types[i] == 'numeric':
+            summary_df['value_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][int(x)])
+            summary_df['value_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][3][int(x)])
+            info_cols += ['value_lower_%d' % (i + 1), 'value_upper_%d' % (i + 1)]
+        if len(results[i][4]) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][4][int(x)])
+            summary_df['percentile_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][5][int(x)])
+            summary_df['percentile_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][6][int(x)])
+            info_cols += ['percentile_column_%d' % (i + 1), 'percentile_lower_%d' % (i + 1), 'percentile_upper_%d' % (i + 1)]
     summary_df = summary_df[info_cols + ['count'] + target]
 
     title = plot_params.get('title', 'Target plot for feature "%s"' % ' & '.join(feature_names))
-    subtitle = plot_params.get('subtitle', 'Average target values through feature grids.')
+    subtitle = plot_params.get('subtitle', 'Average target value through different feature value combinations.')
 
     # inner call target plot interact
     axes = _info_plot_interact(
         feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
-        percentile_columns=[results[0][2], results[1][2]], ys=target, plot_data=target_count_data,
+        percentile_columns=[results[0][4], results[1][4]], ys=target, plot_data=target_count_data,
         title=title, subtitle=subtitle, figsize=figsize, ncols=ncols, plot_params=plot_params)
 
     return axes, summary_df
