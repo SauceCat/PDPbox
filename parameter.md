@@ -402,7 +402,6 @@ pdp.pdp_interact_plot(pdp_67_24, ['feat_67', 'feat_24'], center=True, plot_org_p
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
                 show_outliers=False, figsize=None, ncols=2, plot_params=None):
-		
     """Plot average target value across different feature values (feature grids)
 
     Parameters:
@@ -456,6 +455,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     """
 ```
 ----
+
 ### pdpbox.info_plots.target_plot_interact
 ```python
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
@@ -517,3 +517,118 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     """
 ```
 ----
+
+### pdpbox.info_plots.actual_plot
+```python
+def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='percentile', percentile_range=None,
+                grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False,
+                which_classes=None, predict_kwds={}, ncols=2, figsize=None, plot_params=None):
+    """Plot prediction distribution across different feature values (feature grid)
+
+    Parameters:
+    -----------
+
+    :param model: a fitted sklearn model
+    :param X: pandas DataFrame
+        data set to investigate on, should contain at least
+        the feature to investigate as well as the target
+    :param feature: string or list
+        feature or feature list to investigate
+        for one-hot encoding features, feature list is required
+    :param feature_name: string
+        name of the feature, not necessary a column name
+    :param num_grid_points: integer, optional, default=10
+        number of grid points for numeric feature
+    :param grid_type: string, optional, default='percentile'
+        'percentile' or 'equal'
+        type of grid points for numeric feature
+    :param percentile_range: tuple or None, optional, default=None
+        percentile range to investigate
+        for numeric feature when grid_type='percentile'
+    :param grid_range: tuple or None, optional, default=None
+        value range to investigate
+        for numeric feature when grid_type='equal'
+    :param cust_grid_points: Series, 1d-array, list or None, optional, default=None
+        customized list of grid points
+        for numeric feature
+    :param show_percentile: bool, optional, default=False
+        whether to display the percentile buckets
+        for numeric feature when grid_type='percentile'
+    :param show_outliers: bool, optional, default=False
+        whether to display the out of range buckets
+        for numeric feature when percentile_range or grid_range is not None
+    :param which_classes: list, optional, default=None
+        which classes to plot, only use when it is a multi-class problem
+    :param predict_kwds: dict, default={}
+        keywords to be passed to the model's predict function
+    :param figsize: tuple or None, optional, default=None
+        size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
+    :param plot_params: dict or None, optional, default=None
+        parameters for the plot
+
+    Return:
+    -------
+
+    :return axes: matplotlib Axes
+        Returns the Axes object with the plot for further tweaking
+    :return summary_df: pandas DataFrame
+        Graph data in data frame format
+    """
+```
+----
+
+### pdpbox.info_plots.actual_plot_interact
+```python
+def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
+                         percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
+                         show_outliers=False, which_classes=None, predict_kwds={}, ncols=2,
+                         figsize=None, plot_params=None):
+    """Plot prediction distribution across different feature value combinations (feature grid combinations)
+
+    Parameters:
+    -----------
+
+    :param model: a fitted sklearn model
+    :param X: pandas DataFrame
+        data set to investigate on, should contain at least
+        the feature to investigate as well as the target
+    :param features: list
+        two features to investigate
+    :param feature_names: list
+        feature names
+    :param num_grid_points: list, optional, default=None
+        number of grid points for each feature
+    :param grid_types: list, optional, default=None
+        type of grid points for each feature
+    :param percentile_ranges: list of tuple, optional, default=None
+        percentile range to investigate for each feature
+    :param grid_ranges: list of tuple, optional, default=None
+        value range to investigate for each feature
+    :param cust_grid_points: list of (Series, 1d-array, list), optional, default=None
+        customized list of grid points for each feature
+    :param show_percentile: bool, optional, default=False
+        whether to display the percentile buckets for both feature
+    :param show_outliers: bool, optional, default=False
+        whether to display the out of range buckets for both features
+    :param which_classes: list, optional, default=None
+        which classes to plot, only use when it is a multi-class problem
+    :param predict_kwds: dict, default={}
+        keywords to be passed to the model's predict function
+    :param figsize: tuple or None, optional, default=None
+        size of the figure, (width, height)
+    :param ncols: integer, optional, default=2
+        number subplot columns, used when it is multi-class problem
+    :param plot_params: dict or None, optional, default=None
+        parameters for the plot
+
+    Return:
+    -------
+
+    :return axes: matplotlib Axes
+        Returns the Axes object with the plot for further tweaking
+    :return summary_df: pandas DataFrame
+        Graph data in data frame format
+    """
+```
