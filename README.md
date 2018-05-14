@@ -41,24 +41,18 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/binary_03.png" width="80%"><br>
 - single variable plot with clustered individual lines    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/binary_04.png" width="80%"><br>
-- actual predictions plot for a single variable  
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_01.PNG" width="80%"><br>
 
 ### Numeric feature 
 - single variable plot with percentile_range=(5, 95)    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/numeric_05.png" width="80%"><br>
 - single variable plot with customized grid points    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/numeric_06.png" width="80%"><br>
-- actual predictions plot for a single variable   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_03.PNG" width="80%">
 
 ### One-hot encoding feature
 - single variable plot with individual lines and original points    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/onehot_01.png" width="80%"><br>
 - single variable plot without centering the lines    
   <img src="https://github.com/SauceCat/pdpBox/blob/master/images/onehot_02.png" width="80%"><br>
-- actual predictions plot for a single variable   
-  <img src="https://github.com/SauceCat/PDPbox/blob/master/images/actual_preds_02.PNG" width="80%"><br>
 
 ### Multiclass
 - single variable plot with individual lines and original points  
@@ -73,8 +67,16 @@ For test and demo, please refer to https://github.com/SauceCat/PDPbox/tree/maste
 ### information plots (pdpbox.info_plots)
 - **target_plot**  
 Plot average target value across different feature values (grid buckets)  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_uni.png"><br>
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_01.png"><br>
 
 - **target_plot_interact**  
 Plot average target value across different feature value combinations  
-<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_inter.png"><br>
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/target_plot_02.png"><br>
+
+- **actual_plot**  
+Plot distribution of prediction across different feature values (grid buckets)  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/actual_plot_01.PNG"><br>
+
+- **target_plot_interact**  
+Plot distribution of prediction across different feature value combinations  
+<img src="https://github.com/SauceCat/pdpBox/blob/master/images/actual_plot_02.PNG"><br>
