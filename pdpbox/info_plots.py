@@ -78,10 +78,13 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     # map feature values to grid point buckets (x)
     data = df[useful_features].copy()
-    data_x, display_columns, bound_lows, bound_ups, percentile_columns, percentile_bound_lows, percentile_bound_ups = \
-        _prepare_data_x(feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points,
-                        grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
-                        cust_grid_points=cust_grid_points, show_percentile=show_percentile, show_outliers=show_outliers)
+    prepared_results = _prepare_data_x(
+        feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
+        percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
+        show_percentile=show_percentile, show_outliers=show_outliers)
+    data_x = prepared_results['data']
+    display_columns, bound_lows, bound_ups = prepared_results['value_display']
+    percentile_columns, percentile_bound_lows, percentile_bound_ups = prepared_results['percentile_display']
 
     # prepare data for bar plot
     data_x['fake_count'] = 1
@@ -146,7 +149,6 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     feature_type = _check_feature(feature=feature, df=X)
     _check_grid_type(grid_type=grid_type)
     _check_percentile_range(percentile_range=percentile_range)
-    _check_classes(classes_list=which_classes, n_classes=n_classes)
 
     # show_outliers should be only turned on when necessary
     if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
@@ -164,6 +166,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     else:
         plot_classes = range(n_classes)
         if which_classes is not None:
+            _check_classes(classes_list=which_classes, n_classes=n_classes)
             plot_classes = sorted(which_classes)
 
         actual_prediction_columns = []
@@ -171,10 +174,13 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
             info_df['actual_prediction_%d' % class_idx] = prediction[:, class_idx]
             actual_prediction_columns.append('actual_prediction_%d' % class_idx)
 
-    info_df_x, display_columns, percentile_columns = _prepare_data_x(
+    prepared_results = _prepare_data_x(
         feature=feature, feature_type=feature_type, data=info_df, num_grid_points=num_grid_points, grid_type=grid_type,
         percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
         show_percentile=show_percentile, show_outliers=show_outliers)
+    info_df_x = prepared_results['data']
+    display_columns, bound_lows, bound_ups = prepared_results['value_display']
+    percentile_columns, percentile_bound_lows, percentile_bound_ups = prepared_results['percentile_display']
 
     info_df_x['fake_count'] = 1
     bar_data = info_df_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
@@ -195,9 +201,16 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
     summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
     info_cols = ['x', 'display_column']
+    if feature_type == 'numeric':
+        summary_df['value_lower'] = summary_df['x'].apply(lambda x: bound_lows[int(x)])
+        summary_df['value_upper'] = summary_df['x'].apply(lambda x: bound_ups[int(x)])
+        info_cols += ['value_lower', 'value_upper']
+
     if len(percentile_columns) != 0:
         summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[int(x)])
-        info_cols.append('percentile_column')
+        summary_df['percentile_lower'] = summary_df['x'].apply(lambda x: percentile_bound_lows[int(x)])
+        summary_df['percentile_upper'] = summary_df['x'].apply(lambda x: percentile_bound_ups[int(x)])
+        info_cols += ['percentile_column', 'percentile_lower', 'percentile_upper']
     summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns_qs]
 
     axes = _actual_plot(plot_data=info_df_x, bar_data=bar_data, box_lines=box_lines,
@@ -303,18 +316,18 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     data = df[useful_features].copy()
 
     # (data_x, display_columns, percentile_columns)
-    results = []
+    prepared_results = []
     data_input = data
     for i in range(2):
-        result = _prepare_data_x(
+        prepared_result = _prepare_data_x(
             feature=features[i], feature_type=feature_types[i], data=data_input,
             num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
             grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
             show_percentile=show_percentile, show_outliers=show_outliers[i])
-        results.append(result)
+        prepared_results.append(prepared_result)
         if i == 0:
-            data_input = result[0].rename(columns={'x': 'x1'})
-    data_x = results[1][0].rename(columns={'x': 'x2'})
+            data_input = prepared_result['data'].rename(columns={'x': 'x1'})
+    data_x = prepared_results[1]['data'].rename(columns={'x': 'x2'})
 
     # prepare data for target interact plot
     data_x['fake_count'] = 1
@@ -325,18 +338,39 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     target_count_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
 
     # prepare summary data frame
-    summary_df = target_count_data.rename(columns={'fake_count': 'count'})
+    x1_values = []
+    x2_values = []
+    for x1_value in range(data_x['x1'].min(), data_x['x1'].max() + 1):
+        for x2_value in range(data_x['x2'].min(), data_x['x2'].max() + 1):
+            x1_values.append(x1_value)
+            x2_values.append(x2_value)
+    summary_df = pd.DataFrame()
+    summary_df['x1'] = x1_values
+    summary_df['x2'] = x2_values
+    summary_df = summary_df.merge(target_count_data.rename(columns={'fake_count': 'count'}),
+                                  on=['x1', 'x2'], how='left').fillna(0)
+
     info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
+    display_columns = []
+    percentile_columns = []
     for i in range(2):
-        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][1][int(x)])
+        display_columns_i, bound_lows_i, bound_ups_i = prepared_results[i]['value_display']
+        percentile_columns_i, percentile_bound_lows_i, percentile_bound_ups_i = prepared_results[i]['percentile_display']
+        display_columns.append(display_columns_i)
+        percentile_columns.append(percentile_columns_i)
+
+        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: display_columns_i[int(x)])
         if feature_types[i] == 'numeric':
-            summary_df['value_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][int(x)])
-            summary_df['value_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][3][int(x)])
+            summary_df['value_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_lows_i[int(x)])
+            summary_df['value_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_ups_i[int(x)])
             info_cols += ['value_lower_%d' % (i + 1), 'value_upper_%d' % (i + 1)]
-        if len(results[i][4]) != 0:
-            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][4][int(x)])
-            summary_df['percentile_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][5][int(x)])
-            summary_df['percentile_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][6][int(x)])
+        if len(percentile_columns_i) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_columns_i[int(x)])
+            summary_df['percentile_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_lows_i[int(x)])
+            summary_df['percentile_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_ups_i[int(x)])
             info_cols += ['percentile_column_%d' % (i + 1), 'percentile_lower_%d' % (i + 1), 'percentile_upper_%d' % (i + 1)]
     summary_df = summary_df[info_cols + ['count'] + target]
 
@@ -345,9 +379,9 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 
     # inner call target plot interact
     axes = _info_plot_interact(
-        feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
-        percentile_columns=[results[0][4], results[1][4]], ys=target, plot_data=target_count_data,
-        title=title, subtitle=subtitle, figsize=figsize, ncols=ncols, plot_params=plot_params)
+        feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+        ys=target, plot_data=target_count_data, title=title, subtitle=subtitle, figsize=figsize,
+        ncols=ncols, plot_params=plot_params)
 
     return axes, summary_df
 
@@ -377,6 +411,10 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
             if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
                 show_outliers[i] = False
 
+    # set up graph parameters
+    if plot_params is None:
+        plot_params = dict()
+
     # check features
     feature_types = [_check_feature(feature=features[0], df=X), _check_feature(feature=features[1], df=X)]
 
@@ -405,19 +443,19 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
             actual_prediction_columns.append('actual_prediction_%d' % class_idx)
 
     # (data_x, display_columns, percentile_columns)
-    results = []
+    prepared_results = []
     data_input = info_df.copy()
     for i in range(2):
-        result = _prepare_data_x(
+        prepared_result = _prepare_data_x(
             feature=features[i], feature_type=feature_types[i], data=data_input,
             num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
             grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
             show_percentile=show_percentile, show_outliers=show_outliers[i])
-        results.append(result)
+        prepared_results.append(prepared_result)
         if i == 0:
-            data_input = result[0].rename(columns={'x': 'x1'})
+            data_input = prepared_result['data'].rename(columns={'x': 'x1'})
 
-    data_x = results[1][0].rename(columns={'x': 'x2'})
+    data_x = prepared_results[1]['data'].rename(columns={'x': 'x2'})
     data_x['fake_count'] = 1
 
     agg_dict = {}
@@ -429,22 +467,52 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
     actual_plot_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
     actual_plot_data.columns = ['_'.join(col) if col[1] != '' else col[0] for col in actual_plot_data.columns]
     actual_plot_data = actual_plot_data.rename(columns={'fake_count_count': 'fake_count'})
-    summary_df = actual_plot_data.rename(columns={'fake_count': 'count'})
+
+    # prepare summary data frame
+    x1_values = []
+    x2_values = []
+    for x1_value in range(data_x['x1'].min(), data_x['x1'].max() + 1):
+        for x2_value in range(data_x['x2'].min(), data_x['x2'].max() + 1):
+            x1_values.append(x1_value)
+            x2_values.append(x2_value)
+    summary_df = pd.DataFrame()
+    summary_df['x1'] = x1_values
+    summary_df['x2'] = x2_values
+    summary_df = summary_df.merge(actual_plot_data.rename(columns={'fake_count': 'count'}),
+                                  on=['x1', 'x2'], how='left').fillna(0)
 
     info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
+    display_columns = []
+    percentile_columns = []
     for i in range(2):
-        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][1][int(x)])
-        if len(results[i][2]) != 0:
-            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: results[i][2][int(x)])
-            info_cols.append('percentile_column_%d' % (i + 1))
+        display_columns_i, bound_lows_i, bound_ups_i = prepared_results[i]['value_display']
+        percentile_columns_i, percentile_bound_lows_i, percentile_bound_ups_i = prepared_results[i]['percentile_display']
+        display_columns.append(display_columns_i)
+        percentile_columns.append(percentile_columns_i)
+
+        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: display_columns_i[int(x)])
+        if feature_types[i] == 'numeric':
+            summary_df['value_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_lows_i[int(x)])
+            summary_df['value_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_ups_i[int(x)])
+            info_cols += ['value_lower_%d' % (i + 1), 'value_upper_%d' % (i + 1)]
+        if len(percentile_columns_i) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_columns_i[int(x)])
+            summary_df['percentile_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_lows_i[int(x)])
+            summary_df['percentile_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_ups_i[int(x)])
+            info_cols += ['percentile_column_%d' % (i + 1), 'percentile_lower_%d' % (i + 1), 'percentile_upper_%d' % (i + 1)]
+
     summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns_qs]
 
     title = plot_params.get('title', 'Actual predictions plot for %s' % ' & '.join(feature_names))
-    subtitle = plot_params.get('subtitle', 'Distribution of actual prediction through feature grids.')
+    subtitle = plot_params.get('subtitle',
+                               'Medium value of actual prediction through different feature value combinations.')
 
     axes = _info_plot_interact(
-        feature_names=feature_names, display_columns=[results[0][1], results[1][1]],
-        percentile_columns=[results[0][2], results[1][2]], ys=actual_prediction_columns,
+        feature_names=feature_names, display_columns=display_columns,
+        percentile_columns=percentile_columns, ys=[col + '_q2' for col in actual_prediction_columns],
         plot_data=actual_plot_data, title=title, subtitle=subtitle, figsize=figsize,
         ncols=ncols, plot_params=plot_params)
 
