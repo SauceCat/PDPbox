@@ -1,5 +1,8 @@
 
+from __future__ import absolute_import
+
 import numpy as np
+import pandas as pd
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -15,52 +18,6 @@ from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
                     grid_range, cust_grid_points, show_percentile, show_outliers):
-    """map feature values to grid points
-
-    Parameters:
-    -----------
-
-    :param feature: string or list
-        feature or feature list to investigate
-        for one-hot encoding features, feature list is required
-    :param feature_type: string
-        'binary', 'numeric' or 'onehot'
-        feature type
-    :param data: pandas DataFrame
-        data set to investigate on
-        only contains useful columns
-    :param num_grid_points: integer
-        number of grid points for numeric feature
-    :param grid_type: string
-        'percentile' or 'equal'
-        type of grid points for numeric feature
-    :param percentile_range: tuple or None
-        percentile range to investigate
-        for numeric feature when grid_type='percentile'
-    :param grid_range: tuple or None
-        value range to investigate
-        for numeric feature when grid_type='equal'
-    :param cust_grid_points: Series, 1d-array, list or None
-        customized list of grid points
-        for numeric feature
-    :param show_percentile: bool
-        whether to display the percentile buckets
-        for numeric feature when grid_type='percentile'
-    :param show_outliers: bool
-        whether to display the out of range buckets
-        for numeric feature when percentile_range or grid_range is not None
-
-    Returns:
-    --------
-
-    :return data_x: pandas DataFrame
-        data with 'x' column, indicating the mapped grid point
-    :return display_columns: list
-        list of xticklabels
-    :return percentile_columns: list
-        list of xticklabels in percentile format
-    """
-
     display_columns = bound_ups = bound_lows = []
     percentile_columns = percentile_bound_lows = percentile_bound_ups = []
     data_x = data.copy()
@@ -197,38 +154,6 @@ def _info_plot_title(title, subtitle, ax, plot_params):
 
 def _target_plot(feature_name, display_columns, percentile_columns, target, bar_data,
                  target_lines, figsize, ncols, plot_params):
-    """inner call for function target_plot
-
-    Parameters:
-    -----------
-
-    :param feature_name: string
-        name of the feature, not necessary a column name
-    :param display_columns: list
-        list of xticklabels
-    :param percentile_columns: list
-        list of xticklabels in percentile format
-    :param target: list
-        list of target columns to investigate
-        if it is not multi-classes, the list would only contain 1 element
-    :param bar_data: pandas DataFrame
-        data for bar plot
-    :param target_lines: list of pandas DataFrame
-        data for target lines
-    :param figsize: tuple or None
-        size of the figure, (width, height)
-    :param ncols: integer, optional, default=2
-        number subplot columns, used when it is multi-class problem
-    :param plot_params: dict or None
-        parameters for the plot
-
-    Returns:
-    --------
-
-    :return: list of matplotlib Axes
-        [axes for title, axes for bar, axes for line]
-    """
-
     # set up graph parameters
     width, height = 16, 7
     nrows = 1
@@ -626,3 +551,97 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
 
     axes = {'title_ax': title_ax, 'value_ax': value_ax}
     return axes
+
+
+def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
+                            grid_range, cust_grid_points, show_percentile, show_outliers):
+    prepared_results = _prepare_data_x(
+        feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
+        percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
+        show_percentile=show_percentile, show_outliers=show_outliers)
+    data_x = prepared_results['data']
+    display_columns, bound_lows, bound_ups = prepared_results['value_display']
+    percentile_columns, percentile_bound_lows, percentile_bound_ups = prepared_results['percentile_display']
+
+    data_x['fake_count'] = 1
+    bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
+    summary_df = pd.DataFrame(range(data_x['x'].min(), data_x['x'].max() + 1), columns=['x'])
+    summary_df = summary_df.merge(bar_data.rename(columns={'fake_count': 'count'}), on='x', how='left').fillna(0)
+
+    summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
+    info_cols = ['x', 'display_column']
+    if feature_type == 'numeric':
+        summary_df['value_lower'] = summary_df['x'].apply(lambda x: bound_lows[int(x)])
+        summary_df['value_upper'] = summary_df['x'].apply(lambda x: bound_ups[int(x)])
+        info_cols += ['value_lower', 'value_upper']
+
+    if len(percentile_columns) != 0:
+        summary_df['percentile_column'] = summary_df['x'].apply(lambda x: percentile_columns[int(x)])
+        summary_df['percentile_lower'] = summary_df['x'].apply(lambda x: percentile_bound_lows[int(x)])
+        summary_df['percentile_upper'] = summary_df['x'].apply(lambda x: percentile_bound_ups[int(x)])
+        info_cols += ['percentile_column', 'percentile_lower', 'percentile_upper']
+
+    return data_x, bar_data, summary_df, info_cols, display_columns, percentile_columns
+
+
+def _prepare_info_plot_interact_data(data_input, features, feature_types, num_grid_points, grid_types,
+                                     percentile_ranges, grid_ranges, cust_grid_points, show_percentile,
+                                     show_outliers, agg_dict):
+    prepared_results = []
+    for i in range(2):
+        prepared_result = _prepare_data_x(
+            feature=features[i], feature_type=feature_types[i], data=data_input,
+            num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
+            grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
+            show_percentile=show_percentile, show_outliers=show_outliers[i])
+        prepared_results.append(prepared_result)
+        if i == 0:
+            data_input = prepared_result['data'].rename(columns={'x': 'x1'})
+
+    data_x = prepared_results[1]['data'].rename(columns={'x': 'x2'})
+    data_x['fake_count'] = 1
+    plot_data = data_x.groupby(['x1', 'x2'], as_index=False).agg(agg_dict)
+
+    return data_x, plot_data, prepared_results
+
+
+def _prepare_info_plot_interact_summary(data_x, plot_data, prepared_results, feature_types):
+    x1_values = []
+    x2_values = []
+    for x1_value in range(data_x['x1'].min(), data_x['x1'].max() + 1):
+        for x2_value in range(data_x['x2'].min(), data_x['x2'].max() + 1):
+            x1_values.append(x1_value)
+            x2_values.append(x2_value)
+    summary_df = pd.DataFrame()
+    summary_df['x1'] = x1_values
+    summary_df['x2'] = x2_values
+    summary_df = summary_df.merge(plot_data.rename(columns={'fake_count': 'count'}),
+                                  on=['x1', 'x2'], how='left').fillna(0)
+
+    info_cols = ['x1', 'x2', 'display_column_1', 'display_column_2']
+    display_columns = []
+    percentile_columns = []
+    for i in range(2):
+        display_columns_i, bound_lows_i, bound_ups_i = prepared_results[i]['value_display']
+        percentile_columns_i, percentile_bound_lows_i, percentile_bound_ups_i = prepared_results[i]['percentile_display']
+        display_columns.append(display_columns_i)
+        percentile_columns.append(percentile_columns_i)
+
+        summary_df['display_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: display_columns_i[int(x)])
+        if feature_types[i] == 'numeric':
+            summary_df['value_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_lows_i[int(x)])
+            summary_df['value_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(lambda x: bound_ups_i[int(x)])
+            info_cols += ['value_lower_%d' % (i + 1), 'value_upper_%d' % (i + 1)]
+
+        if len(percentile_columns_i) != 0:
+            summary_df['percentile_column_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_columns_i[int(x)])
+            summary_df['percentile_lower_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_lows_i[int(x)])
+            summary_df['percentile_upper_%d' % (i + 1)] = summary_df['x%d' % (i + 1)].apply(
+                lambda x: percentile_bound_ups_i[int(x)])
+            info_cols += ['percentile_column_%d' % (i + 1), 'percentile_lower_%d' % (i + 1),
+                          'percentile_upper_%d' % (i + 1)]
+
+    return summary_df, info_cols, display_columns, percentile_columns
+
