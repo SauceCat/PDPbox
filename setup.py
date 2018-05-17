@@ -1,8 +1,10 @@
 from setuptools import setup
+import versioneer
 
 setup(name='PDPbox',
       packages=['pdpbox'],
-      version='0.1',
+      version=versioneer.get_version(),
+      cmdclass=versioneer.get_cmdclass(),
       description='python partial dependence plot toolbox',
       author='SauceCat',
       author_email='jiangchun.lee@gmail.com',
