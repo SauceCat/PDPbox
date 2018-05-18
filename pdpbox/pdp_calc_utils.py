@@ -43,7 +43,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
         value_grids = np.percentile(x, percentile_grids)
 
         grids_df = pd.DataFrame()
-        grids_df['percentile_grids'] = percentile_grids
+        grids_df['percentile_grids'] = [round(v, 2) for v in percentile_grids]
         grids_df['value_grids'] = value_grids
         grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
             {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
