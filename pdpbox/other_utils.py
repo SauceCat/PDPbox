@@ -100,7 +100,8 @@ def _check_classes(classes_list, n_classes):
             raise ValueError('class index should be < n_classes.')
 
 
-def _check_info_plot_params(df, feature, grid_type, percentile_range, grid_range, cust_grid_points, show_outliers):
+def _check_info_plot_params(df, feature, grid_type, percentile_range, grid_range,
+                            cust_grid_points, show_outliers):
     _check_dataset(df=df)
     feature_type = _check_feature(feature=feature, df=df)
     _check_grid_type(grid_type=grid_type)
@@ -109,7 +110,6 @@ def _check_info_plot_params(df, feature, grid_type, percentile_range, grid_range
     # show_outliers should be only turned on when necessary
     if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
         show_outliers = False
-
     return feature_type, show_outliers
 
 

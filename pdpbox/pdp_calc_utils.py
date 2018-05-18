@@ -144,21 +144,31 @@ def _find_closest(x, feature_grids):
     return values.index(min(values, key=lambda y: abs(y-x)))
 
 
-def _find_bucket(x, feature_grids):
+def _find_bucket(x, feature_grids, endpoint):
     # map value into value bucket
     if x < feature_grids[0]:
         bucket = 0
-    elif x > feature_grids[-1]:
-        bucket = len(feature_grids)
     else:
-        bucket = len(feature_grids) - 1
-        for i in range(len(feature_grids) - 2):
-            if feature_grids[i] <= x < feature_grids[i + 1]:
-                bucket = i + 1
+        if endpoint:
+            if x > feature_grids[-1]:
+                bucket = len(feature_grids)
+            else:
+                bucket = len(feature_grids) - 1
+                for i in range(len(feature_grids) - 2):
+                    if feature_grids[i] <= x < feature_grids[i + 1]:
+                        bucket = i + 1
+        else:
+            if x >= feature_grids[-1]:
+                bucket = len(feature_grids)
+            else:
+                bucket = len(feature_grids) - 1
+                for i in range(len(feature_grids) - 2):
+                    if feature_grids[i] <= x < feature_grids[i + 1]:
+                        bucket = i + 1
     return bucket
 
 
-def _make_bucket_column_names(feature_grids):
+def _make_bucket_column_names(feature_grids, endpoint):
     # create bucket names
     column_names = []
     bound_lows = [np.nan]
@@ -169,18 +179,23 @@ def _make_bucket_column_names(feature_grids):
         column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
         bound_lows.append(feature_grids[i])
         bound_ups.append(feature_grids[i + 1])
-        if i == len(feature_grids) - 2:
+
+        if (i == len(feature_grids) - 2) and endpoint:
             column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+
         column_names.append(column_name)
 
-    column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
+    if endpoint:
+        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
+    else:
+        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['>= %.2f' % feature_grids[-1]]
     bound_lows.append(feature_grids[-1])
     bound_ups.append(np.nan)
 
     return column_names, bound_lows, bound_ups
 
 
-def _make_bucket_column_names_percentile(percentile_info):
+def _make_bucket_column_names_percentile(percentile_info, endpoint):
     # create percentile bucket names
     percentile_column_names = []
     percentile_bound_lows = [0]
@@ -198,13 +213,19 @@ def _make_bucket_column_names_percentile(percentile_info):
         percentile_bound_ups.append(high)
 
         if i == len(percentile_info) - 2:
-            percentile_column_name = '[%.2f, %.2f]' % (low, high)
+            if endpoint:
+                percentile_column_name = '[%.2f, %.2f]' % (low, high)
+            else:
+                percentile_column_name = '[%.2f, %.2f)' % (low, high)
 
         percentile_column_names.append(percentile_column_name)
 
     low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
     high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-    percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+    if endpoint:
+        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+    else:
+        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['>= %.2f' % high]
     percentile_bound_lows.append(high)
     percentile_bound_ups.append(100)
 

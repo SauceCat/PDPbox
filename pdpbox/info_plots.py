@@ -9,7 +9,7 @@ from .other_utils import (_make_list, _check_model, _check_target, _check_classe
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
-                show_outliers=False, figsize=None, ncols=2, plot_params=None):
+                show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
     """Plot average target value across different feature values (feature grids)
 
     Parameters:
@@ -46,6 +46,9 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     :param show_outliers: bool, optional, default=False
         whether to display the out of range buckets
         for numeric feature when percentile_range or grid_range is not None
+    :param endpoint: bool, optional
+        If True, stop is the last grid point, default=True
+        Otherwise, it is not included
     :param figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
     :param ncols: integer, optional, default=2
@@ -77,7 +80,8 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     data_x, bar_data, summary_df, info_cols, display_columns, percentile_columns = _prepare_info_plot_data(
         feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points,
         grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
-        cust_grid_points=cust_grid_points, show_percentile=show_percentile, show_outliers=show_outliers)
+        cust_grid_points=cust_grid_points, show_percentile=show_percentile, show_outliers=show_outliers,
+        endpoint=endpoint)
 
     # prepare data for target lines
     # each target line contains 'x' and mean target value
@@ -86,7 +90,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         target_line = data_x.groupby('x', as_index=False).agg(
             {target[target_idx]: 'mean'}).sort_values('x', ascending=True)
         target_lines.append(target_line)
-        summary_df = summary_df.merge(target_line, on='x', how='outer').fillna(0)
+        summary_df = summary_df.merge(target_line, on='x', how='outer')
     summary_df = summary_df[info_cols + ['count'] + target]
 
     # inner call target plot
@@ -111,7 +115,7 @@ def q3(x):
 
 
 def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='percentile', percentile_range=None,
-                grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False,
+                grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False, endpoint=True,
                 which_classes=None, predict_kwds={}, ncols=2, figsize=None, plot_params=None):
     """Plot prediction distribution across different feature values (feature grid)
 
@@ -147,6 +151,9 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     :param show_outliers: bool, optional, default=False
         whether to display the out of range buckets
         for numeric feature when percentile_range or grid_range is not None
+    :param endpoint: bool, optional
+        If True, stop is the last grid point, default=True
+        Otherwise, it is not included
     :param which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
     :param predict_kwds: dict, default={}
@@ -196,7 +203,8 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     info_df_x, bar_data, summary_df, info_cols, display_columns, percentile_columns = _prepare_info_plot_data(
         feature=feature, feature_type=feature_type, data=info_df, num_grid_points=num_grid_points,
         grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
-        cust_grid_points=cust_grid_points, show_percentile=show_percentile, show_outliers=show_outliers)
+        cust_grid_points=cust_grid_points, show_percentile=show_percentile,
+        show_outliers=show_outliers, endpoint=endpoint)
 
     # prepare data for box lines
     # each box line contains 'x' and actual prediction q1, q2, q3
@@ -220,7 +228,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         show_outliers=False, figsize=None, ncols=2, plot_params=None):
+                         show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
     """Plot average target value across different feature value combinations (feature grid combinations)
 
     Parameters:
@@ -250,6 +258,9 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         whether to display the percentile buckets for both feature
     :param show_outliers: bool, optional, default=False
         whether to display the out of range buckets for both features
+    :param endpoint: bool, optional
+        If True, stop is the last grid point, default=True
+        Otherwise, it is not included
     :param figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
     :param ncols: integer, optional, default=2
@@ -309,7 +320,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         data_input=data, features=features, feature_types=feature_types, num_grid_points=num_grid_points,
         grid_types=grid_types, percentile_ranges=percentile_ranges, grid_ranges=grid_ranges,
         cust_grid_points=cust_grid_points, show_percentile=show_percentile,
-        show_outliers=show_outliers, agg_dict=agg_dict)
+        show_outliers=show_outliers, endpoint=endpoint, agg_dict=agg_dict)
 
     # prepare summary data frame
     summary_df, info_cols, display_columns, percentile_columns = _prepare_info_plot_interact_summary(
@@ -330,7 +341,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 
 def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         show_outliers=False, which_classes=None, predict_kwds={}, ncols=2,
+                         show_outliers=False, endpoint=True, which_classes=None, predict_kwds={}, ncols=2,
                          figsize=None, plot_params=None):
     """Plot prediction distribution across different feature value combinations (feature grid combinations)
 
@@ -359,6 +370,9 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         whether to display the percentile buckets for both feature
     :param show_outliers: bool, optional, default=False
         whether to display the out of range buckets for both features
+    :param endpoint: bool, optional
+        If True, stop is the last grid point, default=True
+        Otherwise, it is not included
     :param which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
     :param predict_kwds: dict, default={}
@@ -425,7 +439,7 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         data_input=info_df, features=features, feature_types=feature_types, num_grid_points=num_grid_points,
         grid_types=grid_types, percentile_ranges=percentile_ranges, grid_ranges=grid_ranges,
         cust_grid_points=cust_grid_points, show_percentile=show_percentile,
-        show_outliers=show_outliers, agg_dict=agg_dict)
+        show_outliers=show_outliers, endpoint=endpoint, agg_dict=agg_dict)
 
     actual_plot_data.columns = ['_'.join(col) if col[1] != '' else col[0] for col in actual_plot_data.columns]
     actual_plot_data = actual_plot_data.rename(columns={'fake_count_count': 'fake_count'})
