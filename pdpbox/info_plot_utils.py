@@ -17,7 +17,7 @@ from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
-                    grid_range, cust_grid_points, show_percentile, show_outliers):
+                    grid_range, cust_grid_points, show_percentile, show_outliers, endpoint):
     display_columns = bound_ups = bound_lows = []
     percentile_columns = percentile_bound_lows = percentile_bound_ups = []
     data_x = data.copy()
@@ -40,11 +40,11 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
                             & (data_x[feature] <= feature_grids[-1])].reset_index(drop=True)
 
         # map feature value into value buckets
-        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x=x, feature_grids=feature_grids))
+        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x=x, feature_grids=feature_grids, endpoint=endpoint))
         uni_xs = sorted(data_x['x'].unique())
 
         # create bucket names
-        display_columns, bound_lows, bound_ups = _make_bucket_column_names(feature_grids=feature_grids)
+        display_columns, bound_lows, bound_ups = _make_bucket_column_names(feature_grids=feature_grids, endpoint=endpoint)
         display_columns = np.array(display_columns)[range(uni_xs[0], uni_xs[-1]+1)]
         bound_lows = np.array(bound_lows)[range(uni_xs[0], uni_xs[-1] + 1)]
         bound_ups = np.array(bound_ups)[range(uni_xs[0], uni_xs[-1] + 1)]
@@ -52,7 +52,7 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         # create percentile bucket names
         if show_percentile and grid_type == 'percentile':
             percentile_columns, percentile_bound_lows, percentile_bound_ups = \
-                _make_bucket_column_names_percentile(percentile_info=percentile_info)
+                _make_bucket_column_names_percentile(percentile_info=percentile_info, endpoint=endpoint)
             percentile_columns = np.array(percentile_columns)[range(uni_xs[0], uni_xs[-1]+1)]
             percentile_bound_lows = np.array(percentile_bound_lows)[range(uni_xs[0], uni_xs[-1] + 1)]
             percentile_bound_ups = np.array(percentile_bound_ups)[range(uni_xs[0], uni_xs[-1] + 1)]
@@ -554,11 +554,11 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
 
 
 def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
-                            grid_range, cust_grid_points, show_percentile, show_outliers):
+                            grid_range, cust_grid_points, show_percentile, show_outliers, endpoint):
     prepared_results = _prepare_data_x(
         feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
         percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile, show_outliers=show_outliers)
+        show_percentile=show_percentile, show_outliers=show_outliers, endpoint=endpoint)
     data_x = prepared_results['data']
     display_columns, bound_lows, bound_ups = prepared_results['value_display']
     percentile_columns, percentile_bound_lows, percentile_bound_ups = prepared_results['percentile_display']
@@ -586,14 +586,14 @@ def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_t
 
 def _prepare_info_plot_interact_data(data_input, features, feature_types, num_grid_points, grid_types,
                                      percentile_ranges, grid_ranges, cust_grid_points, show_percentile,
-                                     show_outliers, agg_dict):
+                                     show_outliers, endpoint, agg_dict):
     prepared_results = []
     for i in range(2):
         prepared_result = _prepare_data_x(
             feature=features[i], feature_type=feature_types[i], data=data_input,
             num_grid_points=num_grid_points[i], grid_type=grid_types[i], percentile_range=percentile_ranges[i],
             grid_range=grid_ranges[i], cust_grid_points=cust_grid_points[i],
-            show_percentile=show_percentile, show_outliers=show_outliers[i])
+            show_percentile=show_percentile, show_outliers=show_outliers[i], endpoint=endpoint)
         prepared_results.append(prepared_result)
         if i == 0:
             data_input = prepared_result['data'].rename(columns={'x': 'x1'})

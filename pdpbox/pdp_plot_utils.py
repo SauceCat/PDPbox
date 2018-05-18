@@ -552,8 +552,8 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
         ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
     else:
         if x_quantile:
-            ax.set_xticks(range(len(pdp_interact_out.feature_grids[0])))
-            ax.set_xticklabels(pdp_interact_out.feature_grids[0], rotation=xticks_rotation)
+            ax.set_xticks(range(len(pdp_interact_out.pdp_isolate_out1.display_columns)))
+            ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
 
     if feature_types[1] == 'onehot':
         ax.set_yticks(range(Y.shape[0]))
@@ -563,8 +563,8 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
         ax.set_yticklabels(pdp_interact_out.pdp_isolate_out2.display_columns)
     else:
         if x_quantile:
-            ax.set_yticks(range(len(pdp_interact_out.feature_grids[1])))
-            ax.set_yticklabels(pdp_interact_out.feature_grids[1])
+            ax.set_yticks(range(len(pdp_interact_out.pdp_isolate_out2.display_columns)))
+            ax.set_yticklabels(pdp_interact_out.pdp_isolate_out2.display_columns)
 
     level = np.min([X.shape[0], X.shape[1]])
     c1 = ax.contourf(X, Y, Z, N=level, origin='lower', cmap=contour_cmap)
