@@ -1,6 +1,4 @@
 
-from __future__ import absolute_import
-
 from .info_plot_utils import (_target_plot, _info_plot_interact, _actual_plot, _prepare_info_plot_interact_data,
                               _prepare_info_plot_interact_summary, _prepare_info_plot_data)
 from .other_utils import (_make_list, _check_model, _check_target, _check_classes,
@@ -58,10 +56,31 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     Returns
     -------
-    axes: Matplotlib Axes
-        Returns the Axes object with the plot for further tweaking
+    fig: matplotlib Figure
+    axes: a dictionary of matplotlib Axes
+        Returns the Axes objects for further tweaking
     summary_df: pandas DataFrame
         Graph data in data frame format
+
+    Examples
+    --------
+
+    Quick start with target_plot
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_titanic = get_dataset.titanic()
+        >>> titanic_data = test_titanic['data']
+        >>> titanic_features = test_titanic['features']
+        >>> titanic_target = test_titanic['target']
+        >>> titanic_model = test_titanic['xgb_model']
+        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
+        ...                                                feature='Sex',
+        ...                                                feature_name='Sex',
+        ...                                                target=titanic_target)
 
     """
 
@@ -94,12 +113,12 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     summary_df = summary_df[info_cols + ['count'] + target]
 
     # inner call target plot
-    axes = _target_plot(
+    fig, axes = _target_plot(
         feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
         target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, ncols=ncols,
         plot_params=plot_params)
 
-    return axes, summary_df
+    return fig, axes, summary_df
 
 
 def q1(x):

@@ -155,7 +155,7 @@ def _info_plot_title(title, subtitle, ax, plot_params):
 def _target_plot(feature_name, display_columns, percentile_columns, target, bar_data,
                  target_lines, figsize, ncols, plot_params):
     # set up graph parameters
-    width, height = 16, 7
+    width, height = 15, 9
     nrows = 1
 
     if len(target) > 1:
@@ -179,13 +179,19 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     subtitle = plot_params.get('subtitle', 'Average target value through different feature values.')
 
     # Axes for title
-    plt.figure(figsize=(width, 2))
-    title_ax = plt.subplot(111)
+    # plt.figure(figsize=(width, 2))
+    # title_ax = plt.subplot(111)
+    fig = plt.figure(figsize=(width, height))
+    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
+    title_ax = plt.Subplot(fig, outer_grid[0])
+    fig.add_subplot(title_ax)
     _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
 
     if len(target) == 1:
-        plt.figure(figsize=(width, height))
-        bar_ax = plt.subplot(111)
+        # plt.figure(figsize=(width, height))
+        # bar_ax = plt.subplot(111)
+        bar_ax = plt.Subplot(fig, outer_grid[1])
+        fig.add_subplot(bar_ax)
         line_ax = bar_ax.twinx()
 
         line_data = target_lines[0].rename(columns={target[0]: 'y'}).sort_values('x', ascending=True)
@@ -194,8 +200,15 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
                        percentile_columns=percentile_columns, plot_params=plot_params)
 
     else:
-        _, plot_axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(width, height), sharey='row')
-        plot_axes = plot_axes.flatten()
+        # _, plot_axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(width, height), sharey='row')
+        # plot_axes = plot_axes.flatten()
+        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35)
+        plot_axes = []
+        for inner_idx in range(len(target)):
+            ax = plt.Subplot(fig, inner_grid[inner_idx])
+            plot_axes.append(ax)
+            fig.add_subplot(ax)
+
         bar_ax = []
         line_ax = []
 
@@ -226,14 +239,18 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
             bar_ax.append(inner_bar_ax)
             line_ax.append(inner_line_ax)
 
+            if target_idx % ncols != 0:
+                inner_bar_ax.set_yticklabels([])
+
+            if (target_idx % ncols + 1 != ncols) and target_idx != len(plot_axes) - 1:
+                inner_line_ax.set_yticklabels([])
+
         if len(plot_axes) > len(target):
             for idx in range(len(target), len(plot_axes)):
                 plot_axes[idx].axis('off')
 
-        plt.subplots_adjust(hspace=0.3)
-
     axes = {'title_ax': title_ax, 'bar_ax': bar_ax, 'line_ax': line_ax}
-    return axes
+    return fig, axes
 
 
 def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, box_color, plot_params):
