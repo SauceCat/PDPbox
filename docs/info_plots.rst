@@ -1,9 +1,14 @@
 
-==========
-info_plots
-==========
+=================
+pdpbox.info_plots
+=================
 
-Plotting API
-------------
+.. toctree::
+   :maxdepth: 2
 
-.. autofunction:: pdpbox.info_plots.target_plot
+   target_plot
+   target_plot_interact
+   actual_plot
+   actual_plot_interact
+
+

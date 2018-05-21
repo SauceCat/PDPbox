@@ -161,7 +161,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     if len(target) > 1:
         nrows = int(np.ceil(len(target) * 1.0 / ncols))
         ncols = np.min([len(target), ncols])
-        width = np.min([8 * len(target), 16])
+        width = np.min([7.5 * len(target), 15])
         height = width * 1.0 / ncols * nrows
 
     if figsize is not None:
@@ -178,19 +178,14 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     title = plot_params.get('title', 'Target plot for feature "%s"' % feature_name)
     subtitle = plot_params.get('subtitle', 'Average target value through different feature values.')
 
-    # Axes for title
-    # plt.figure(figsize=(width, 2))
-    # title_ax = plt.subplot(111)
     fig = plt.figure(figsize=(width, height))
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
-    title_ax = plt.Subplot(fig, outer_grid[0])
+    title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
     _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
 
     if len(target) == 1:
-        # plt.figure(figsize=(width, height))
-        # bar_ax = plt.subplot(111)
-        bar_ax = plt.Subplot(fig, outer_grid[1])
+        bar_ax = plt.subplot(outer_grid[1])
         fig.add_subplot(bar_ax)
         line_ax = bar_ax.twinx()
 
@@ -200,12 +195,10 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
                        percentile_columns=percentile_columns, plot_params=plot_params)
 
     else:
-        # _, plot_axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(width, height), sharey='row')
-        # plot_axes = plot_axes.flatten()
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35)
         plot_axes = []
         for inner_idx in range(len(target)):
-            ax = plt.Subplot(fig, inner_grid[inner_idx])
+            ax = plt.subplot(inner_grid[inner_idx])
             plot_axes.append(ax)
             fig.add_subplot(ax)
 
@@ -317,7 +310,7 @@ def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_color, box_ax,
 def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feature_name,
                  display_columns, percentile_columns, figsize, ncols, plot_params):
     # set up graph parameters
-    width, height = 16, 7
+    width, height = 15, 9
     nrows = 1
 
     if plot_params is None:
@@ -334,7 +327,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
     if len(actual_prediction_columns) > 1:
         nrows = int(np.ceil(len(actual_prediction_columns) * 1.0 / ncols))
         ncols = np.min([len(actual_prediction_columns), ncols])
-        width = np.min([8 * len(actual_prediction_columns), 16])
+        width = np.min([7.5 * len(actual_prediction_columns), 15])
         height = width * 1.0 / ncols * nrows
 
     if figsize is not None:
@@ -343,16 +336,19 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
     if plot_params is None:
         plot_params = dict()
 
-    # Axes for title
-    plt.figure(figsize=(width, 2))
-    title_ax = plt.subplot(111)
+    fig = plt.figure(figsize=(width, height))
+    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
+    title_ax = plt.subplot(outer_grid[0])
+    fig.add_subplot(title_ax)
     _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
 
     if len(actual_prediction_columns) == 1:
-        plt.figure(figsize=(width, height))
-        gs = GridSpec(2, 1)
-        box_ax = plt.subplot(gs[0])
-        bar_ax = plt.subplot(gs[1], sharex=box_ax)
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1])
+
+        box_ax = plt.subplot(inner_grid[0])
+        bar_ax = plt.subplot(inner_grid[1], sharex=box_ax)
+        fig.add_subplot(box_ax)
+        fig.add_subplot(bar_ax)
 
         box_data = plot_data[['x', actual_prediction_columns[0]]].rename(columns={actual_prediction_columns[0]: 'y'})
         box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0] + '_q2': 'y'})
@@ -360,8 +356,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
                       box_color=box_color, box_ax=box_ax, feature_name=feature_name, display_columns=display_columns,
                       percentile_columns=percentile_columns, plot_params=plot_params)
     else:
-        plt.figure(figsize=(width, height))
-        outer = GridSpec(nrows, ncols, wspace=0.2, hspace=0.3)
+        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35)
 
         box_ax = []
         bar_ax = []
@@ -375,9 +370,11 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         for idx in range(len(actual_prediction_columns)):
             box_color = box_colors[idx % len(box_colors)]
 
-            inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer[idx], wspace=0, hspace=0.2)
+            inner = GridSpecFromSubplotSpec(2, 1, subplot_spec=inner_grid[idx], wspace=0, hspace=0.2)
             inner_box_ax = plt.subplot(inner[0])
             inner_bar_ax = plt.subplot(inner[1], sharex=inner_box_ax)
+            fig.add_subplot(inner_box_ax)
+            fig.add_subplot(inner_bar_ax)
 
             inner_box_data = plot_data[['x', actual_prediction_columns[idx]]].rename(
                 columns={actual_prediction_columns[idx]: 'y'})
@@ -393,11 +390,15 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
             inner_box_ax.set_title(subplot_title, fontdict={'fontsize': 13, 'fontname': font_family})
             inner_box_ax.set_ylim(0., y_max)
 
+            if idx % ncols != 0:
+                inner_bar_ax.set_yticklabels([])
+                inner_box_ax.set_yticklabels([])
+
             box_ax.append(inner_box_ax)
             bar_ax.append(inner_bar_ax)
 
     axes = {'title_ax': title_ax, 'box_ax': box_ax, 'bar_ax': bar_ax}
-    return axes
+    return fig, axes
 
 
 def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percentile_columns,
@@ -409,6 +410,8 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
     plot_ax.set_xlim(-0.5, len(display_columns[0]) - 0.5)
     plot_ax.set_ylim(-0.5, len(display_columns[1]) - 0.5)
 
+    percentile_ax = None
+    percentile_ay = None
     # display percentile
     if len(percentile_columns[0]) > 0:
         percentile_ax = plot_ax.twiny()
@@ -437,7 +440,7 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
     plot_ax.set_ylabel(feature_names[1])
 
     _axes_modify(font_family=font_family, ax=plot_ax)
-    return value_min, value_max
+    return value_min, value_max, percentile_ax, percentile_ay
 
 
 def _modify_legend_ax(ax, font_family):
@@ -490,10 +493,14 @@ def _plot_legend_circles(count_min, count_max, circle_ax, cmap, font_family):
 def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
                         plot_data, title, subtitle, figsize, ncols, plot_params):
 
-    nrows = int(np.ceil(len(ys) * 1.0 / ncols))
-    ncols = np.min([len(ys), ncols])
-    width = np.min([8 * len(ys), 16])
-    height = width * 1.0 / ncols * nrows
+    width, height = 15, 9
+    nrows = 1
+
+    if len(ys) > 1:
+        nrows = int(np.ceil(len(ys) * 1.0 / ncols))
+        ncols = np.min([len(ys), ncols])
+        width = np.min([7.5 * len(ys), 15])
+        height = width * 1.0 / ncols * nrows
 
     if figsize is not None:
         width, height = figsize
@@ -507,8 +514,10 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
     marker_size_max = plot_params.get('marker_size_max', 1500)
 
     # plot title
-    plt.figure(figsize=(width, 2))
-    title_ax = plt.subplot(111)
+    fig = plt.figure(figsize=(width, height))
+    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
+    title_ax = plt.subplot(outer_grid[0])
+    fig.add_subplot(title_ax)
     _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
 
     # draw value plots and legend
@@ -517,39 +526,51 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
     for count in plot_data['fake_count'].values:
         size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
-    legend_width = np.max([8, np.min([width, 12])])
 
     if len(ys) == 1:
-        _, value_ax = plt.subplots(nrows=1, ncols=1, figsize=(width, height))
-        value_min, value_max = _plot_interact(
-            plot_data=plot_data, y=ys[0], plot_ax=value_ax,
-            feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[height-3, 1])
+        value_ax = plt.subplot(inner_grid[0])
+        fig.add_subplot(value_ax)
+        value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
+            plot_data=plot_data, y=ys[0], plot_ax=value_ax, feature_names=feature_names,
+            display_columns=display_columns, percentile_columns=percentile_columns,
             marker_sizes=marker_sizes, cmap=cmap, line_width=line_width, xticks_rotation=xticks_rotation,
             font_family=font_family)
 
         # draw legend
-        _, legend_ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
+        # _, legend_ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
+        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[1], wspace=0)
+        legend_ax = [plt.subplot(legend_grid[0]), plt.subplot(legend_grid[1])]
+        fig.add_subplot(legend_ax[0])
+        fig.add_subplot(legend_ax[1])
         _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=legend_ax[0],
                               cmap=cmap, font_family=font_family)
         _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax[1],
                              cmap=cmap, font_family=font_family)
 
     else:
-        # value_ax = fig.axes
-        plt.figure(figsize=(width / 3, 1))
-        legend_ax = plt.subplot(111)
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[1, height - 3])
+        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[0], wspace=0)
+        legend_ax = plt.subplot(legend_grid[0])
+        fig.add_subplot(legend_ax)
+
         _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax,
                              cmap=cmap, font_family=font_family)
 
-        _, value_ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(width, height), sharey='row')
-        value_ax = value_ax.flatten()
+        value_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=inner_grid[1], wspace=0.2, hspace=0.35)
+        value_ax = []
+        for y_idx in range(len(ys)):
+            ax = plt.subplot(value_grid[y_idx])
+            value_ax.append(ax)
+            fig.add_subplot(ax)
 
         for idx in range(len(ys)):
+
             cmap_idx = cmaps[idx % len(cmaps)]
 
-            value_min, value_max = _plot_interact(
-                plot_data=plot_data, y=ys[idx], plot_ax=value_ax[idx],
-                feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
+            value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
+                plot_data=plot_data, y=ys[idx], plot_ax=value_ax[idx], feature_names=feature_names,
+                display_columns=display_columns, percentile_columns=percentile_columns,
                 marker_sizes=marker_sizes, cmap=cmap_idx, line_width=line_width,
                 xticks_rotation=xticks_rotation, font_family=font_family)
 
@@ -562,12 +583,19 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
                 subplot_title += '\n\n\n'
             value_ax[idx].set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
 
+            if idx % ncols != 0:
+                value_ax[idx].set_yticklabels([])
+
+            if (idx % ncols + 1 != ncols) and idx != len(value_ax) - 1:
+                if percentile_ay is not None:
+                    percentile_ay.set_yticklabels([])
+
         if len(value_ax) > len(ys):
             for idx in range(len(ys), len(value_ax)):
                 value_ax[idx].axis('off')
 
-    axes = {'title_ax': title_ax, 'value_ax': value_ax}
-    return axes
+    axes = {'title_ax': title_ax, 'value_ax': value_ax, 'legend_ax': legend_ax}
+    return fig, axes
 
 
 def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
