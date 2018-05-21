@@ -1,7 +1,9 @@
-pandas
 numpy
+scipy
+pandas
 matplotlib>=2.1.2
 joblib
 psutil
 scikit-learn
 numpydoc>=0.7.0
+
