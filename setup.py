@@ -3,6 +3,7 @@ import versioneer
 
 setup(name='PDPbox',
       packages=['pdpbox'],
+      package_data={'pdpbox': ['datasets/*.pkl']},
       version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
       description='python partial dependence plot toolbox',

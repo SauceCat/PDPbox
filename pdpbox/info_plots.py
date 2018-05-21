@@ -1,6 +1,4 @@
 
-from __future__ import absolute_import
-
 from .info_plot_utils import (_target_plot, _info_plot_interact, _actual_plot, _prepare_info_plot_interact_data,
                               _prepare_info_plot_interact_summary, _prepare_info_plot_data)
 from .other_utils import (_make_list, _check_model, _check_target, _check_classes,
@@ -10,59 +8,119 @@ from .other_utils import (_make_list, _check_model, _check_target, _check_classe
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None, show_percentile=False,
                 show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
-    """Plot average target value across different feature values (feature grids)
+    """
+    Plot average target value across different feature values (feature grids)
 
-    Parameters:
-    -----------
-
-    :param df: pandas DataFrame
+    Parameters
+    ----------
+    df: pandas DataFrame
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
-    :param feature: string or list
+    feature: string or list
         feature or feature list to investigate
         for one-hot encoding features, feature list is required
-    :param feature_name: string
+    feature_name: string
         name of the feature, not necessary a column name
-    :param target: string or list
+    target: string or list
         column name or column name list for target value
         for multi-class problem, a list of one-hot encoding target column
-    :param num_grid_points: integer, optional, default=10
+    num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
-    :param grid_type: string, optional, default='percentile'
+    grid_type: string, optional, default='percentile'
         'percentile' or 'equal'
         type of grid points for numeric feature
-    :param percentile_range: tuple or None, optional, default=None
+    percentile_range: tuple or None, optional, default=None
         percentile range to investigate
         for numeric feature when grid_type='percentile'
-    :param grid_range: tuple or None, optional, default=None
+    grid_range: tuple or None, optional, default=None
         value range to investigate
         for numeric feature when grid_type='equal'
-    :param cust_grid_points: Series, 1d-array, list or None, optional, default=None
+    cust_grid_points: Series, 1d-array, list or None, optional, default=None
         customized list of grid points
         for numeric feature
-    :param show_percentile: bool, optional, default=False
+    show_percentile: bool, optional, default=False
         whether to display the percentile buckets
         for numeric feature when grid_type='percentile'
-    :param show_outliers: bool, optional, default=False
+    show_outliers: bool, optional, default=False
         whether to display the out of range buckets
         for numeric feature when percentile_range or grid_range is not None
-    :param endpoint: bool, optional
-        If True, stop is the last grid point, default=True
+    endpoint: bool, optional, default=True
+        If True, stop is the last grid point
         Otherwise, it is not included
-    :param figsize: tuple or None, optional, default=None
+    figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
-    :param ncols: integer, optional, default=2
+    ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
-    :param plot_params: dict or None, optional, default=None
+    plot_params: dict or None, optional, default=None
         parameters for the plot
 
-    Return:
+    Returns
     -------
-
-    :return axes: matplotlib Axes
-        Returns the Axes object with the plot for further tweaking
-    :return summary_df: pandas DataFrame
+    fig: matplotlib Figure
+    axes: a dictionary of matplotlib Axes
+        Returns the Axes objects for further tweaking
+    summary_df: pandas DataFrame
         Graph data in data frame format
+
+    Examples
+    --------
+
+    Quick start with target_plot
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_titanic = get_dataset.titanic()
+        >>> titanic_data = test_titanic['data']
+        >>> titanic_target = test_titanic['target']
+        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
+        ...                                                feature='Sex',
+        ...                                                feature_name='Sex',
+        ...                                                target=titanic_target)
+
+
+    With One-hot encoding features
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
+        ...                                                feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'],
+        ...                                                feature_name='Embarked',
+        ...                                                target=titanic_target)
+
+
+    With numeric features
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
+        ...                                                feature='Fare',
+        ...                                                feature_name='Fare',
+        ...                                                target=titanic_target,
+        ...                                                show_percentile=True)
+
+
+    With multi-class
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_otto = get_dataset.otto()
+        >>> otto_data = test_otto['data']
+        >>> otto_target = test_otto['target']
+        >>> fig, axes, summary_df = info_plots.target_plot(df=otto_data,
+        ...                                                feature='feat_67',
+        ...                                                feature_name='feat_67',
+        ...                                                target=['target_0', 'target_2', 'target_5', 'target_8'])
+
     """
 
     # check inputs
@@ -94,12 +152,12 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
     summary_df = summary_df[info_cols + ['count'] + target]
 
     # inner call target plot
-    axes = _target_plot(
+    fig, axes = _target_plot(
         feature_name=feature_name, display_columns=display_columns, percentile_columns=percentile_columns,
         target=target, bar_data=bar_data, target_lines=target_lines, figsize=figsize, ncols=ncols,
         plot_params=plot_params)
 
-    return axes, summary_df
+    return fig, axes, summary_df
 
 
 def q1(x):
@@ -119,59 +177,123 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
                 which_classes=None, predict_kwds={}, ncols=2, figsize=None, plot_params=None):
     """Plot prediction distribution across different feature values (feature grid)
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
-    :param model: a fitted sklearn model
-    :param X: pandas DataFrame
+    model: a fitted sklearn model
+    X: pandas DataFrame
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
-    :param feature: string or list
+    feature: string or list
         feature or feature list to investigate
         for one-hot encoding features, feature list is required
-    :param feature_name: string
+    feature_name: string
         name of the feature, not necessary a column name
-    :param num_grid_points: integer, optional, default=10
+    num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
-    :param grid_type: string, optional, default='percentile'
+    grid_type: string, optional, default='percentile'
         'percentile' or 'equal'
         type of grid points for numeric feature
-    :param percentile_range: tuple or None, optional, default=None
+    percentile_range: tuple or None, optional, default=None
         percentile range to investigate
         for numeric feature when grid_type='percentile'
-    :param grid_range: tuple or None, optional, default=None
+    grid_range: tuple or None, optional, default=None
         value range to investigate
         for numeric feature when grid_type='equal'
-    :param cust_grid_points: Series, 1d-array, list or None, optional, default=None
+    cust_grid_points: Series, 1d-array, list or None, optional, default=None
         customized list of grid points
         for numeric feature
-    :param show_percentile: bool, optional, default=False
+    show_percentile: bool, optional, default=False
         whether to display the percentile buckets
         for numeric feature when grid_type='percentile'
-    :param show_outliers: bool, optional, default=False
+    show_outliers: bool, optional, default=False
         whether to display the out of range buckets
         for numeric feature when percentile_range or grid_range is not None
-    :param endpoint: bool, optional
+    endpoint: bool, optional
         If True, stop is the last grid point, default=True
         Otherwise, it is not included
-    :param which_classes: list, optional, default=None
+    which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
-    :param predict_kwds: dict, default={}
+    predict_kwds: dict, default={}
         keywords to be passed to the model's predict function
-    :param figsize: tuple or None, optional, default=None
+    figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
-    :param ncols: integer, optional, default=2
+    ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
-    :param plot_params: dict or None, optional, default=None
+    plot_params: dict or None, optional, default=None
         parameters for the plot
 
-    Return:
+    Returns
     -------
-
-    :return axes: matplotlib Axes
-        Returns the Axes object with the plot for further tweaking
-    :return summary_df: pandas DataFrame
+    fig: matplotlib Figure
+    axes: a dictionary of matplotlib Axes
+        Returns the Axes objects for further tweaking
+    summary_df: pandas DataFrame
         Graph data in data frame format
+
+    Examples
+    --------
+
+    Quick start with actual_plot
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_titanic = get_dataset.titanic()
+        >>> titanic_data = test_titanic['data']
+        >>> titanic_features = test_titanic['features']
+        >>> titanic_target = test_titanic['target']
+        >>> titanic_model = test_titanic['xgb_model']
+        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
+        ...                                                X=titanic_data[titanic_features],
+        ...                                                feature='Sex',
+        ...                                                feature_name='Sex')
+
+
+    With One-hot encoding features
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
+        ...                                                X=titanic_data[titanic_features],
+        ...                                                feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'],
+        ...                                                feature_name='Embarked')
+
+
+    With numeric features
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
+        ...                                                X=titanic_data[titanic_features],
+        ...                                                feature='Fare',
+        ...                                                feature_name='Fare')
+
+
+    With multi-class
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_otto = get_dataset.otto()
+        >>> otto_data = test_otto['data']
+        >>> otto_model = test_otto['rf_model']
+        >>> otto_features = test_otto['features']
+        >>> otto_target = test_otto['target']
+        >>> fig, axes, summary_df = info_plots.actual_plot(model=otto_model,
+        ...                                                X=otto_data[otto_features],
+        ...                                                feature='feat_67',
+        ...                                                feature_name='feat_67',
+        ...                                                which_classes=[1, 2, 3])
+
     """
 
     # check inputs
@@ -219,11 +341,11 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
         summary_df = summary_df.merge(box_line, on='x', how='outer').fillna(0)
     summary_df = summary_df[info_cols + ['count'] + actual_prediction_columns_qs]
 
-    axes = _actual_plot(plot_data=info_df_x, bar_data=bar_data, box_lines=box_lines,
-                        actual_prediction_columns=actual_prediction_columns,
-                        feature_name=feature_name, display_columns=display_columns,
-                        percentile_columns=percentile_columns, figsize=figsize, ncols=ncols, plot_params=plot_params)
-    return axes, summary_df
+    fig, axes = _actual_plot(plot_data=info_df_x, bar_data=bar_data, box_lines=box_lines,
+                             actual_prediction_columns=actual_prediction_columns, feature_name=feature_name,
+                             display_columns=display_columns, percentile_columns=percentile_columns, figsize=figsize,
+                             ncols=ncols, plot_params=plot_params)
+    return fig, axes, summary_df
 
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
@@ -231,60 +353,96 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
                          show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
     """Plot average target value across different feature value combinations (feature grid combinations)
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
-    :param df: pandas DataFrame
+    df: pandas DataFrame
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
-    :param features: list
+    features: list
         two features to investigate
-    :param feature_names: list
+    feature_names: list
         feature names
-    :param target: string or list
+    target: string or list
         column name or column name list for target value
         for multi-class problem, a list of one-hot encoding target column
-    :param num_grid_points: list, optional, default=None
+    num_grid_points: list, optional, default=None
         number of grid points for each feature
-    :param grid_types: list, optional, default=None
+    grid_types: list, optional, default=None
         type of grid points for each feature
-    :param percentile_ranges: list of tuple, optional, default=None
+    percentile_ranges: list of tuple, optional, default=None
         percentile range to investigate for each feature
-    :param grid_ranges: list of tuple, optional, default=None
+    grid_ranges: list of tuple, optional, default=None
         value range to investigate for each feature
-    :param cust_grid_points: list of (Series, 1d-array, list), optional, default=None
+    cust_grid_points: list of (Series, 1d-array, list), optional, default=None
         customized list of grid points for each feature
-    :param show_percentile: bool, optional, default=False
+    show_percentile: bool, optional, default=False
         whether to display the percentile buckets for both feature
-    :param show_outliers: bool, optional, default=False
+    show_outliers: bool, optional, default=False
         whether to display the out of range buckets for both features
-    :param endpoint: bool, optional
+    endpoint: bool, optional
         If True, stop is the last grid point, default=True
         Otherwise, it is not included
-    :param figsize: tuple or None, optional, default=None
+    figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
-    :param ncols: integer, optional, default=2
+    ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
-    :param plot_params: dict or None, optional, default=None
+    plot_params: dict or None, optional, default=None
         parameters for the plot
 
-    Notes:
-    ------
-    Parameters are consistent with the ones for function target_plot
-    But for this function, you need to specify parameter value for both features
-    in list format
-    For example:
-    percentile_ranges = [(0, 90), (5, 95)] means
-    percentile_range = (0, 90) for feature 1
-    percentile_range = (5, 95) for feature 2
+    Notes
+    -----
 
-    Return:
+    > Parameters are consistent with the ones for function target_plot
+    > But for this function, you need to specify parameter value for both features
+    > in list format
+    > For example:
+    > percentile_ranges = [(0, 90), (5, 95)] means
+    > percentile_range = (0, 90) for feature 1
+    > percentile_range = (5, 95) for feature 2
+
+    Returns
     -------
-
-    :return axes: matplotlib Axes
-        Returns the Axes object with the plot for further tweaking
-    :return summary_df: pandas DataFrame
+    fig: matplotlib Figure
+    axes: a dictionary of matplotlib Axes
+        Returns the Axes objects for further tweaking
+    summary_df: pandas DataFrame
         Graph data in data frame format
+
+    Examples
+    --------
+
+    Quick start with target_plot_interact
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_titanic = get_dataset.titanic()
+        >>> titanic_data = test_titanic['data']
+        >>> titanic_target = test_titanic['target']
+        >>> fig, axes, summary_df = info_plots.target_plot_interact(df=titanic_data,
+        ...                                                         features=['Sex', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
+        ...                                                         feature_names=['Sex', 'Embarked'],
+        ...                                                         target=titanic_target)
+
+
+    With multi-class
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_otto = get_dataset.otto()
+        >>> otto_data = test_otto['data']
+        >>> otto_target = test_otto['target']
+        >>> fig, axes, summary_df = info_plots.target_plot_interact(df=otto_data,
+        ...                                                         features=['feat_67', 'feat_32'],
+        ...                                                         feature_names=['feat_67', 'feat_32'],
+        ...                                                         target=['target_0', 'target_2', 'target_5', 'target_8'])
+
     """
 
     # check inputs
@@ -331,12 +489,12 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     subtitle = plot_params.get('subtitle', 'Average target value through different feature value combinations.')
 
     # inner call target plot interact
-    axes = _info_plot_interact(
+    fig, axes = _info_plot_interact(
         feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
         ys=target, plot_data=target_plot_data, title=title, subtitle=subtitle, figsize=figsize,
         ncols=ncols, plot_params=plot_params)
 
-    return axes, summary_df
+    return fig, axes, summary_df
 
 
 def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
@@ -345,52 +503,92 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
                          figsize=None, plot_params=None):
     """Plot prediction distribution across different feature value combinations (feature grid combinations)
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
-    :param model: a fitted sklearn model
-    :param X: pandas DataFrame
+    model: a fitted sklearn model
+    X: pandas DataFrame
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
-    :param features: list
+    features: list
         two features to investigate
-    :param feature_names: list
+    feature_names: list
         feature names
-    :param num_grid_points: list, optional, default=None
+    num_grid_points: list, optional, default=None
         number of grid points for each feature
-    :param grid_types: list, optional, default=None
+    grid_types: list, optional, default=None
         type of grid points for each feature
-    :param percentile_ranges: list of tuple, optional, default=None
+    percentile_ranges: list of tuple, optional, default=None
         percentile range to investigate for each feature
-    :param grid_ranges: list of tuple, optional, default=None
+    grid_ranges: list of tuple, optional, default=None
         value range to investigate for each feature
-    :param cust_grid_points: list of (Series, 1d-array, list), optional, default=None
+    cust_grid_points: list of (Series, 1d-array, list), optional, default=None
         customized list of grid points for each feature
-    :param show_percentile: bool, optional, default=False
+    show_percentile: bool, optional, default=False
         whether to display the percentile buckets for both feature
-    :param show_outliers: bool, optional, default=False
+    show_outliers: bool, optional, default=False
         whether to display the out of range buckets for both features
-    :param endpoint: bool, optional
+    endpoint: bool, optional
         If True, stop is the last grid point, default=True
         Otherwise, it is not included
-    :param which_classes: list, optional, default=None
+    which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
-    :param predict_kwds: dict, default={}
+    predict_kwds: dict, default={}
         keywords to be passed to the model's predict function
-    :param figsize: tuple or None, optional, default=None
+    figsize: tuple or None, optional, default=None
         size of the figure, (width, height)
-    :param ncols: integer, optional, default=2
+    ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
-    :param plot_params: dict or None, optional, default=None
+    plot_params: dict or None, optional, default=None
         parameters for the plot
 
-    Return:
+    Returns
     -------
-
-    :return axes: matplotlib Axes
-        Returns the Axes object with the plot for further tweaking
-    :return summary_df: pandas DataFrame
+    fig: matplotlib Figure
+    axes: a dictionary of matplotlib Axes
+        Returns the Axes objects for further tweaking
+    summary_df: pandas DataFrame
         Graph data in data frame format
+
+    Examples
+    --------
+
+    Quick start with actual_plot_interact
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_titanic = get_dataset.titanic()
+        >>> titanic_data = test_titanic['data']
+        >>> titanic_features = test_titanic['features']
+        >>> titanic_target = test_titanic['target']
+        >>> titanic_model = test_titanic['xgb_model']
+        >>> fig, axes, summary_df = info_plots.actual_plot_interact(model=titanic_model,
+        ...                                                         X=titanic_data[titanic_features],
+        ...                                                         features=['Fare', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
+        ...                                                         feature_names=['Fare', 'Embarked'])
+
+
+    With multi-class
+
+    .. plot::
+        :context: close-figs
+        :include-source:
+
+        >>> from pdpbox import info_plots, get_dataset
+        >>> test_otto = get_dataset.otto()
+        >>> otto_data = test_otto['data']
+        >>> otto_model = test_otto['rf_model']
+        >>> otto_features = test_otto['features']
+        >>> otto_target = test_otto['target']
+        >>> fig, axes, summary_df = info_plots.actual_plot_interact(model=otto_model,
+        ...                                                         X=otto_data[otto_features],
+        ...                                                         features=['feat_67', 'feat_32'],
+        ...                                                         feature_names=['feat_67', 'feat_32'],
+        ...                                                         which_classes=[1, 2, 3])
+
     """
 
     # check model
@@ -453,10 +651,10 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
     subtitle = plot_params.get('subtitle',
                                'Medium value of actual prediction through different feature value combinations.')
 
-    axes = _info_plot_interact(
+    fig, axes = _info_plot_interact(
         feature_names=feature_names, display_columns=display_columns,
         percentile_columns=percentile_columns, ys=[col + '_q2' for col in actual_prediction_columns],
         plot_data=actual_plot_data, title=title, subtitle=subtitle, figsize=figsize,
         ncols=ncols, plot_params=plot_params)
 
-    return axes, summary_df
+    return fig, axes, summary_df

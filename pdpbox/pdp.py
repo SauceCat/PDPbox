@@ -148,9 +148,9 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
             percentile_info = None
 
         display_columns = [round(v, 2) for v in feature_grids]
-        if percentile_info is not None:
-            display_columns = [str(display_columns[i]) + '\n' + str(percentile_info[i])
-                               for i in range(len(percentile_info))]
+
+        # if percentile_info is not None:
+            # display_columns = [str(display_columns[i]) + '\n' + str(percentile_info[i]) for i in range(len(percentile_info))]
 
     # get the actual prediction and actual values
     actual_columns = []
