@@ -1,0 +1,8 @@
+pandas
+numpy
+matplotlib>=2.1.2
+joblib
+psutil
+scikit-learn
+mpl_toolkits
+numpydoc>=0.7.0
