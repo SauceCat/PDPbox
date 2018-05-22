@@ -155,5 +155,16 @@ def _check_info_plot_interact_params(num_grid_points, grid_types, percentile_ran
     }
 
 
+def _check_memory_limit(memory_limit):
+    if memory_limit <= 0 or memory_limit >= 1:
+        raise ValueError('memory_limit: should be (0, 1)')
+
+
+def _check_frac_to_plot(frac_to_plot):
+    if type(frac_to_plot) == float:
+        if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
+            raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
+
+
 
 

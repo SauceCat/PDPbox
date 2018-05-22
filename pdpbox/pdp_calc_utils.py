@@ -60,16 +60,18 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
 
 def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
                     feature_grid, predict_kwds, data_transformer):
+
+    _data = data.copy()
     if feature_type == 'onehot':
-        other_grids = list(set(feature) - set([feature_grid]))
-        data[feature_grid] = 1
+        other_grids = [grid for grid in feature if grid != feature_grid]
+        _data[feature_grid] = 1
         for grid in other_grids:
-            data[grid] = 0
+            _data[grid] = 0
     else:
-        data[feature] = feature_grid
+        _data[feature] = feature_grid
 
     if data_transformer is not None:
-        data = data_transformer(data)
+        _data = data_transformer(_data)
 
     if classifier:
         predict = model.predict_proba
@@ -77,7 +79,7 @@ def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature,
         predict = model.predict
 
     # get predictions for this chunk
-    preds = predict(data[model_features], **predict_kwds)
+    preds = predict(_data[model_features], **predict_kwds)
 
     if n_classes > 2:
         grid_results = []
