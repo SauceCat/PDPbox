@@ -67,59 +67,51 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
 
     Quick start with target_plot
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_titanic = get_dataset.titanic()
-        >>> titanic_data = test_titanic['data']
-        >>> titanic_target = test_titanic['target']
-        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
-        ...                                                feature='Sex',
-        ...                                                feature_name='Sex',
-        ...                                                target=titanic_target)
+        from pdpbox import info_plots, get_dataset
+
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_target = test_titanic['target']
+        fig, axes, summary_df = info_plots.target_plot(
+            df=titanic_data, feature='Sex', feature_name='Sex', target=titanic_target)
 
 
     With One-hot encoding features
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
-        ...                                                feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'],
-        ...                                                feature_name='Embarked',
-        ...                                                target=titanic_target)
+        fig, axes, summary_df = info_plots.target_plot(
+            df=titanic_data, feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'],
+            feature_name='Embarked', target=titanic_target)
 
 
     With numeric features
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> fig, axes, summary_df = info_plots.target_plot(df=titanic_data,
-        ...                                                feature='Fare',
-        ...                                                feature_name='Fare',
-        ...                                                target=titanic_target,
-        ...                                                show_percentile=True)
+        fig, axes, summary_df = info_plots.target_plot(
+            df=titanic_data, feature='Fare', feature_name='Fare',
+            target=titanic_target, show_percentile=True)
 
 
     With multi-class
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_otto = get_dataset.otto()
-        >>> otto_data = test_otto['data']
-        >>> otto_target = test_otto['target']
-        >>> fig, axes, summary_df = info_plots.target_plot(df=otto_data,
-        ...                                                feature='feat_67',
-        ...                                                feature_name='feat_67',
-        ...                                                target=['target_0', 'target_2', 'target_5', 'target_8'])
+        from pdpbox import info_plots, get_dataset
+
+        test_otto = get_dataset.otto()
+        otto_data = test_otto['data']
+        otto_target = test_otto['target']
+        fig, axes, summary_df = info_plots.target_plot(
+            df=otto_data, feature='feat_67', feature_name='feat_67',
+            target=['target_0', 'target_2', 'target_5', 'target_8'])
 
     """
 
@@ -236,63 +228,57 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
     Quick start with actual_plot
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_titanic = get_dataset.titanic()
-        >>> titanic_data = test_titanic['data']
-        >>> titanic_features = test_titanic['features']
-        >>> titanic_target = test_titanic['target']
-        >>> titanic_model = test_titanic['xgb_model']
-        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
-        ...                                                X=titanic_data[titanic_features],
-        ...                                                feature='Sex',
-        ...                                                feature_name='Sex')
+        from pdpbox import info_plots, get_dataset
+
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_features = test_titanic['features']
+        titanic_target = test_titanic['target']
+        titanic_model = test_titanic['xgb_model']
+        fig, axes, summary_df = info_plots.actual_plot(
+            model=titanic_model, X=titanic_data[titanic_features],
+            feature='Sex', feature_name='Sex')
 
 
     With One-hot encoding features
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
-        ...                                                X=titanic_data[titanic_features],
-        ...                                                feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'],
-        ...                                                feature_name='Embarked')
+        fig, axes, summary_df = info_plots.actual_plot(
+            model=titanic_model, X=titanic_data[titanic_features],
+            feature=['Embarked_C', 'Embarked_Q', 'Embarked_S'], feature_name='Embarked')
 
 
     With numeric features
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> fig, axes, summary_df = info_plots.actual_plot(model=titanic_model,
-        ...                                                X=titanic_data[titanic_features],
-        ...                                                feature='Fare',
-        ...                                                feature_name='Fare')
+        fig, axes, summary_df = info_plots.actual_plot(
+            model=titanic_model, X=titanic_data[titanic_features],
+            feature='Fare', feature_name='Fare')
 
 
     With multi-class
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_otto = get_dataset.otto()
-        >>> otto_data = test_otto['data']
-        >>> otto_model = test_otto['rf_model']
-        >>> otto_features = test_otto['features']
-        >>> otto_target = test_otto['target']
-        >>> fig, axes, summary_df = info_plots.actual_plot(model=otto_model,
-        ...                                                X=otto_data[otto_features],
-        ...                                                feature='feat_67',
-        ...                                                feature_name='feat_67',
-        ...                                                which_classes=[1, 2, 3])
+        from pdpbox import info_plots, get_dataset
+
+        test_otto = get_dataset.otto()
+        otto_data = test_otto['data']
+        otto_model = test_otto['rf_model']
+        otto_features = test_otto['features']
+        otto_target = test_otto['target']
+
+        fig, axes, summary_df = info_plots.actual_plot(
+            model=otto_model, X=otto_data[otto_features],
+            feature='feat_67', feature_name='feat_67', which_classes=[1, 2, 3])
 
     """
 
@@ -393,13 +379,12 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     Notes
     -----
 
-    > Parameters are consistent with the ones for function target_plot
-    > But for this function, you need to specify parameter value for both features
-    > in list format
-    > For example:
-    > percentile_ranges = [(0, 90), (5, 95)] means
-    > percentile_range = (0, 90) for feature 1
-    > percentile_range = (5, 95) for feature 2
+    - Parameters are consistent with the ones for function target_plot
+    - But for this function, you need to specify parameter value for both features in list format
+    - For example:
+        - percentile_ranges = [(0, 90), (5, 95)] means
+        - percentile_range = (0, 90) for feature 1
+        - percentile_range = (5, 95) for feature 2
 
     Returns
     -------
@@ -414,34 +399,18 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 
     Quick start with target_plot_interact
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_titanic = get_dataset.titanic()
-        >>> titanic_data = test_titanic['data']
-        >>> titanic_target = test_titanic['target']
-        >>> fig, axes, summary_df = info_plots.target_plot_interact(df=titanic_data,
-        ...                                                         features=['Sex', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
-        ...                                                         feature_names=['Sex', 'Embarked'],
-        ...                                                         target=titanic_target)
+        from pdpbox import info_plots, get_dataset
 
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_target = test_titanic['target']
 
-    With multi-class
-
-    .. plot::
-        :context: close-figs
-        :include-source:
-
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_otto = get_dataset.otto()
-        >>> otto_data = test_otto['data']
-        >>> otto_target = test_otto['target']
-        >>> fig, axes, summary_df = info_plots.target_plot_interact(df=otto_data,
-        ...                                                         features=['feat_67', 'feat_32'],
-        ...                                                         feature_names=['feat_67', 'feat_32'],
-        ...                                                         target=['target_0', 'target_2', 'target_5', 'target_8'])
+        fig, axes, summary_df = info_plots.target_plot_interact(
+            df=titanic_data, features=['Sex', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
+            feature_names=['Sex', 'Embarked'], target=titanic_target)
 
     """
 
@@ -550,44 +519,36 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
     summary_df: pandas DataFrame
         Graph data in data frame format
 
+    Notes
+    -----
+
+    - Parameters are consistent with the ones for function actual_plot
+    - But for this function, you need to specify parameter value for both features in list format
+    - For example:
+        - percentile_ranges = [(0, 90), (5, 95)] means
+        - percentile_range = (0, 90) for feature 1
+        - percentile_range = (5, 95) for feature 2
+
     Examples
     --------
 
     Quick start with actual_plot_interact
 
-    .. plot::
-        :context: close-figs
-        :include-source:
+    .. highlight:: python
+    .. code-block:: python
 
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_titanic = get_dataset.titanic()
-        >>> titanic_data = test_titanic['data']
-        >>> titanic_features = test_titanic['features']
-        >>> titanic_target = test_titanic['target']
-        >>> titanic_model = test_titanic['xgb_model']
-        >>> fig, axes, summary_df = info_plots.actual_plot_interact(model=titanic_model,
-        ...                                                         X=titanic_data[titanic_features],
-        ...                                                         features=['Fare', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
-        ...                                                         feature_names=['Fare', 'Embarked'])
+        from pdpbox import info_plots, get_dataset
 
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_features = test_titanic['features']
+        titanic_target = test_titanic['target']
+        titanic_model = test_titanic['xgb_model']
 
-    With multi-class
-
-    .. plot::
-        :context: close-figs
-        :include-source:
-
-        >>> from pdpbox import info_plots, get_dataset
-        >>> test_otto = get_dataset.otto()
-        >>> otto_data = test_otto['data']
-        >>> otto_model = test_otto['rf_model']
-        >>> otto_features = test_otto['features']
-        >>> otto_target = test_otto['target']
-        >>> fig, axes, summary_df = info_plots.actual_plot_interact(model=otto_model,
-        ...                                                         X=otto_data[otto_features],
-        ...                                                         features=['feat_67', 'feat_32'],
-        ...                                                         feature_names=['feat_67', 'feat_32'],
-        ...                                                         which_classes=[1, 2, 3])
+        fig, axes, summary_df = info_plots.actual_plot_interact(
+            model=titanic_model, X=titanic_data[titanic_features],
+            features=['Fare', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
+            feature_names=['Fare', 'Embarked'])
 
     """
 
