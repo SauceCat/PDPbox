@@ -6,7 +6,7 @@ from matplotlib.gridspec import GridSpec
 
 import copy
 
-from .pdp_calc_utils import _sample_data, _find_onehot_actual, _find_closest
+from .pdp_calc_utils import _sample_data
 from sklearn.cluster import MiniBatchKMeans, KMeans
 
 
@@ -53,8 +53,8 @@ def _axes_modify(font_family, ax, top=False, right=False, legend=False):
         ax.set_yticks([])
 
 
-def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot,
-              cluster, n_cluster_centers, cluster_method, x_quantile, ax, plot_params):
+def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, cluster, n_cluster_centers,
+              cluster_method, x_quantile, show_percentile, ax, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
@@ -102,9 +102,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot,
             _ice_line_plot(x=x, ice_plot_data=ice_plot_data, feature_grids=feature_grids, ax=ax, plot_params=plot_params)
 
     std = ice_lines[feature_grids].std().values
-    ymin, ymax = _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=ax, plot_params=plot_params)
-
-    return ymin, ymax
+    _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=ax, plot_params=plot_params)
 
 
 def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
@@ -132,8 +130,6 @@ def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
 
     ymin, ymax = np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0])
     ax.set_ylim(ymin, ymax)
-
-    return ymin, ymax
 
 
 def _ice_line_plot(x, ice_plot_data, feature_grids, ax, plot_params):

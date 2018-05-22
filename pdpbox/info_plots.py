@@ -17,7 +17,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
     feature: string or list
-        feature or feature list to investigate
+        feature or feature list to investigate,
         for one-hot encoding features, feature list is required
     feature_name: string
         name of the feature, not necessary a column name
@@ -174,8 +174,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
     model: a fitted sklearn model
     X: pandas DataFrame
-        data set to investigate on, should contain at least
-        the feature to investigate as well as the target
+        data set on which the model is trained
     feature: string or list
         feature or feature list to investigate
         for one-hot encoding features, feature list is required
@@ -184,19 +183,18 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
     grid_type: string, optional, default='percentile'
-        'percentile' or 'equal'
+        'percentile' or 'equal',
         type of grid points for numeric feature
     percentile_range: tuple or None, optional, default=None
-        percentile range to investigate
+        percentile range to investigate,
         for numeric feature when grid_type='percentile'
     grid_range: tuple or None, optional, default=None
-        value range to investigate
+        value range to investigate,
         for numeric feature when grid_type='equal'
     cust_grid_points: Series, 1d-array, list or None, optional, default=None
-        customized list of grid points
-        for numeric feature
+        customized list of grid points for numeric feature
     show_percentile: bool, optional, default=False
-        whether to display the percentile buckets
+        whether to display the percentile buckets,
         for numeric feature when grid_type='percentile'
     show_outliers: bool, optional, default=False
         whether to display the out of range buckets
