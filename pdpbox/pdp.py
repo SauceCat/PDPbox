@@ -241,7 +241,7 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_
         nrows = int(np.ceil(len(pdp_plot_data) * 1.0 / ncols))
         ncols = np.min([len(pdp_plot_data), ncols])
         width = np.min([7.5 * len(pdp_plot_data), 15])
-        height = width * 1.0 / ncols * nrows
+        height = np.min([width * 1.0 / ncols, 8]) * nrows
 
     if figsize is not None:
         width, height = figsize

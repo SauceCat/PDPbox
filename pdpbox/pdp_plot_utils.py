@@ -104,6 +104,14 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     std = ice_lines[feature_grids].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=ax, plot_params=plot_params)
 
+    if show_percentile and len(percentile_info) > 0:
+        percentile_ax = ax.twiny()
+        percentile_ax.set_xticks(ax.get_xticks())
+        percentile_ax.set_xbound(ax.get_xbound())
+        percentile_ax.set_xticklabels(percentile_info, rotation=xticks_rotation)
+        percentile_ax.set_xlabel('percentile info')
+        _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+
 
 def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
 
