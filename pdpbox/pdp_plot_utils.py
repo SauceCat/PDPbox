@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 import copy
 
 from .pdp_calc_utils import _sample_data
-from .info_plot_utils import _axes_modify, _autolabel
+from .info_plot_utils import _axes_modify, _autolabel, _modify_legend_ax
 
 from sklearn.cluster import MiniBatchKMeans, KMeans
 
@@ -26,35 +27,44 @@ def _pdp_plot_title(n_grids, feature_name, ax, plot_params):
     ax.axis('off')
 
 
-def _draw_pdp_barplot(bar_data, bar_ax, display_columns, plot_params):
+def _draw_pdp_countplot(count_data, count_ax, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
-    bar_color = plot_params.get('bar_color', '#5BB573')
-    bar_width = plot_params.get('bar_width', np.min([0.4, 0.4 / (10.0 / len(display_columns))]))
+    count_data['count_norm'] = count_data['count'] * 1.0 / count_data['count'].sum()
+    bar_plot_data = count_data['count_norm'].values
+    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(bar_plot_data))
 
-    # add value label for bar plot
-    rects = bar_ax.bar(x=bar_data['x'], height=bar_data['fake_count'], width=bar_width, color=bar_color, alpha=0.5)
-    _autolabel(rects=rects, ax=bar_ax, bar_color=bar_color)
-    _axes_modify(font_family=font_family, ax=bar_ax)
+    cmap = plot_params.get('line_cmap', 'Blues')
+    count_ax.imshow(np.expand_dims(bar_plot_data, 0), aspect="auto", cmap=cmap, norm=norm)
+    x = count_data['x'].values
+
+    for idx in range(len(bar_plot_data)):
+        text_color = "black"
+        if bar_plot_data[idx] >= np.max(bar_plot_data) * 0.5:
+            text_color = "white"
+        count_ax.text(x[idx], 0, round(bar_plot_data[idx], 3), ha="center", va="center",
+                      color=text_color, fontdict={'family': font_family})
+    _modify_legend_ax(count_ax, font_family=font_family)
 
 
-def _draw_pdp_distplot(hist_data, hist_ax, plot_params):
+def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
     font_family = plot_params.get('font_family', 'Arial')
-    bar_color = plot_params.get('bar_color', '#5BB573')
 
-    hist_ax.hist(hist_data, bins=100, color=bar_color, alpha=0.5)
-    _axes_modify(font_family=font_family, ax=hist_ax)
+    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(hist_data))
+    cmap = plot_params.get('line_cmap', 'Blues')
+
+    hist_ax.imshow(np.expand_dims(hist_data, 0), aspect="auto", cmap=cmap, norm=norm, extent=(vmin, vmax, 0, 0.5))
+    _modify_legend_ax(hist_ax, font_family=font_family)
 
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, cluster, n_cluster_centers,
-              cluster_method, x_quantile, show_percentile, pdp_ax, bar_data, bar_ax, plot_params):
+              cluster_method, x_quantile, show_percentile, pdp_ax, count_data, count_ax, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
     # modify axes
     _axes_modify(font_family, pdp_ax)
-
     feature_type = pdp_isolate_out.feature_type
     feature_grids = pdp_isolate_out.feature_grids
     display_columns = pdp_isolate_out.display_columns
@@ -62,14 +72,31 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
 
     if feature_type == 'binary' or feature_type == 'onehot' or x_quantile:
         x = range(len(feature_grids))
-        pdp_ax.set_xticks(x)
+        count_x = range(count_data['x'].min(), count_data['x'].max() + 1)
+        pdp_ax.set_xticks(count_x)
         pdp_ax.set_xticklabels([])
+        pdp_ax.set_xlim(count_x[0] - 0.5, count_x[-1] + 0.5)
+
         if x_quantile:
-            pdp_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
+            display_columns_adj = display_columns
+            if len(count_x) > len(display_columns):
+                display_columns_adj = [''] + list(display_columns)
+            pdp_ax.set_xticklabels(display_columns_adj, rotation=xticks_rotation)
+
+            if show_percentile and len(percentile_info) > 0:
+                percentile_ax = pdp_ax.twiny()
+                percentile_ax.set_xticks(pdp_ax.get_xticks())
+                percentile_ax.set_xbound(pdp_ax.get_xbound())
+                percentile_info_adj = percentile_info
+                if len(count_x) > len(percentile_info):
+                    percentile_info_adj = [''] + list(percentile_info)
+                percentile_ax.set_xticklabels(percentile_info_adj, rotation=xticks_rotation)
+                percentile_ax.set_xlabel('percentile info')
+                _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
     else:
-        # for numeric feature
+        # for numeric feature not x_quantile
         x = feature_grids
-        pdp_ax.set_xticklabels([])
+        # pdp_ax.set_xticklabels([])
 
     ice_lines = copy.deepcopy(pdp_isolate_out.ice_lines)
     pdp_y = copy.deepcopy(pdp_isolate_out.pdp)
@@ -99,29 +126,21 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     std = ice_lines[feature_grids].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=pdp_ax, plot_params=plot_params)
 
-    if show_percentile and len(percentile_info) > 0:
-        percentile_ax = pdp_ax.twiny()
-        percentile_ax.set_xticks(pdp_ax.get_xticks())
-        percentile_ax.set_xbound(pdp_ax.get_xbound())
-        percentile_ax.set_xticklabels(percentile_info, rotation=xticks_rotation)
-        percentile_ax.set_xlabel('percentile info')
-        _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
-
     if not x_quantile and feature_type == 'numeric':
         hist_data = pdp_isolate_out.hist_data.copy()
-        _draw_pdp_distplot(hist_data=hist_data, hist_ax=bar_ax, plot_params=plot_params)
+        _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, vmin=np.min(x), vmax=np.max(x), plot_params=plot_params)
     else:
-        _draw_pdp_barplot(bar_data=bar_data, bar_ax=bar_ax, display_columns=bar_data['display_column'].values,
-                          plot_params=plot_params)
-    bar_ax.set_xticks(pdp_ax.get_xticks())
-    bar_ax.set_xbound(pdp_ax.get_xbound())
+        _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, plot_params=plot_params)
+        count_ax.set_xticks(pdp_ax.get_xticks())
+
+    count_ax.set_xbound(pdp_ax.get_xbound())
 
     if feature_type in ['binary', 'onehot']:
-        bar_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
+        count_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
     else:
         if x_quantile:
-            bar_ax.set_xticklabels(bar_data['display_column'].values)
-    bar_ax.set_xlabel(feature_name, fontsize=10)
+            count_ax.set_xticklabels(count_data['display_column'].values)
+    count_ax.set_xlabel(feature_name, fontsize=10)
 
 
 def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
