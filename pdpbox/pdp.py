@@ -1,5 +1,5 @@
 
-from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter
+from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_bar_data
 from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_interact_plot_title,
                              _pdp_contour_plot, _pdp_interact_plot)
 from .other_utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
@@ -47,7 +47,7 @@ class PDPIsolate(object):
     """
 
     def __init__(self, n_classes, classifier, which_class, feature, feature_type, feature_grids,
-                 percentile_info, display_columns, ice_lines, pdp):
+                 percentile_info, display_columns, ice_lines, pdp, bar_data, hist_data):
 
         self._type = 'PDPIsolate_instance'
         self.n_classes = n_classes
@@ -60,6 +60,8 @@ class PDPIsolate(object):
         self.display_columns = display_columns
         self.ice_lines = ice_lines
         self.pdp = pdp
+        self.bar_data = bar_data
+        self.hist_data = hist_data
 
 
 def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile',
@@ -158,6 +160,13 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     else:
         ice_lines = pd.concat(grid_results, axis=1)
 
+    # calculate the bar
+    bar_df = _prepare_pdp_bar_data(feature=feature, feature_type=feature_type, data=_train_X[_make_list(feature)],
+                                   feature_grids=feature_grids, percentile_info=percentile_info)
+    hist_data = None
+    if feature_type == 'numeric':
+        hist_data = _train_X[feature].values
+
     # combine the final results
     if n_classes > 2:
         pdp_isolate_out = []
@@ -166,13 +175,14 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
             pdp_isolate_out.append(PDPIsolate(
                 n_classes=n_classes, classifier=classifier, which_class=n_class, feature=feature,
                 feature_type=feature_type, feature_grids=feature_grids, percentile_info=percentile_info,
-                display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp))
+                display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp,
+                bar_data=bar_df, hist_data=hist_data))
     else:
         pdp = ice_lines[feature_grids].mean().values
         pdp_isolate_out = PDPIsolate(
             n_classes=n_classes, classifier=classifier, which_class=None, feature=feature,
             feature_type=feature_type, feature_grids=feature_grids, percentile_info=percentile_info,
-            display_columns=display_columns, ice_lines=ice_lines, pdp=pdp)
+            display_columns=display_columns, ice_lines=ice_lines, pdp=pdp, bar_data=bar_df, hist_data=hist_data)
 
     return pdp_isolate_out
 
@@ -234,7 +244,7 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_
             pdp_plot_data.append(pdp_isolate_out[n_class])
 
     # set up graph parameters
-    width, height = 15, 9
+    width, height = 15, 11
     nrows = 1
 
     if len(pdp_plot_data) > 1:
@@ -255,9 +265,28 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_
     fig.add_subplot(title_ax)
     _pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=title_ax, plot_params=plot_params)
 
+    # prepare bar data
+    bar_data = pdp_plot_data[0].bar_data.copy()
+    feature_type = pdp_plot_data[0].feature_type
+    if feature_type == 'numeric':
+        if bar_data.iloc[0]['count'] == 0:
+            bar_data = bar_data.iloc[1:]
+        if bar_data.iloc[-1]['count'] == 0:
+            bar_data = bar_data.iloc[:-1]
+        bar_data = bar_data.reset_index(drop=True)
+        bar_data['x'] -= 1
+    bar_data = bar_data.rename(columns={'count': 'fake_count'})
+
     if len(pdp_plot_data) == 1:
-        pdp_ax = plt.subplot(outer_grid[1])
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[7, 2])
+        # pdp_ax = plt.subplot(outer_grid[1])
+        # fig.add_subplot(pdp_ax)
+
+        pdp_ax = plt.subplot(inner_grid[0])
         fig.add_subplot(pdp_ax)
+        bar_ax = plt.subplot(inner_grid[1])
+        fig.add_subplot(bar_ax, sharex=pdp_ax)
+        # bar_ax = pdp_ax.twinx()
 
         feature_name_adj = feature_name
         if pdp_plot_data[0].which_class is not None:
@@ -267,7 +296,11 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_
             pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
             frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
             cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
-            ax=pdp_ax, plot_params=plot_params)
+            pdp_ax=pdp_ax, bar_data=bar_data, bar_ax=bar_ax, plot_params=plot_params)
+
+        # bar_ax.get_yaxis().tick_right()
+        # bar_ax.grid(False)
+        # bar_ax.set_ylabel('count')
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
         pdp_ax = []

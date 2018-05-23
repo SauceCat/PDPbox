@@ -1,6 +1,4 @@
 
-from __future__ import absolute_import
-
 import numpy as np
 import pandas as pd
 
@@ -11,15 +9,18 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import ListedColormap
 
-from .pdp_plot_utils import _axes_modify
 from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
                              _make_bucket_column_names_percentile)
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
                     grid_range, cust_grid_points, show_percentile, show_outliers, endpoint):
-    display_columns = bound_ups = bound_lows = []
-    percentile_columns = percentile_bound_lows = percentile_bound_ups = []
+    display_columns = []
+    bound_ups = []
+    bound_lows = []
+    percentile_columns = []
+    percentile_bound_lows = []
+    percentile_bound_ups = []
     data_x = data.copy()
 
     if feature_type == 'binary':
@@ -73,6 +74,35 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
     }
 
     return results
+
+
+def _axes_modify(font_family, ax, top=False, right=False, legend=False):
+    # modify the axes
+
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.set_facecolor('white')
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
+
+    for d in ['top', 'bottom', 'right', 'left']:
+        ax.spines[d].set_visible(False)
+
+    if not legend:
+        if top:
+            ax.get_xaxis().tick_top()
+        elif right:
+            ax.get_yaxis().tick_right()
+        else:
+            ax.get_xaxis().tick_bottom()
+            ax.get_yaxis().tick_left()
+            ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+            ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
+    else:
+        ax.set_xticks([])
+        ax.set_yticks([])
 
 
 def _autolabel(rects, ax, bar_color):

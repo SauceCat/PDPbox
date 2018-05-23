@@ -237,24 +237,6 @@ def _make_bucket_column_names_percentile(percentile_info, endpoint):
 def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
                           feature_grids_combo, predict_kwds, data_transformer):
 
-    """
-    Calculate interaction ice lines
-
-    :param data_chunk: chunk of data to calculate on
-    :param model: the fitted model
-    :param classifier: whether the model is a classifier
-    :param model_features: features used by the model
-    :param n_classes: number of classes if it is a classifier
-    :param features: feature column names
-    :param feature_types: feature types
-    :param feature_grids: feature grids
-    :param feature_list: list of features
-    :param predict_kwds: other parameters pass to the predictor
-
-    :return:
-        a dataframe containing changing feature values and corresponding predictions
-    """
-
     for idx in range(len(feature_list)):
         data[feature_list[idx]] = feature_grids_combo[idx]
 
@@ -279,3 +261,50 @@ def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, fe
             result['preds'] = preds
 
     return result
+
+
+def _prepare_pdp_bar_data(feature, feature_type, data, feature_grids, percentile_info):
+    bound_ups = []
+    bound_lows = []
+    percentile_columns = []
+    percentile_bound_lows = []
+    percentile_bound_ups = []
+
+    if feature_type == 'onehot':
+        bar_data = pd.DataFrame(data[feature_grids].sum(axis=0)).reset_index(drop=False)
+        bar_data = bar_data.rename(columns={0: 'count'})
+        bar_data['x'] = range(bar_data.shape[0])
+        display_columns = feature_grids
+    else:
+        data_x = data.copy()
+        if feature_type == 'binary':
+            data_x['x'] = data_x[feature]
+            display_columns = ['%s_0' % feature, '%s_1' % feature]
+        else:
+            data_x['x'] = data_x[feature].apply(
+                lambda x: _find_bucket(x=x, feature_grids=feature_grids, endpoint=False))
+            display_columns, bound_lows, bound_ups = _make_bucket_column_names(feature_grids=feature_grids,
+                                                                               endpoint=False)
+            if len(percentile_info) > 0:
+                percentile_columns, percentile_bound_lows, percentile_bound_ups = \
+                    _make_bucket_column_names_percentile(percentile_info=percentile_info, endpoint=False)
+        data_x['count'] = 1
+        bar_data = data_x.groupby('x', as_index=False).agg({'count': 'count'}).sort_values(
+            'x', ascending=True).reset_index(drop=True)
+
+    summary_df = pd.DataFrame(range(len(feature_grids)), columns=['x'])
+    if feature_type == 'numeric':
+        summary_df = pd.DataFrame(range(len(feature_grids) + 1), columns=['x'])
+    summary_df = summary_df.merge(bar_data, on='x', how='left').fillna(0)
+    summary_df['display_column'] = display_columns
+
+    if feature_type == 'numeric':
+        summary_df['value_lower'] = bound_lows
+        summary_df['value_upper'] = bound_ups
+
+    if len(percentile_columns) > 0:
+        summary_df['percentile_column'] = percentile_columns
+        summary_df['percentile_lower'] = percentile_bound_lows
+        summary_df['percentile_upper'] = percentile_bound_ups
+
+    return summary_df
