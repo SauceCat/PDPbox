@@ -44,6 +44,10 @@ class PDPIsolate(object):
         ICE lines
     pdp: 1-d numpy array
         calculated PDP values
+    count_data: pandas DataFrame
+        data points distribution
+    hist_data: 1-d numpy array
+        data points distribution for numeric features
     """
 
     def __init__(self, n_classes, classifier, which_class, feature, feature_type, feature_grids,
@@ -202,6 +206,8 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
         name of the feature, not necessary a column name
     center: bool, default=True
         whether to center the plot
+    plot_pts_dist: bool, default=False
+        whether to show data points distribution
     plot_lines: bool, default=False
         whether to plot out the individual lines
     frac_to_plot: float or integer, default=1
@@ -232,6 +238,60 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     axes: a dictionary of matplotlib Axes
         Returns the Axes objects for further tweaking
 
+    Examples
+    --------
+
+    PDP for binary features
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_target = test_titanic['target']
+
+        pdp_sex = pdp.pdp_isolate(model=titanic_model,
+                                  train_X=titanic_data[titanic_features],
+                                  feature='Sex')
+        fig, axes = pdp.pdp_plot(pdp_sex, 'sex')
+
+
+    PDP for one-hot encoding features
+
+    .. highlight:: python
+    .. code-block:: python
+
+        pdp_embark = pdp.pdp_isolate(titanic_model,
+                                     titanic_data[titanic_features],
+                                     ['Embarked_C', 'Embarked_S', 'Embarked_Q'])
+        fig, axes = pdp.pdp_plot(pdp_embark, 'Embark', center=True, plot_lines=True, frac_to_plot=100)
+
+
+    PDP for numeric features
+
+    .. highlight:: python
+    .. code-block:: python
+
+        pdp_fare = pdp.pdp_isolate(titanic_model, titanic_data[titanic_features], 'Fare')
+        fig, axes = pdp.pdp_plot(pdp_fare, 'Fare')
+
+
+    PDP for multi-class problem
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_otto = get_dataset.otto()
+        otto_data = test_otto['data']
+        otto_target = test_otto['target']
+
+        pdp_feat_67_rf = pdp.pdp_isolate(otto_model, otto_data[otto_features], 'feat_67', n_jobs=2)
+        fig, axes = pdp.pdp_plot(pdp_feat_67_rf, 'feat_67', center=True, x_quantile=True, ncols=2,
+                                 plot_lines=True, frac_to_plot=100, which_classes=[0, 3, 7])
     """
 
     # check function inputs
