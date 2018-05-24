@@ -256,7 +256,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
             subplot_title = target[target_idx]
             if len(percentile_columns) > 0:
                 subplot_title += '\n\n'
-            plot_axes[target_idx].set_title(subplot_title, fontdict={'fontsize': 13, 'fontname': font_family})
+            plot_axes[target_idx].set_title(subplot_title, fontdict={'fontsize': 10, 'fontname': font_family})
 
             inner_line_ax.set_ylim(0., y_max)
             bar_ax.append(inner_bar_ax)

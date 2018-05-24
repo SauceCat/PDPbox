@@ -197,6 +197,9 @@ def _make_bucket_column_names(feature_grids, endpoint):
     return column_names, bound_lows, bound_ups
 
 
+
+
+
 def _make_bucket_column_names_percentile(percentile_info, endpoint):
     # create percentile bucket names
     percentile_column_names = []
@@ -263,7 +266,55 @@ def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, fe
     return result
 
 
-def _prepare_pdp_count_data(feature, feature_type, data, feature_grids, percentile_info):
+def _pdp_count_dist_xticklabels(feature_grids):
+    # create bucket names
+    column_names = []
+
+    # number of buckets: len(feature_grids) - 1
+    for i in range(len(feature_grids) - 1):
+        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+
+        if i == len(feature_grids) - 2:
+            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+        column_names.append(column_name)
+
+    return column_names
+
+
+def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
+    if feature_type == 'onehot':
+        count_data = pd.DataFrame(data[feature_grids].sum(axis=0)).reset_index(drop=False).rename(columns={0: 'count'})
+        count_data['x'] = range(count_data.shape[0])
+    elif feature_type == 'binary':
+        count_data = pd.DataFrame(data={'x': [0, 1], 'count': [data[data[feature] == 0].shape[0],
+                                                               data[data[feature] == 1].shape[0]]})
+    else:
+        data_x = data.copy()
+        vmin, vmax = data[feature].min(), data[feature].max()
+
+        feature_grids = list(feature_grids)
+        count_x = range(len(feature_grids) - 1)
+        # append lower and upper bound to the grids
+        if feature_grids[0] > vmin:
+            feature_grids = [vmin] + feature_grids
+            count_x = [-1] + count_x
+        if feature_grids[-1] < vmax:
+            feature_grids = feature_grids + [vmax]
+            count_x = count_x + [count_x[-1] + 1]
+
+        data_x['x'] = pd.cut(x=data_x[feature].values, bins=feature_grids, labels=False, include_lowest=True)
+        data_x['count'] = 1
+        count_data_temp = data_x.groupby('x', as_index=False).agg(
+            {'count': 'count'}).sort_values('x', ascending=True).reset_index(drop=True)
+        count_data = pd.DataFrame(data={'x': range(len(feature_grids) - 1),
+                                        'xticklabels': _pdp_count_dist_xticklabels(feature_grids=feature_grids)})
+        count_data = count_data.merge(count_data_temp, on='x', how='left').fillna(0)
+        count_data['x'] = count_x
+
+    return count_data
+
+
+def _prepare_pdp_count_data_old(feature, feature_type, data, feature_grids, percentile_info):
     bound_ups = []
     bound_lows = []
     percentile_columns = []
@@ -291,20 +342,27 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids, percenti
         count_data = data_x.groupby('x', as_index=False).agg({'count': 'count'}).sort_values(
             'x', ascending=True).reset_index(drop=True)
 
-    summary_df = pd.DataFrame(range(len(feature_grids)), columns=['x'])
     # for numeric features, there is 1 more bucket, < feature_grids[0]
     if feature_type == 'numeric':
         summary_df = pd.DataFrame(range(len(feature_grids) + 1), columns=['x'])
-    summary_df = summary_df.merge(count_data, on='x', how='left').fillna(0)
-    summary_df['display_column'] = display_columns
+        summary_df = summary_df.merge(count_data, on='x', how='left').fillna(0)
+        summary_df['display_column'] = display_columns
 
-    if feature_type == 'numeric':
         summary_df['value_lower'] = bound_lows
         summary_df['value_upper'] = bound_ups
+        if len(percentile_columns) > 0:
+            summary_df['percentile_column'] = percentile_columns
+            summary_df['percentile_lower'] = percentile_bound_lows
+            summary_df['percentile_upper'] = percentile_bound_ups
 
-    if len(percentile_columns) > 0:
-        summary_df['percentile_column'] = percentile_columns
-        summary_df['percentile_lower'] = percentile_bound_lows
-        summary_df['percentile_upper'] = percentile_bound_ups
+        if summary_df.iloc[0]['count'] == 0:
+            summary_df = summary_df.iloc[1:]
+        summary_df = summary_df.reset_index(drop=True)
+        summary_df['x'] -= 1
+    else:
+        summary_df = pd.DataFrame(range(len(feature_grids)), columns=['x'])
+        summary_df = summary_df.merge(count_data, on='x', how='left').fillna(0)
+        summary_df['display_column'] = display_columns
 
     return summary_df
+

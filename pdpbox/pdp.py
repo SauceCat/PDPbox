@@ -161,8 +161,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         ice_lines = pd.concat(grid_results, axis=1)
 
     # calculate the counts
-    count_data = _prepare_pdp_count_data(feature=feature, feature_type=feature_type, data=_train_X[_make_list(feature)],
-                                         feature_grids=feature_grids, percentile_info=percentile_info)
+    count_data = _prepare_pdp_count_data(
+        feature=feature, feature_type=feature_type, data=_train_X[_make_list(feature)], feature_grids=feature_grids)
 
     hist_data = None
     if feature_type == 'numeric':
@@ -188,7 +188,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     return pdp_isolate_out
 
 
-def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_to_plot=1,
+def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, plot_lines=False, frac_to_plot=1,
              cluster=False, n_cluster_centers=None, cluster_method='accurate', x_quantile=False,
              show_percentile=False, figsize=None, ncols=None, plot_params=None, which_classes=None):
     """Plot partial dependent plot
@@ -266,52 +266,77 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_lines=False, frac_
     fig.add_subplot(title_ax)
     _pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=title_ax, plot_params=plot_params)
 
-    # prepare count data
+    # prepare count data when plot_pts_dist=True
     # adjust when it is numeric feature
-    count_data = pdp_plot_data[0].count_data.copy()
     feature_type = pdp_plot_data[0].feature_type
+    pdp_count_hspace = 0.15
+    count_data = pdp_plot_data[0].count_data.copy()
     if feature_type == 'numeric':
-        if count_data.iloc[0]['count'] == 0:
-            count_data = count_data.iloc[1:]
-        if count_data.iloc[-1]['count'] == 0:
-            count_data = count_data.iloc[:-1]
-        count_data = count_data.reset_index(drop=True)
-        count_data['x'] -= 1
+        pdp_count_hspace = 0.25
 
     if len(pdp_plot_data) == 1:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[7, 0.5])
-        pdp_ax = plt.subplot(inner_grid[0])
-        fig.add_subplot(pdp_ax)
-        count_ax = plt.subplot(inner_grid[1])
-        fig.add_subplot(count_ax, sharex=pdp_ax)
-
         feature_name_adj = feature_name
         if pdp_plot_data[0].which_class is not None:
             feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[0].which_class)
 
-        _pdp_plot(
-            pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
-            frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
-            cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
-            pdp_ax=pdp_ax, count_data=count_data, count_ax=count_ax, plot_params=plot_params)
+        if plot_pts_dist:
+            inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1],
+                                                 height_ratios=[7, 0.5], hspace=pdp_count_hspace)
+            _pdp_ax = plt.subplot(inner_grid[0])
+            fig.add_subplot(_pdp_ax)
+            _count_ax = plt.subplot(inner_grid[1])
+            fig.add_subplot(_count_ax, sharex=_pdp_ax)
+            pdp_ax = {'_pdp_ax': _pdp_ax, '_count_ax': _count_ax}
+
+            _pdp_plot(
+                pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
+                frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
+                cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
+                pdp_ax=_pdp_ax, count_data=count_data, count_ax=_count_ax, plot_params=plot_params)
+        else:
+            pdp_ax = plt.subplot(outer_grid[1])
+            fig.add_subplot(pdp_ax)
+            _pdp_plot(
+                pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
+                frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
+                cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
+                pdp_ax=pdp_ax, count_data=None, count_ax=None, plot_params=plot_params)
+
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
-        pdp_ax = []
-        for inner_idx in range(len(pdp_plot_data)):
-            ax = plt.subplot(inner_grid[inner_idx])
-            pdp_ax.append(ax)
-            fig.add_subplot(ax)
+        if plot_pts_dist:
+            pdp_ax = []
+            for inner_idx in range(len(pdp_plot_data)):
+                inner_inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=inner_grid[inner_idx],
+                                                           height_ratios=[7, 0.5], hspace=pdp_count_hspace)
+                _pdp_ax = plt.subplot(inner_inner_grid[0])
+                _count_ax = plt.subplot(inner_inner_grid[1])
+                pdp_ax.append({'_pdp_ax': _pdp_ax, '_count_ax': _count_ax})
+                fig.add_subplot(_pdp_ax)
+                fig.add_subplot(_count_ax, sharex=_pdp_ax)
 
-        for pdp_idx in range(len(pdp_plot_data)):
-            feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[pdp_idx].which_class)
-            _pdp_plot(pdp_isolate_out=pdp_plot_data[pdp_idx], feature_name=feature_name_adj, center=center,
-                      plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
-                      n_cluster_centers=n_cluster_centers, cluster_method=cluster_method, x_quantile=x_quantile,
-                      show_percentile=show_percentile, ax=pdp_ax[pdp_idx], plot_params=plot_params)
+                feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[inner_idx].which_class)
+                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, center=center,
+                          plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
+                          n_cluster_centers=n_cluster_centers, cluster_method=cluster_method, x_quantile=x_quantile,
+                          show_percentile=show_percentile, pdp_ax=_pdp_ax,
+                          count_data=count_data, count_ax=_count_ax, plot_params=plot_params)
+        else:
+            pdp_ax = []
+            for inner_idx in range(len(pdp_plot_data)):
+                ax = plt.subplot(inner_grid[inner_idx])
+                pdp_ax.append(ax)
+                fig.add_subplot(ax)
+
+                feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[inner_idx].which_class)
+                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, center=center,
+                          plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
+                          n_cluster_centers=n_cluster_centers, cluster_method=cluster_method, x_quantile=x_quantile,
+                          show_percentile=show_percentile, pdp_ax=ax, count_data=None, count_ax=None,
+                          plot_params=plot_params)
 
     axes = {'title_ax': title_ax, 'pdp_ax': pdp_ax}
     return fig, axes
-
 
 
 class pdp_interact_obj:

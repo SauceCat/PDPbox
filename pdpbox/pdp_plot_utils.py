@@ -8,7 +8,7 @@ from matplotlib.gridspec import GridSpec
 import copy
 
 from .pdp_calc_utils import _sample_data
-from .info_plot_utils import _axes_modify, _autolabel, _modify_legend_ax
+from .info_plot_utils import _axes_modify, _modify_legend_ax
 
 from sklearn.cluster import MiniBatchKMeans, KMeans
 
@@ -16,7 +16,7 @@ from sklearn.cluster import MiniBatchKMeans, KMeans
 def _pdp_plot_title(n_grids, feature_name, ax, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
-    title = plot_params.get('title', 'PDP for %s' % feature_name)
+    title = plot_params.get('title', 'PDP for feature "%s"' % feature_name)
     subtitle = plot_params.get('subtitle', "Number of unique grid points: %d" % n_grids)
     title_fontsize = plot_params.get('title_fontsize', 15)
     subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
@@ -27,24 +27,46 @@ def _pdp_plot_title(n_grids, feature_name, ax, plot_params):
     ax.axis('off')
 
 
-def _draw_pdp_countplot(count_data, count_ax, plot_params):
+def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_columns, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
     count_data['count_norm'] = count_data['count'] * 1.0 / count_data['count'].sum()
-    bar_plot_data = count_data['count_norm'].values
-    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(bar_plot_data))
-
+    count_plot_data = count_data['count_norm'].values
+    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(count_plot_data))
     cmap = plot_params.get('line_cmap', 'Blues')
-    count_ax.imshow(np.expand_dims(bar_plot_data, 0), aspect="auto", cmap=cmap, norm=norm)
-    x = count_data['x'].values
+    xticks_rotation = plot_params.get('xticks_rotation', 0)
+    count_xticks_color = '#424242'
+    count_xticks_size = 10
 
-    for idx in range(len(bar_plot_data)):
-        text_color = "black"
-        if bar_plot_data[idx] >= np.max(bar_plot_data) * 0.5:
-            text_color = "white"
-        count_ax.text(x[idx], 0, round(bar_plot_data[idx], 3), ha="center", va="center",
-                      color=text_color, fontdict={'family': font_family})
     _modify_legend_ax(count_ax, font_family=font_family)
+
+    if feature_type == 'numeric':
+        x = pdp_ax.get_xticks()[:-1] + 0.5
+        count_ax.set_xticklabels(
+            count_data['xticklabels'].values, color=count_xticks_color, fontsize=count_xticks_size, rotation=xticks_rotation)
+    else:
+        x = count_data['x'].values
+        count_ax.set_xticklabels(
+            display_columns, rotation=xticks_rotation, color=count_xticks_color, fontsize=count_xticks_size)
+
+    count_ax.imshow(np.expand_dims(count_plot_data, 0), aspect="auto", cmap=cmap, norm=norm,
+                    alpha=0.8, extent=(np.min(x)-0.5, np.max(x)+0.5, 0, 0.5))
+
+    for idx in range(len(count_plot_data)):
+        text_color = "black"
+        if count_plot_data[idx] >= np.max(count_plot_data) * 0.5:
+            text_color = "white"
+        count_ax.text(x[idx], 0.25, round(count_plot_data[idx], 3), ha="center", va="center",
+                      color=text_color, fontdict={'family': font_family})
+
+    count_ax.set_xticks(x+0.5, minor=True)
+    count_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
+    count_ax.tick_params(which="minor", bottom=False, left=False)
+    count_ax.set_title('distribution of data points',
+                       fontdict={'family': font_family, 'color': count_xticks_color}, fontsize=count_xticks_size)
+
+    count_ax.set_xticks(x)
+    count_ax.set_xbound(pdp_ax.get_xbound())
 
 
 def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
@@ -53,7 +75,8 @@ def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
     norm = mpl.colors.Normalize(vmin=0, vmax=np.max(hist_data))
     cmap = plot_params.get('line_cmap', 'Blues')
 
-    hist_ax.imshow(np.expand_dims(hist_data, 0), aspect="auto", cmap=cmap, norm=norm, extent=(vmin, vmax, 0, 0.5))
+    hist_ax.imshow(np.expand_dims(hist_data, 0), aspect="auto", cmap=cmap, norm=norm,
+                   extent=(vmin, vmax, 0, 0.5), alpha=0.8)
     _modify_legend_ax(hist_ax, font_family=font_family)
 
 
@@ -69,34 +92,36 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     feature_grids = pdp_isolate_out.feature_grids
     display_columns = pdp_isolate_out.display_columns
     percentile_info = pdp_isolate_out.percentile_info
+    percentile_xticklabels = list(percentile_info)
 
     if feature_type == 'binary' or feature_type == 'onehot' or x_quantile:
+        # x for original pdp
+        # anyway, pdp is started from x=0
         x = range(len(feature_grids))
-        count_x = range(count_data['x'].min(), count_data['x'].max() + 1)
-        pdp_ax.set_xticks(count_x)
-        pdp_ax.set_xticklabels([])
-        pdp_ax.set_xlim(count_x[0] - 0.5, count_x[-1] + 0.5)
+        xticks = x
+        xticklabels = list(display_columns)
 
-        if x_quantile:
-            display_columns_adj = display_columns
-            if len(count_x) > len(display_columns):
-                display_columns_adj = [''] + list(display_columns)
-            pdp_ax.set_xticklabels(display_columns_adj, rotation=xticks_rotation)
+        if count_ax is not None:
+            if x_quantile:
+                count_display_columns = count_data['xticklabels'].values
+                # number of grids = number of bins + 1
+                # need to include the final point: + 2
+                count_x = range(count_data['x'].min(), count_data['x'].max() + 2)
+                xticks = count_x
+                if count_x[0] == -1:
+                    xticklabels = [float(count_display_columns[0].split(',')[0].replace('[', ''))] + xticklabels
+                    percentile_xticklabels = ['(0.0)'] + percentile_xticklabels
+                if count_x[-1] == len(feature_grids):
+                    xticklabels = xticklabels + [float(count_display_columns[-1].split(',')[1].replace(']', ''))]
+                    percentile_xticklabels = percentile_xticklabels + ['(100.0)']
+            else:
+                xticklabels = []
+            pdp_ax.set_xlim(xticks[0] - 0.5, xticks[-1] + 0.5)
 
-            if show_percentile and len(percentile_info) > 0:
-                percentile_ax = pdp_ax.twiny()
-                percentile_ax.set_xticks(pdp_ax.get_xticks())
-                percentile_ax.set_xbound(pdp_ax.get_xbound())
-                percentile_info_adj = percentile_info
-                if len(count_x) > len(percentile_info):
-                    percentile_info_adj = [''] + list(percentile_info)
-                percentile_ax.set_xticklabels(percentile_info_adj, rotation=xticks_rotation)
-                percentile_ax.set_xlabel('percentile info')
-                _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+        pdp_ax.set_xticks(xticks)
+        pdp_ax.set_xticklabels(xticklabels, rotation=xticks_rotation)
     else:
-        # for numeric feature not x_quantile
         x = feature_grids
-        # pdp_ax.set_xticklabels([])
 
     ice_lines = copy.deepcopy(pdp_isolate_out.ice_lines)
     pdp_y = copy.deepcopy(pdp_isolate_out.pdp)
@@ -126,21 +151,27 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     std = ice_lines[feature_grids].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=pdp_ax, plot_params=plot_params)
 
-    if not x_quantile and feature_type == 'numeric':
-        hist_data = pdp_isolate_out.hist_data.copy()
-        _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, vmin=np.min(x), vmax=np.max(x), plot_params=plot_params)
-    else:
-        _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, plot_params=plot_params)
-        count_ax.set_xticks(pdp_ax.get_xticks())
+    if count_ax is not None:
+        if not x_quantile and feature_type == 'numeric':
+            # in this situation, x=feature_grids
+            hist_data = pdp_isolate_out.hist_data.copy()
+            _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, vmin=np.min(x), vmax=np.max(x),
+                               plot_params=plot_params)
+        else:
+            _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, pdp_ax=pdp_ax, feature_type=feature_type,
+                                display_columns=display_columns, plot_params=plot_params)
+        count_ax.set_xlabel(feature_name, fontsize=11, fontdict={'family': font_family})
 
-    count_ax.set_xbound(pdp_ax.get_xbound())
-
-    if feature_type in ['binary', 'onehot']:
-        count_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
     else:
-        if x_quantile:
-            count_ax.set_xticklabels(count_data['display_column'].values)
-    count_ax.set_xlabel(feature_name, fontsize=10)
+        pdp_ax.set_xlabel(feature_name, fontsize=11, fontdict={'family': font_family})
+
+    if show_percentile and len(percentile_info) > 0:
+        percentile_pdp_ax = pdp_ax.twiny()
+        percentile_pdp_ax.set_xticks(pdp_ax.get_xticks())
+        percentile_pdp_ax.set_xbound(pdp_ax.get_xbound())
+        percentile_pdp_ax.set_xticklabels(percentile_xticklabels, rotation=xticks_rotation)
+        percentile_pdp_ax.set_xlabel('percentile info')
+        _axes_modify(font_family=font_family, ax=percentile_pdp_ax, top=True)
 
 
 def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
@@ -150,12 +181,12 @@ def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
 
     pdp_color = plot_params.get('pdp_color', '#1A4E5D')
     pdp_hl_color = plot_params.get('pdp_hl_color', '#FEDC00')
-    pdp_linewidth = plot_params.get('pdp_linewidth', 2)
+    pdp_linewidth = plot_params.get('pdp_linewidth', 1.5)
     zero_color = plot_params.get('zero_color', '#E75438')
-    zero_linewidth = plot_params.get('zero_linewidth', 1.5)
+    zero_linewidth = plot_params.get('zero_linewidth', 1)
     fill_color = plot_params.get('fill_color', '#66C2D7')
     fill_alpha = plot_params.get('fill_alpha', 0.2)
-    markersize = plot_params.get('markersize', 5)
+    markersize = plot_params.get('markersize', 3.5)
 
     if pdp_hl:
         ax.plot(x, y, color=pdp_hl_color, linewidth=pdp_linewidth * 3, alpha=0.8)
