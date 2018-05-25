@@ -455,39 +455,114 @@ def _pdp_contour_plot(pdp_interact_out, feature_names, x_quantile, ax, fig, plot
         Z.append(zs)
     Z = np.array(Z)
 
-    if feature_types[0] == 'onehot':
-        ax.set_xticks(range(X.shape[1]))
-        ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
-    elif feature_types[0] == 'binary':
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
-    else:
-        if x_quantile:
-            ax.set_xticks(range(len(pdp_interact_out.pdp_isolate_out1.display_columns)))
-            ax.set_xticklabels(pdp_interact_out.pdp_isolate_out1.display_columns, rotation=xticks_rotation)
-
-    if feature_types[1] == 'onehot':
-        ax.set_yticks(range(Y.shape[0]))
-        ax.set_yticklabels(pdp_interact_out.pdp_isolate_out2.display_columns)
-    elif feature_types[1] == 'binary':
-        ax.set_yticks([0, 1])
-        ax.set_yticklabels(pdp_interact_out.pdp_isolate_out2.display_columns)
-    else:
-        if x_quantile:
-            ax.set_yticks(range(len(pdp_interact_out.pdp_isolate_out2.display_columns)))
-            ax.set_yticklabels(pdp_interact_out.pdp_isolate_out2.display_columns)
-
     level = np.min([X.shape[0], X.shape[1]])
     c1 = ax.contourf(X, Y, Z, N=level, origin='lower', cmap=contour_cmap)
     c2 = ax.contour(c1, levels=c1.levels, colors=contour_color, origin='lower')
     ax.clabel(c2, contour_label_fontsize=9, inline=1)
 
-    ax.set_xlabel(feature_names[0], fontsize=10)
-    ax.set_ylabel(feature_names[1], fontsize=10)
-    ax.get_yaxis().tick_right()
+    _pdp_inter_xyticks(pdp_interact_out=pdp_interact_out, feature_types=feature_types, feature_names=feature_names,
+                       inter_ax=ax, x_quantile=x_quantile)
 
     if fig is not None:
         cax = fig.add_axes([0, 0, 0, 0], axes_locator=ColorBarLocator(ax))
         fig.colorbar(c1, cax=cax, orientation='horizontal')
+
+
+def _pdp_inter_xyticks(pdp_interact_out, feature_types, feature_names, inter_ax, x_quantile):
+    xticklabels, yticklabels = pdp_interact_out.pdp_isolate_out1.display_columns, \
+                                pdp_interact_out.pdp_isolate_out2.display_columns
+    if feature_types[0] != 'numeric' or x_quantile:
+        inter_ax.set_xticks(range(len(xticklabels)))
+        inter_ax.set_xticklabels(xticklabels)
+
+    if feature_types[1] != 'numeric' or x_quantile:
+        inter_ax.set_yticks(range(len(yticklabels)))
+        inter_ax.set_yticklabels(yticklabels)
+
+    inter_ax.set_xlabel(feature_names[0], fontsize=10)
+    inter_ax.set_ylabel(feature_names[1], fontsize=10)
+    inter_ax.get_yaxis().tick_right()
+
+
+def _pdp_inter_grid(pdp_interact_out, feature_names, inter_ax, cmap, norm, x_quantile, plot_params):
+
+    font_family = plot_params.get('font_family', 'Arial')
+    feature_types = pdp_interact_out.feature_types
+    probs = copy.deepcopy(pdp_interact_out.pdp)
+    n_grids_x, n_grids_y = len(pdp_interact_out.feature_grids[0]), len(pdp_interact_out.feature_grids[1])
+    probs_mx = probs['preds'].values.reshape((n_grids_x, n_grids_y)).T
+
+    inter_ax.imshow(probs_mx, cmap=cmap, norm=norm, alpha=0.8)
+    for r in range(probs_mx.shape[0]):
+        for c in range(probs_mx.shape[1]):
+            text_color = 'w'
+            if probs_mx[r, c] >= norm.vmin + (norm.vmax - norm.vmin) * 0.5:
+                text_color = 'black'
+            inter_ax.text(c, r, round(probs_mx[r, c], 3), ha="center", va="center", color=text_color)
+    inter_ax.set_xticks(np.arange(n_grids_x) + 0.5, minor=True)
+    inter_ax.set_yticks(np.arange(n_grids_y) + 0.5, minor=True)
+    inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
+    inter_ax.tick_params(which="minor", bottom=False, left=False)
+
+    _axes_modify(font_family=font_family, ax=inter_ax)
+    _pdp_inter_xyticks(pdp_interact_out=pdp_interact_out, feature_types=feature_types, feature_names=feature_names,
+                       inter_ax=inter_ax, x_quantile=x_quantile)
+
+
+def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_quantile, fig, plot_params):
+    cmap = plot_params.get('cmap', 'viridis')
+    font_family = plot_params.get('font_family', 'Arial')
+
+    inter_ax = plt.subplot(chart_grids[3])
+    fig.add_subplot(inter_ax)
+    pdp_x_ax = plt.subplot(chart_grids[1], sharex=inter_ax)
+    fig.add_subplot(pdp_x_ax)
+    pdp_y_ax = plt.subplot(chart_grids[2], sharey=inter_ax)
+    fig.add_subplot(pdp_y_ax)
+
+    pdp_x = copy.deepcopy(pdp_interact_out.pdp_isolate_out1.pdp)
+    pdp_y = copy.deepcopy(pdp_interact_out.pdp_isolate_out2.pdp)
+    pdp_inter = copy.deepcopy(pdp_interact_out.pdp['preds'].values)
+    pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
+    pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
+
+    norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
+
+    pdp_x_ax.imshow(np.expand_dims(pdp_x, 0), cmap=cmap, norm=norm)
+    for idx in range(len(pdp_x)):
+        text_color = 'w'
+        if pdp_x[idx] >= pdp_min + (pdp_max - pdp_min) * 0.5:
+            text_color = 'black'
+        pdp_x_ax.text(idx, 0, round(pdp_x[idx], 3), ha="center", va="center", color=text_color)
+
+    pdp_y_ax.imshow(np.expand_dims(pdp_y, 1), cmap=cmap, norm=norm)
+    for idx in range(len(pdp_y)):
+        text_color = 'w'
+        if pdp_y[idx] >= pdp_min + (pdp_max - pdp_min) * 0.5:
+            text_color = 'black'
+        pdp_y_ax.text(0, idx, round(pdp_y[idx], 3), ha="center", va="center", color=text_color, rotation='vertical')
+
+    _modify_legend_ax(ax=pdp_x_ax, font_family=font_family)
+    _modify_legend_ax(ax=pdp_y_ax, font_family=font_family)
+
+    _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
+                   inter_ax=inter_ax, x_quantile=x_quantile, fig=fig, plot_params=plot_params, norm=norm)
+
+
+def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quantile, fig, plot_params, norm):
+    cmap = plot_params.get('cmap', 'viridis')
+    if norm is None:
+        pdp_inter = copy.deepcopy(pdp_interact_out.pdp['preds'].values)
+        pdp_min, pdp_max = np.min(pdp_inter), np.max(pdp_inter)
+        norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
+
+    if plot_type == 'contour':
+        _pdp_contour_plot(pdp_interact_out=pdp_interact_out, feature_names=feature_names, x_quantile=x_quantile,
+                          ax=inter_ax, fig=fig, plot_params=plot_params)
+    elif plot_type == 'grid':
+        _pdp_inter_grid(pdp_interact_out=pdp_interact_out, feature_names=feature_names, inter_ax=inter_ax,
+                        cmap=cmap, norm=norm, x_quantile=x_quantile, plot_params=plot_params)
+    else:
+        raise ValueError("plot_type: should be 'contour' or 'grid'")
 
 

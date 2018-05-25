@@ -720,3 +720,15 @@ def _prepare_info_plot_interact_summary(data_x, plot_data, prepared_results, fea
 
     return summary_df, info_cols, display_columns, percentile_columns
 
+
+def _calc_figsize(num_charts, ncols, unit_width, unit_height):
+    if num_charts > 1:
+        nrows = int(np.ceil(num_charts * 1.0 / ncols))
+        ncols = np.min([num_charts, ncols])
+        width = np.min([unit_width * num_charts, 15])
+        height = np.min([width * 1.0 / ncols, unit_height]) * nrows
+    else:
+        width, height = unit_width, unit_height
+
+    return width, height
+

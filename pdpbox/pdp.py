@@ -1,9 +1,10 @@
 
-from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data
+from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
 from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_interact_plot_title,
-                             _pdp_contour_plot, _pdp_interact_plot)
+                             _pdp_contour_plot, _pdp_interact_plot, _pdp_inter_three, _pdp_inter_one)
 from .other_utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
-                          _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list)
+                          _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default)
+from .info_plot_utils import _calc_figsize
 
 import pandas as pd
 import numpy as np
@@ -170,7 +171,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
 
     hist_data = None
     if feature_type == 'numeric':
-        hist_data = np.histogram(_train_X[feature].values, bins=100, normed=True)[0]
+        hist_data = np.histogram(_train_X[feature].values,
+                                 bins=np.min([100, _train_X[feature].nunique()]), normed=True)[0]
 
     # combine the final results
     if n_classes > 2:
@@ -399,11 +401,11 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     return fig, axes
 
 
-class pdp_interact_obj:
+class PDPInteract:
     def __init__(self, n_classes, classifier, model_features, features, feature_types, feature_grids,
                  pdp_isolate_out1, pdp_isolate_out2, pdp):
 
-        self._type = 'pdp_interact_instance'
+        self._type = 'PDPInteract_instance'
         self.n_classes = n_classes
         self.classifier = classifier
         self.model_features = model_features
@@ -415,9 +417,8 @@ class pdp_interact_obj:
         self.pdp = pdp
 
 
-def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=['percentile', 'percentile'],
-                 percentile_ranges=[None, None], grid_ranges=[None, None], cust_grid_points=[None, None],
-                 memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None):
+def pdp_interact(model, train_X, features, num_grid_points=None, grid_types=None, percentile_ranges=None, grid_ranges=None,
+                 cust_grid_points=None, memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None):
     """
     Calculate PDP interaction plot
 
@@ -450,10 +451,24 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
         instance of pdp_interact_obj
     """
 
-    # check input dataset
-    if type(train_X) != pd.core.frame.DataFrame:
-        raise ValueError('train_X: only accept pandas DataFrame')
+    # check function inputs
+    _check_dataset(df=train_X)
     _train_X = train_X.copy()
+    model_features = _train_X.columns.values
+
+    num_grid_points = _expand_default(num_grid_points, 10)
+    grid_types = _expand_default(grid_types, 'percentile')
+    _check_grid_type(grid_type=grid_types[0])
+    _check_grid_type(grid_type=grid_types[1])
+
+    percentile_ranges = _expand_default(percentile_ranges, None)
+    _check_percentile_range(percentile_range=percentile_ranges[0])
+    _check_percentile_range(percentile_range=percentile_ranges[1])
+
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+
+    _check_memory_limit(memory_limit=memory_limit)
 
     # calculate pdp_isolate for each feature
     pdp_isolate_out1 = pdp_isolate(model, _train_X, features[0], num_grid_points=num_grid_points[0],
@@ -468,214 +483,120 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], grid_types=
                                    data_transformer=data_transformer)
 
     # whether it is for multi-classes
-    if type(pdp_isolate_out1) == dict:
-        model_features = pdp_isolate_out1['class_0'].model_features
-        feature_grids = [pdp_isolate_out1['class_0'].feature_grids, pdp_isolate_out2['class_0'].feature_grids]
-        feature_types = [pdp_isolate_out1['class_0'].feature_type, pdp_isolate_out2['class_0'].feature_type]
-        classifier = pdp_isolate_out1['class_0'].classifier
-        n_classes = pdp_isolate_out1['class_0'].n_classes
+    if type(pdp_isolate_out1) == list:
+        feature_grids = [pdp_isolate_out1[0].feature_grids, pdp_isolate_out2[0].feature_grids]
+        feature_types = [pdp_isolate_out1[0].feature_type, pdp_isolate_out2[0].feature_type]
+        classifier = pdp_isolate_out1[0].classifier
+        n_classes = pdp_isolate_out1[0].n_classes
     else:
-        model_features = pdp_isolate_out1.model_features
         feature_grids = [pdp_isolate_out1.feature_grids, pdp_isolate_out2.feature_grids]
         feature_types = [pdp_isolate_out1.feature_type, pdp_isolate_out2.feature_type]
         classifier = pdp_isolate_out1.classifier
         n_classes = pdp_isolate_out1.n_classes
 
     # make features into list
-    feature_list = []
-    for feat in features:
-        if type(feat) == list:
-            feature_list += feat
-        else:
-            feature_list.append(feat)
+    feature_list = _make_list(features[0]) + _make_list(features[1])
 
-    # new from here
     # calculate memory usage
     unit_memory = _train_X.memory_usage(deep=True).sum()
     free_memory = psutil.virtual_memory()[1] * memory_limit
     num_units = int(np.floor(free_memory / unit_memory))
-
     true_n_jobs = np.min([num_units, n_jobs])
 
     # create grid combination
-    grids1, grids2 = feature_grids
-    if feature_types[0] == 'onehot':
-        grids1 = range(len(grids1))
-    if feature_types[1] == 'onehot':
-        grids2 = range(len(grids2))
-
-    grids_combo_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
-    grids_combo1, grids_combo2 = grids_combo_temp[:, 0], grids_combo_temp[:, 1]
-    if feature_types[0] == 'onehot':
-        grids_combo1_temp = np.array(grids_combo1.T, dtype=np.int64)[0]
-        grids_combo1 = np.zeros((len(grids_combo1), len(grids1)), dtype=int)
-        grids_combo1[range(len(grids_combo1)), grids_combo1_temp] = 1
-    if feature_types[1] == 'onehot':
-        grids_combo2_temp = np.array(grids_combo2.T, dtype=np.int64)[0]
-        grids_combo2 = np.zeros((len(grids_combo2), len(grids2)), dtype=int)
-        grids_combo2[range(len(grids_combo2)), grids_combo2_temp] = 1
-
-    grids_combo = np.array(np.concatenate((grids_combo1, grids_combo2), axis=1))
+    grid_combos = _get_grid_combos(feature_grids, feature_types)
 
     grid_results = Parallel(n_jobs=true_n_jobs)(
-        delayed(_calc_ice_lines_inter)(_train_X.copy(), model, classifier, model_features, n_classes,
-                                       feature_list, grids_combo[i], predict_kwds, data_transformer)
-        for i in range(len(grids_combo)))
+        delayed(_calc_ice_lines_inter)(
+            _train_X, model, classifier, model_features, n_classes, feature_list, grid_combo, predict_kwds,
+            data_transformer) for grid_combo in grid_combos)
 
     ice_lines = pd.concat(grid_results, axis=0).reset_index(drop=True)
     pdp = ice_lines.groupby(feature_list, as_index=False).mean()
 
+    # combine the final results
     if n_classes > 2:
-        pdp_interact_out = {}
+        pdp_interact_out = []
         for n_class in range(n_classes):
-            pdp_interact_out['class_%d' % n_class] = \
-                pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-                                 features=features, feature_types=feature_types, feature_grids=feature_grids,
-                                 pdp_isolate_out1=pdp_isolate_out1['class_%d' % n_class],
-                                 pdp_isolate_out2=pdp_isolate_out2['class_%d' % n_class],
-                                 pdp=pdp[feature_list + ['class_%d_preds' % n_class]].rename(
-                                     columns={'class_%d_preds' % n_class: 'preds'}))
+            _pdp = pdp[feature_list + ['class_%d_preds' % n_class]].rename(columns={'class_%d_preds' % n_class: 'preds'})
+            pdp_interact_out.append(PDPInteract(
+                n_classes=n_classes, classifier=classifier, model_features=model_features, features=features,
+                feature_types=feature_types, feature_grids=feature_grids, pdp_isolate_out1=pdp_isolate_out1[n_class],
+                pdp_isolate_out2=pdp_isolate_out2[n_class], pdp=_pdp))
     else:
-        pdp_interact_out = pdp_interact_obj(n_classes=n_classes, classifier=classifier, model_features=model_features,
-                                            features=features, feature_types=feature_types, feature_grids=feature_grids,
-                                            pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
+        pdp_interact_out = PDPInteract(
+            n_classes=n_classes, classifier=classifier, model_features=model_features, features=features,
+            feature_types=feature_types, feature_grids=feature_grids, pdp_isolate_out1=pdp_isolate_out1,
+            pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
 
     return pdp_interact_out
 
 
-def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts=False, plot_lines=False,
-                      frac_to_plot=1., cluster=False, n_cluster_centers=None, cluster_method=None, x_quantile=False,
-                      figsize=None, plot_params=None, multi_flag=False, which_class=None, only_inter=False, ncols=None):
-    """
-    PDP two variables interaction plot
+def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_quantile=False, plot_pdp=False,
+                      which_classes=None, figsize=None, ncols=2, plot_params=None):
 
-    :param pdp_interact_out: pdp_interact_obj
-        a calculated pdp_interact_obj
-    :param feature_names: list
-        a list of feature names
-    :param center: boolean, default=True
-        whether to center the individual pdp plot
-    :param plot_org_pts: boolean, default=False
-        whether to plot out the original points for the individual pdp plot
-    :param plot_lines: boolean, default=False
-        whether to plot out the individual lines for the individual pdp plot
-    :param frac_to_plot: integer or float, default=1
-        how many lines or points to plot for the individual pdp plot
-    :param cluster: boolean, default=False
-        whether to cluster the the individual pdp plot
-    :param n_cluster_centers: integer, default=None
-        number of cluster centers for the individual pdp plot under clustering mode
-    :param cluster_method: string, default=None
-        clustering method to use
-    :param x_quantile: boolean, default=False
-        whether to construct x axis ticks using quantiles
-    :param figsize: (width, height), default=None
-        figure size
-    :param plot_params: dict, default=None
-        values of plot parameters
-    :param multi_flag: boolean, default=False
-        whether it is a subplot of a multi-class plot
-    :param which_class: integer, default=None
-        must not be None under multi-class mode
-    :param only_inter: boolean, default=False
-        only plot the contour plot
-    :param ncols: integer, default=None
-        used under multi-class mode when only contour plots are generated
-    """
+    pdp_interact_plot_data = _make_list(x=pdp_interact_out)
 
-    # check frac_to_plot
-    if type(frac_to_plot) == float:
-        if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
-            raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
+    # multi-class problem
+    if len(pdp_interact_plot_data) > 1 and which_classes is not None:
+        pdp_interact_plot_data = []
+        for n_class in which_classes:
+            pdp_interact_plot_data.append(pdp_interact_out[n_class])
+    num_charts = len(pdp_interact_plot_data)
 
-    if type(pdp_interact_out) == dict:
-        if (type(frac_to_plot) == int) and (frac_to_plot > pdp_interact_out['class_0'].pdp_isolate_out1.ice_lines.shape[0]):
-            raise ValueError('frac_to_plot: sample size should not be larger than the population size')
-    else:
-        if (type(frac_to_plot) == int) and (frac_to_plot > pdp_interact_out.pdp_isolate_out1.ice_lines.shape[0]):
-            raise ValueError('frac_to_plot: sample size should not be larger than the population size')
+    # plot_pdp and plot_type grid is only True for numeric features when x_quantile is True
+    if 'numeric' in pdp_interact_plot_data[0].feature_types and not x_quantile:
+        plot_pdp = False
+        plot_type = 'contour'
 
-    # check n_cluster_centers
-    if cluster:
-        if n_cluster_centers is None:
-            raise ValueError('n_cluster_centers: should not be None under clustering mode')
-        if cluster_method is not None:
-            if (cluster_method != 'accurate') and (cluster_method != 'approx'):
-                raise ValueError("cluster_method: should be 'accurate' or 'approx'")
+    # set up graph parameters
+    width, height = 7, 9.5
+    nrows = 1
 
-    # check which_class
-    if multi_flag and which_class >= len(pdp_interact_out.keys()):
-        raise ValueError('which_class: class does not exist')
+    if num_charts > 1:
+        nrows = int(np.ceil(num_charts * 1.0 / ncols))
+        ncols = np.min([num_charts, ncols])
+        width = np.min([7.5 * ncols, 15])
+        height = np.min([width * 1.0 / ncols, 7.5]) * nrows
 
-    # only the contour plot
-    if only_inter:
-        if type(pdp_interact_out) == dict and not multi_flag:
-            n_classes = len(pdp_interact_out.keys())
+    if figsize is not None:
+        width, height = figsize
 
-            if ncols is None:
-                ncols = 2
-            nrows = np.ceil(float(n_classes) / ncols)
+    if plot_params is None:
+        plot_params = dict()
 
-            if figsize is None:
-                figwidth = 15
-            else:
-                figwidth = figsize[0]
+    fig = plt.figure(figsize=(width, height))
+    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height - 2])
+    title_ax = plt.subplot(outer_grid[0])
+    fig.add_subplot(title_ax)
+    n_grids = len(pdp_interact_plot_data[0].feature_grids[0]) * len(pdp_interact_plot_data[0].feature_grids[1])
+    _pdp_plot_title(n_grids=n_grids, feature_name="%s and %s" % (feature_names[0], feature_names[1]),
+                    ax=title_ax, plot_params=plot_params)
 
-            # draw graph title
-            plt.figure(figsize=(figwidth, figwidth / 7.5))
-            ax0 = plt.subplot(111)
-            _pdp_interact_plot_title(pdp_interact_out=pdp_interact_out, feature_names=feature_names,
-                                     ax=ax0, multi_flag=multi_flag, which_class=which_class,
-                                     only_inter=only_inter, plot_params=plot_params)
-
-            plt.figure(figsize=(figwidth, (figwidth / ncols) * nrows))
-            for n_class in range(n_classes):
-                ax1 = plt.subplot(nrows, ncols, n_class + 1)
-                _pdp_contour_plot(pdp_interact_out['class_%d' % n_class],
-                                  feature_names=[feature_names[0] + ' class_%d' % n_class,
-                                                 feature_names[1] + ' class_%d' % n_class],
-                                  x_quantile=x_quantile, ax=ax1, fig=None, plot_params=plot_params)
+    if num_charts == 1:
+        if plot_pdp:
+            inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
+                                                 width_ratios=[0.5, 7], hspace=0.1, wspace=0)
+            _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
+                             chart_grids=inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
         else:
-            if figsize is None:
-                fig = plt.figure(figsize=(8, 10))
-            else:
-                fig = plt.figure(figsize=figsize)
-
-            gs = GridSpec(5, 1)
-            gs.update(wspace=0, hspace=0)
-            ax0 = plt.subplot(gs[0, :])
-
-            if multi_flag:
-                _pdp_interact_out = pdp_interact_out['class_%d' % which_class]
-            else:
-                _pdp_interact_out = pdp_interact_out
-
-            _pdp_interact_plot_title(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
-                                     ax=ax0, multi_flag=multi_flag, which_class=which_class,
-                                     only_inter=only_inter, plot_params=plot_params)
-
-            ax1 = plt.subplot(gs[1:, :])
-            _pdp_contour_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names,
-                              x_quantile=x_quantile, ax=ax1, fig=fig, plot_params=plot_params)
+            inter_ax = plt.subplot(outer_grid[1])
+            fig.add_subplot(inter_ax)
+            _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
+                           inter_ax=inter_ax, x_quantile=x_quantile, fig=fig, plot_params=plot_params, norm=None)
     else:
-        if type(pdp_interact_out) == dict and not multi_flag:
-            n_classes = len(pdp_interact_out.keys())
-            for n_class in range(n_classes):
-                _pdp_interact_plot(pdp_interact_out=pdp_interact_out['class_%d' % n_class],
-                                   feature_names=feature_names, center=center, plot_org_pts=plot_org_pts,
-                                   plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
-                                   n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                                   x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
-                                   multi_flag=True, which_class=n_class)
-        else:
-            if multi_flag:
-                _pdp_interact_out = pdp_interact_out['class_%d' % which_class]
+        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
+        inter_ax = []
+        for inner_idx in range(num_charts):
+            if plot_pdp:
+                inner_inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=inner_grid[inner_idx],
+                                                           height_ratios=[0.5, 7], width_ratios=[0.5, 7],
+                                                           hspace=0.1, wspace=0)
+                _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[inner_idx], feature_names=feature_names, plot_type=plot_type,
+                                 chart_grids=inner_inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
             else:
-                _pdp_interact_out = pdp_interact_out
-
-            _pdp_interact_plot(pdp_interact_out=_pdp_interact_out, feature_names=feature_names, center=center,
-                               plot_org_pts=plot_org_pts, plot_lines=plot_lines, frac_to_plot=frac_to_plot,
-                               cluster=cluster, n_cluster_centers=n_cluster_centers, cluster_method=cluster_method,
-                               x_quantile=x_quantile, figsize=figsize, plot_params=plot_params,
-                               multi_flag=False, which_class=None)
+                inner_inter_ax = plt.subplot(inner_grid[inner_idx])
+                fig.add_subplot(inner_inter_ax)
+                _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[inner_idx], feature_names=feature_names, plot_type=plot_type,
+                               inter_ax=inner_inter_ax, x_quantile=x_quantile, fig=fig, plot_params=plot_params, norm=None)
 

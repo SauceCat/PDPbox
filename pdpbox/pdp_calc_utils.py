@@ -58,6 +58,30 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
         return value_grids, []
 
 
+def _get_grid_combos(feature_grids, feature_types):
+    # create grid combination
+    grids1, grids2 = feature_grids
+    if feature_types[0] == 'onehot':
+        grids1 = range(len(grids1))
+    if feature_types[1] == 'onehot':
+        grids2 = range(len(grids2))
+
+    grid_combos_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
+    grid_combos1, grid_combos2 = grid_combos_temp[:, 0], grid_combos_temp[:, 1]
+    if feature_types[0] == 'onehot':
+        grid_combos1_temp = np.array(grid_combos1.T, dtype=np.int64)[0]
+        grid_combos1 = np.zeros((len(grid_combos1), len(grids1)), dtype=int)
+        grid_combos1[range(len(grid_combos1)), grid_combos1_temp] = 1
+    if feature_types[1] == 'onehot':
+        grid_combos2_temp = np.array(grid_combos2.T, dtype=np.int64)[0]
+        grid_combos2 = np.zeros((len(grid_combos2), len(grids2)), dtype=int)
+        grid_combos2[range(len(grid_combos2)), grid_combos2_temp] = 1
+
+    grid_combos = np.array(np.concatenate((grid_combos1, grid_combos2), axis=1))
+
+    return grid_combos
+
+
 def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
                     feature_grid, predict_kwds, data_transformer):
 
@@ -195,9 +219,6 @@ def _make_bucket_column_names(feature_grids, endpoint):
     bound_ups.append(np.nan)
 
     return column_names, bound_lows, bound_ups
-
-
-
 
 
 def _make_bucket_column_names_percentile(percentile_info, endpoint):
