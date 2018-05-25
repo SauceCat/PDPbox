@@ -640,7 +640,7 @@ def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_t
 
     data_x['fake_count'] = 1
     bar_data = data_x.groupby('x', as_index=False).agg({'fake_count': 'count'}).sort_values('x', ascending=True)
-    summary_df = pd.DataFrame(range(data_x['x'].min(), data_x['x'].max() + 1), columns=['x'])
+    summary_df = pd.DataFrame(np.arange(data_x['x'].min(), data_x['x'].max() + 1), columns=['x'])
     summary_df = summary_df.merge(bar_data.rename(columns={'fake_count': 'count'}), on='x', how='left').fillna(0)
 
     summary_df['display_column'] = summary_df['x'].apply(lambda x: display_columns[int(x)])
