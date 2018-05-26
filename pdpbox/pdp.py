@@ -1,10 +1,8 @@
 
 from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
-from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_interact_plot_title,
-                             _pdp_contour_plot, _pdp_interact_plot, _pdp_inter_three, _pdp_inter_one)
+from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .other_utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
                           _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default)
-from .info_plot_utils import _calc_figsize
 
 import pandas as pd
 import numpy as np
@@ -544,10 +542,8 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
             pdp_interact_plot_data.append(pdp_interact_out[n_class])
     num_charts = len(pdp_interact_plot_data)
 
-    # plot_pdp and plot_type grid is only True for numeric features when x_quantile is True
-    if 'numeric' in pdp_interact_plot_data[0].feature_types and not x_quantile:
-        plot_pdp = False
-        plot_type = 'contour'
+    if plot_type == 'grid' or plot_pdp:
+        x_quantile = True
 
     # set up graph parameters
     width, height = 7, 9.5
@@ -576,14 +572,14 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     if num_charts == 1:
         if plot_pdp:
             inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
-                                                 width_ratios=[0.5, 7], hspace=0.1, wspace=0)
+                                                 width_ratios=[0.5, 7], hspace=0, wspace=0)
             _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
                              chart_grids=inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
         else:
             inter_ax = plt.subplot(outer_grid[1])
             fig.add_subplot(inter_ax)
             _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
-                           inter_ax=inter_ax, x_quantile=x_quantile, fig=fig, plot_params=plot_params, norm=None)
+                           inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=None)
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
         inter_ax = []
@@ -598,5 +594,5 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
                 inner_inter_ax = plt.subplot(inner_grid[inner_idx])
                 fig.add_subplot(inner_inter_ax)
                 _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[inner_idx], feature_names=feature_names, plot_type=plot_type,
-                               inter_ax=inner_inter_ax, x_quantile=x_quantile, fig=fig, plot_params=plot_params, norm=None)
+                               inter_ax=inner_inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=None)
 

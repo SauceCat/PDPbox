@@ -76,7 +76,7 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
     return results
 
 
-def _axes_modify(font_family, ax, top=False, right=False, legend=False):
+def _axes_modify(font_family, ax, top=False, right=False, grid=False):
     # modify the axes
 
     for tick in ax.get_xticklabels():
@@ -90,19 +90,16 @@ def _axes_modify(font_family, ax, top=False, right=False, legend=False):
     for d in ['top', 'bottom', 'right', 'left']:
         ax.spines[d].set_visible(False)
 
-    if not legend:
-        if top:
-            ax.get_xaxis().tick_top()
-        elif right:
-            ax.get_yaxis().tick_right()
-        else:
-            ax.get_xaxis().tick_bottom()
-            ax.get_yaxis().tick_left()
-            ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-            ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
-    else:
-        ax.set_xticks([])
-        ax.set_yticks([])
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+
+    if top:
+        ax.get_xaxis().tick_top()
+    if right:
+        ax.get_yaxis().tick_right()
+    if not grid:
+        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
 
 
 def _autolabel(rects, ax, bar_color):
