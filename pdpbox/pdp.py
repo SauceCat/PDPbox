@@ -573,6 +573,9 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
         if plot_pdp:
             inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
                                                  width_ratios=[0.5, 7], hspace=0, wspace=0)
+            if plot_type == 'grid':
+                inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
+                                                     width_ratios=[0.5, 7], hspace=0.1, wspace=0)
             _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
                              chart_grids=inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
         else:
