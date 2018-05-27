@@ -234,20 +234,6 @@ def _ice_cluster_plot(x, ice_lines, feature_grids, n_cluster_centers, cluster_me
         ax.plot(x, y, linewidth=1, c=colors[i % 10])
 
 
-def _pdp_inter_xyticks(display_columns, feature_types, feature_names, inter_ax, x_quantile):
-
-    if feature_types[0] != 'numeric' or x_quantile:
-        inter_ax.set_xticks(range(len(display_columns[0])))
-        inter_ax.set_xticklabels(display_columns[0])
-
-    if feature_types[1] != 'numeric' or x_quantile:
-        inter_ax.set_yticks(range(len(display_columns[1])))
-        inter_ax.set_yticklabels(display_columns[1])
-
-    inter_ax.set_xlabel(feature_names[0], fontsize=10)
-    inter_ax.set_ylabel(feature_names[1], fontsize=10)
-
-
 def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params):
 
     contour_color = plot_params.get('contour_color', 'white')
@@ -271,23 +257,32 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
             inter_ax.text(c, r, round(pdp_mx[r, c], 3), ha="center", va="center", color=text_color,
                           size=fontsize, fontdict={'family': font_family})
 
-    inter_ax.set_xticks(np.arange(pdp_mx.shape[1]) + 0.5, minor=True)
-    inter_ax.set_yticks(np.arange(pdp_mx.shape[0]) + 0.5, minor=True)
-    inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
-    inter_ax.tick_params(which="minor", bottom=False, left=False)
+    # draw the white gaps
+    inter_ax.set_xticks(np.arange(pdp_mx.shape[1] - 1) + 0.5, minor=True)
+    inter_ax.set_yticks(np.arange(pdp_mx.shape[0] - 1) + 0.5, minor=True)
+    inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
 
 
 def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quantile, plot_params, norm, ticks=True):
-
     cmap = plot_params.get('cmap', 'viridis')
     inter_fill_alpha = plot_params.get('inter_fill_alpha', 0.8)
     fontsize = plot_params.get('inter_fontsize', 9)
     font_family = plot_params.get('font_family', 'Arial')
 
-    pdp_inter = copy.deepcopy(pdp_interact_out.pdp['preds'].values)
+    # prepare pdp_mx
+    pdp_mx_temp = copy.deepcopy(pdp_interact_out.pdp)
+    for feature, feature_type, mark in zip(pdp_interact_out.features, pdp_interact_out.feature_types, ['x', 'y']):
+        if feature_type in ['numeric', 'binary']:
+            pdp_mx_temp[mark] = pdp_mx_temp[feature]
+        else:
+            pdp_mx_temp[mark] = pdp_mx_temp[feature].apply(lambda x : list(x).index(1), axis=1)
+    pdp_mx_temp = pdp_mx_temp[['x', 'y', 'preds']].sort_values(by=['x', 'y'], ascending=True)
+
+    pdp_inter = copy.deepcopy(pdp_mx_temp['preds'].values)
     n_grids_x, n_grids_y = len(pdp_interact_out.feature_grids[0]), len(pdp_interact_out.feature_grids[1])
     pdp_mx = pdp_inter.reshape((n_grids_x, n_grids_y)).T
 
+    # if it is called by _pdp_inter_three, norm is not None
     if norm is None:
         pdp_min, pdp_max = np.min(pdp_inter), np.max(pdp_inter)
         norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
@@ -302,66 +297,74 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
         else:
             X, Y = np.meshgrid(pdp_interact_out.feature_grids[0], pdp_interact_out.feature_grids[1])
         _pdp_contour_plot(X=X, Y=Y, **inter_params)
-
     elif plot_type == 'grid':
         _pdp_inter_grid(**inter_params)
     else:
         raise ValueError("plot_type: should be 'contour' or 'grid'")
 
+    # if it is called by _pdp_inter_three, ticks is False
     if ticks:
         _axes_modify(font_family=font_family, ax=inter_ax, grid=True)
-        _pdp_inter_xyticks(display_columns=[pdp_interact_out.pdp_isolate_out1.display_columns,
-                                            pdp_interact_out.pdp_isolate_out2.display_columns],
-                           feature_types=pdp_interact_out.feature_types, feature_names=feature_names,
-                           inter_ax=inter_ax, x_quantile=x_quantile)
+
+        if pdp_interact_out.feature_types[0] != 'numeric' or x_quantile:
+            inter_ax.set_xticks(range(len(pdp_interact_out.feature_grids[0])))
+            inter_ax.set_xticklabels(pdp_interact_out.feature_grids[0])
+
+        if pdp_interact_out.feature_types[1] != 'numeric' or x_quantile:
+            inter_ax.set_yticks(range(len(pdp_interact_out.feature_grids[1])))
+            inter_ax.set_yticklabels(pdp_interact_out.feature_grids[1])
+
+        inter_ax.set_xlabel(feature_names[0], fontsize=10, fontdict={'family': font_family})
+        inter_ax.set_ylabel(feature_names[1], fontsize=10, fontdict={'family': font_family})
+    inter_ax.tick_params(which="minor", bottom=False, left=False)
 
 
-def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, inter_fill_alpha,
-            fontsize, font_family, y=False):
+def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plot_type, plot_params, y=False):
+    font_family = plot_params.get('font_family', 'Arial')
+    fontsize = plot_params.get('inter_fontsize', 9)
+    inter_fill_alpha = plot_params.get('inter_fill_alpha', 0.8)
 
-    if y:
-        pdp_ax.imshow(np.expand_dims(pdp_values, 1), cmap=cmap, norm=norm, origin='lower', alpha=inter_fill_alpha)
-    else:
-        pdp_ax.imshow(np.expand_dims(pdp_values, 0), cmap=cmap, norm=norm, origin='lower', alpha=inter_fill_alpha)
+    pdp_ax.imshow(np.expand_dims(pdp_values, int(y)), cmap=cmap, norm=norm, origin='lower', alpha=inter_fill_alpha)
+
     for idx in range(len(pdp_values)):
         text_color = 'w'
         if pdp_values[idx] >= vmean:
             text_color = 'black'
-        if y:
-            pdp_ax.text(0, idx, round(pdp_values[idx], 3), ha="center", va="center", color=text_color,
-                        rotation='vertical', size=fontsize, fontdict={'family': font_family})
-        else:
-            pdp_ax.text(idx, 0, round(pdp_values[idx], 3), ha="center", va="center", color=text_color,
-                        size=fontsize, fontdict={'family': font_family})
 
-    for d in ['top', 'bottom', 'right', 'left']:
-        pdp_ax.spines[d].set_visible(False)
+        text_params = {'s': round(pdp_values[idx], 3), 'ha': 'center', 'va': 'center', 'color': text_color,
+                       'size': fontsize, 'fontdict': {'family': font_family}}
+        if y:
+            pdp_ax.text(x=0, y=idx, rotation='vertical', **text_params)
+        else:
+            pdp_ax.text(x=idx, y=0, **text_params)
+
+    pdp_ax.set_frame_on(False)
 
     if y:
-        pdp_ax.set_yticks(np.arange(len(pdp_values)) + 0.5, minor=True)
+        pdp_ax.set_yticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_yticks(range(len(ticklabels)))
         pdp_ax.set_yticklabels(ticklabels)
-        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
-        pdp_ax.get_yaxis().set_label_position('right')
+        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 10})
+        if plot_type == 'contour':
+            pdp_ax.get_yaxis().set_label_position('right')
         pdp_ax.set_xticks([])
     else:
-        pdp_ax.set_xticks(np.arange(len(pdp_values)) + 0.5, minor=True)
+        pdp_ax.set_xticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_xticks(range(len(ticklabels)))
         pdp_ax.get_xaxis().tick_top()
         pdp_ax.set_xticklabels(ticklabels)
-        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
+        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 10})
+        if plot_type == 'grid':
+            pdp_ax.get_xaxis().set_label_position('top')
         pdp_ax.set_yticks([])
 
-    pdp_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
-    pdp_ax.tick_params(which="minor", bottom=False, left=False)
+    pdp_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
+    pdp_ax.tick_params(which="minor", top=False, left=False)
     pdp_ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
 
 
 def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_quantile, fig, plot_params):
     cmap = plot_params.get('cmap', 'viridis')
-    font_family = plot_params.get('font_family', 'Arial')
-    fontsize = plot_params.get('inter_fontsize', 9)
-    inter_fill_alpha = plot_params.get('inter_fill_alpha', 0.8)
 
     inter_ax = plt.subplot(chart_grids[3])
     fig.add_subplot(inter_ax)
@@ -380,20 +383,24 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     vmean = norm.vmin + (norm.vmax - norm.vmin) * 0.5
     feature_grids = pdp_interact_out.feature_grids
 
-    pdp_xy_params = {'cmap': cmap, 'norm': norm, 'inter_fill_alpha': inter_fill_alpha,
-                     'fontsize': fontsize, 'font_family': font_family, 'vmean': vmean}
+    pdp_xy_params = {'cmap': cmap, 'norm': norm, 'vmean': vmean, 'plot_params': plot_params, 'plot_type': plot_type}
     _pdp_xy(pdp_values=pdp_x, pdp_ax=pdp_x_ax, ticklabels=feature_grids[0], feature_name=feature_names[0], y=False, **pdp_xy_params)
     _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=feature_grids[1], feature_name=feature_names[1], y=True, **pdp_xy_params)
 
     _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
                    inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=norm, ticks=False)
-    for d in ['top', 'bottom', 'right', 'left']:
-        inter_ax.spines[d].set_visible(False)
+
+    inter_ax.set_frame_on(False)
     plt.setp(inter_ax.get_xticklabels(), visible=False)
     plt.setp(inter_ax.get_yticklabels(), visible=False)
     inter_ax.tick_params(which="minor", bottom=False, left=False)
     inter_ax.tick_params(which="major", bottom=False, left=False)
 
+    return {
+        'pdp_x_ax': pdp_x_ax,
+        'pdp_y_ax': pdp_y_ax,
+        'pdp_inter_ax': inter_ax
+    }
 
 
 

@@ -3,6 +3,7 @@ from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, 
 from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .other_utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
                           _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default)
+from .info_plot_utils import _calc_figsize
 
 import pandas as pd
 import numpy as np
@@ -400,12 +401,13 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
 
 
 class PDPInteract:
-    def __init__(self, n_classes, classifier, model_features, features, feature_types, feature_grids,
+    def __init__(self, n_classes, classifier, which_class, model_features, features, feature_types, feature_grids,
                  pdp_isolate_out1, pdp_isolate_out2, pdp):
 
         self._type = 'PDPInteract_instance'
         self.n_classes = n_classes
         self.classifier = classifier
+        self.which_class = which_class
         self.model_features = model_features
         self.features = features
         self.feature_types = feature_types
@@ -518,14 +520,14 @@ def pdp_interact(model, train_X, features, num_grid_points=None, grid_types=None
         for n_class in range(n_classes):
             _pdp = pdp[feature_list + ['class_%d_preds' % n_class]].rename(columns={'class_%d_preds' % n_class: 'preds'})
             pdp_interact_out.append(PDPInteract(
-                n_classes=n_classes, classifier=classifier, model_features=model_features, features=features,
-                feature_types=feature_types, feature_grids=feature_grids, pdp_isolate_out1=pdp_isolate_out1[n_class],
-                pdp_isolate_out2=pdp_isolate_out2[n_class], pdp=_pdp))
+                n_classes=n_classes, classifier=classifier, which_class=n_class, model_features=model_features,
+                features=features, feature_types=feature_types, feature_grids=feature_grids,
+                pdp_isolate_out1=pdp_isolate_out1[n_class], pdp_isolate_out2=pdp_isolate_out2[n_class], pdp=_pdp))
     else:
         pdp_interact_out = PDPInteract(
-            n_classes=n_classes, classifier=classifier, model_features=model_features, features=features,
-            feature_types=feature_types, feature_grids=feature_grids, pdp_isolate_out1=pdp_isolate_out1,
-            pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
+            n_classes=n_classes, classifier=classifier, which_class=None, model_features=model_features,
+            features=features, feature_types=feature_types, feature_grids=feature_grids,
+            pdp_isolate_out1=pdp_isolate_out1, pdp_isolate_out2=pdp_isolate_out2, pdp=pdp)
 
     return pdp_interact_out
 
@@ -542,19 +544,21 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
             pdp_interact_plot_data.append(pdp_interact_out[n_class])
     num_charts = len(pdp_interact_plot_data)
 
+    inner_hspace = inner_wspace = 0
     if plot_type == 'grid' or plot_pdp:
         x_quantile = True
+        if plot_type == 'grid':
+            inner_hspace = inner_wspace = 0.1
 
-    # set up graph parameters
-    width, height = 7, 9.5
-    nrows = 1
+    # calculate figure size
+    title_height = 2
+    if plot_pdp:
+        unit_figsize = (10.5, 10.5)
+    else:
+        unit_figsize = (7.5, 7.5)
 
-    if num_charts > 1:
-        nrows = int(np.ceil(num_charts * 1.0 / ncols))
-        ncols = np.min([num_charts, ncols])
-        width = np.min([7.5 * ncols, 15])
-        height = np.min([width * 1.0 / ncols, 7.5]) * nrows
-
+    width, height, nrows, ncols = _calc_figsize(
+        num_charts=num_charts, ncols=ncols, title_height=title_height, unit_figsize=unit_figsize)
     if figsize is not None:
         width, height = figsize
 
@@ -562,40 +566,48 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
         plot_params = dict()
 
     fig = plt.figure(figsize=(width, height))
-    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height - 2])
+    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[title_height, height - title_height])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
+
+    # todo: unify _pdp_plot_title for both pdp and pdp interact
     n_grids = len(pdp_interact_plot_data[0].feature_grids[0]) * len(pdp_interact_plot_data[0].feature_grids[1])
     _pdp_plot_title(n_grids=n_grids, feature_name="%s and %s" % (feature_names[0], feature_names[1]),
                     ax=title_ax, plot_params=plot_params)
 
+    inter_params = {'plot_type': plot_type, 'x_quantile': x_quantile, 'plot_params': plot_params}
     if num_charts == 1:
         if plot_pdp:
             inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
-                                                 width_ratios=[0.5, 7], hspace=0, wspace=0)
-            if plot_type == 'grid':
-                inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
-                                                     width_ratios=[0.5, 7], hspace=0.1, wspace=0)
-            _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
-                             chart_grids=inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
+                                                 width_ratios=[0.5, 7], hspace=inner_hspace, wspace=inner_wspace)
+            inter_ax = _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], chart_grids=inner_grid,
+                                        fig=fig, feature_names=feature_names, **inter_params)
         else:
             inter_ax = plt.subplot(outer_grid[1])
             fig.add_subplot(inter_ax)
-            _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], feature_names=feature_names, plot_type=plot_type,
-                           inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=None)
+            _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], inter_ax=inter_ax, norm=None,
+                           feature_names=feature_names, **inter_params)
     else:
-        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
+        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.2)
         inter_ax = []
         for inner_idx in range(num_charts):
+            feature_names_adj = ['%s (class %d)' % (feature_name, pdp_interact_plot_data[inner_idx].which_class)
+                                 for feature_name in feature_names]
             if plot_pdp:
                 inner_inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=inner_grid[inner_idx],
                                                            height_ratios=[0.5, 7], width_ratios=[0.5, 7],
-                                                           hspace=0.1, wspace=0)
-                _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[inner_idx], feature_names=feature_names, plot_type=plot_type,
-                                 chart_grids=inner_inner_grid, x_quantile=x_quantile, fig=fig, plot_params=plot_params)
+                                                           hspace=inner_hspace, wspace=inner_wspace)
+                inner_inter_ax = _pdp_inter_three(
+                    pdp_interact_out=pdp_interact_plot_data[inner_idx], chart_grids=inner_inner_grid, fig=fig,
+                    feature_names=feature_names_adj, **inter_params)
             else:
                 inner_inter_ax = plt.subplot(inner_grid[inner_idx])
                 fig.add_subplot(inner_inter_ax)
-                _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[inner_idx], feature_names=feature_names, plot_type=plot_type,
-                               inter_ax=inner_inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=None)
+                _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[inner_idx], inter_ax=inner_inter_ax,
+                               norm=None, feature_names=feature_names_adj, **inter_params)
+            inter_ax.append(inner_inter_ax)
+
+    axes = {'title_ax': title_ax, 'pdp_inter_ax': inter_ax}
+
+    return fig, axes
 
