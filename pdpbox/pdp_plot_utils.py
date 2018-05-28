@@ -242,12 +242,13 @@ def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, font
     c1 = inter_ax.contourf(X, Y, pdp_mx, N=level, origin='lower', cmap=cmap, norm=norm, alpha=inter_fill_alpha)
     c2 = inter_ax.contour(c1, levels=c1.levels, colors=contour_color, origin='lower')
     inter_ax.clabel(c2, contour_label_fontsize=fontsize, inline=1)
+    inter_ax.set_aspect('auto')
 
 
 def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params):
 
     font_family = plot_params.get('font_family', 'Arial')
-    inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower')
+    inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower', aspect='auto')
 
     for r in range(pdp_mx.shape[0]):
         for c in range(pdp_mx.shape[1]):

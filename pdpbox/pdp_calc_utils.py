@@ -260,20 +260,20 @@ def _make_bucket_column_names_percentile(percentile_info, endpoint):
 
 def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
                           feature_grids_combo, predict_kwds, data_transformer):
-
+    _data = data.copy()
     for idx in range(len(feature_list)):
-        data[feature_list[idx]] = feature_grids_combo[idx]
+        _data[feature_list[idx]] = feature_grids_combo[idx]
 
     if data_transformer is not None:
-        data = data_transformer(data)
+        _data = data_transformer(_data)
 
     if classifier:
         predict = model.predict_proba
     else:
         predict = model.predict
 
-    preds = predict(data[model_features], **predict_kwds)
-    result = data[feature_list].copy()
+    preds = predict(_data[model_features], **predict_kwds)
+    result = _data[feature_list].copy()
 
     if n_classes > 2:
         for n_class in range(n_classes):
