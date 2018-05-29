@@ -1,8 +1,8 @@
 
 from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
-from .pdp_plot_utils import (_pdp_plot_title, _pdp_plot, _pdp_inter_three, _pdp_inter_one)
-from .other_utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
-                          _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default)
+from .pdp_plot_utils import (_pdp_plot, _pdp_inter_three, _pdp_inter_one)
+from .utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
+                    _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default, _plot_title)
 from .info_plot_utils import _calc_figsize
 
 import pandas as pd
@@ -325,7 +325,10 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height - 2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _pdp_plot_title(n_grids=n_grids, feature_name=feature_name, ax=title_ax, plot_params=plot_params)
+
+    title = plot_params.get('title', 'PDP for feature "%s"' % feature_name)
+    subtitle = plot_params.get('subtitle', "Number of unique grid points: %d" % n_grids)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     # prepare count data when plot_pts_dist=True
     # adjust when it is numeric feature
@@ -570,10 +573,12 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
 
-    # todo: unify _pdp_plot_title for both pdp and pdp interact
-    n_grids = len(pdp_interact_plot_data[0].feature_grids[0]) * len(pdp_interact_plot_data[0].feature_grids[1])
-    _pdp_plot_title(n_grids=n_grids, feature_name="%s and %s" % (feature_names[0], feature_names[1]),
-                    ax=title_ax, plot_params=plot_params)
+    n_grids = [pdp_interact_plot_data[0].feature_grids[0], pdp_interact_plot_data[0].feature_grids[1]]
+    title = plot_params.get('title', 'PDP interact for "%s" and "%s"' % (feature_names[0], feature_names[1]))
+    subtitle = plot_params.get('subtitle', "Number of unique grid points: (%s: %d, %s: %d)"
+                               % (feature_names[0], n_grids[0], feature_names[1], n_grids[1]))
+
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     inter_params = {'plot_type': plot_type, 'x_quantile': x_quantile, 'plot_params': plot_params}
     if num_charts == 1:

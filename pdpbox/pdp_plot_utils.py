@@ -1,30 +1,15 @@
+
+from .pdp_calc_utils import _sample_data
+from .info_plot_utils import _axes_modify, _modify_legend_ax
+
 import pandas as pd
 import numpy as np
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 
 import copy
-
-from .pdp_calc_utils import _sample_data
-from .info_plot_utils import _axes_modify, _modify_legend_ax
-
 from sklearn.cluster import MiniBatchKMeans, KMeans
-
-
-def _pdp_plot_title(n_grids, feature_name, ax, plot_params):
-
-    font_family = plot_params.get('font_family', 'Arial')
-    title = plot_params.get('title', 'PDP for feature "%s"' % feature_name)
-    subtitle = plot_params.get('subtitle', "Number of unique grid points: %d" % n_grids)
-    title_fontsize = plot_params.get('title_fontsize', 15)
-    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
-
-    ax.set_facecolor('white')
-    ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
-    ax.text(0, 0.5, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
-    ax.axis('off')
 
 
 def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_columns, plot_params):

@@ -11,6 +11,7 @@ from matplotlib.colors import ListedColormap
 
 from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
                              _make_bucket_column_names_percentile)
+from .utils import _plot_title
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
@@ -168,17 +169,6 @@ def _draw_bar_line(bar_data, bar_ax, line_data, line_ax, line_color,
     line_ax.set_ylabel('target_avg')
 
 
-def _info_plot_title(title, subtitle, ax, plot_params):
-    font_family = plot_params.get('font_family', 'Arial')
-    title_fontsize = plot_params.get('title_fontsize', 15)
-    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
-
-    ax.set_facecolor('white')
-    ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
-    ax.text(0, 0.5, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
-    ax.axis('off')
-
-
 def _target_plot(feature_name, display_columns, percentile_columns, target, bar_data,
                  target_lines, figsize, ncols, plot_params):
     # set up graph parameters
@@ -209,7 +199,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     if len(target) == 1:
         bar_ax = plt.subplot(outer_grid[1])
@@ -367,7 +357,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     if len(actual_prediction_columns) == 1:
         inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1])
@@ -545,7 +535,7 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     # draw value plots and legend
     count_min, count_max = plot_data['fake_count'].min(), plot_data['fake_count'].max()

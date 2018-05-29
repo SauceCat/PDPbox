@@ -166,5 +166,17 @@ def _check_frac_to_plot(frac_to_plot):
             raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
 
 
+def _plot_title(title, subtitle, title_ax, plot_params):
+    """Add plot title."""
+
+    title_params = {'fontname': plot_params.get('font_family', 'Arial'), 'x': 0, 'va': 'top', 'ha': 'left'}
+    title_fontsize = plot_params.get('title_fontsize', 15)
+    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
+
+    title_ax.set_facecolor('white')
+    title_ax.text(y=0.7, s=title, fontsize=title_fontsize, **title_params)
+    title_ax.text(y=0.5, s=subtitle, fontsize=subtitle_fontsize, color='grey', **title_params)
+    title_ax.axis('off')
+
 
 
