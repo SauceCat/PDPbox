@@ -2,7 +2,8 @@
 from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
 from .pdp_plot_utils import (_pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
-                    _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default, _plot_title)
+                    _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default,
+                    _plot_title, _calc_memory_usage)
 from .info_plot_utils import _calc_figsize
 
 import pandas as pd
@@ -26,8 +27,6 @@ class PDPIsolate(object):
 
     n_classes: integer or None
         number of classes for classifier, None when it is a regressor
-    classifier: bool
-        whether the model is a classifier
     which_class: integer or None
         for multi-class classifier, indicate which class the result belongs to
     feature: string or list
@@ -50,12 +49,11 @@ class PDPIsolate(object):
         data points distribution for numeric features
     """
 
-    def __init__(self, n_classes, classifier, which_class, feature, feature_type, feature_grids,
+    def __init__(self, n_classes, which_class, feature, feature_type, feature_grids,
                  percentile_info, display_columns, ice_lines, pdp, count_data, hist_data):
 
         self._type = 'PDPIsolate_instance'
         self.n_classes = n_classes
-        self.classifier = classifier
         self.which_class = which_class
         self.feature = feature
         self.feature_type = feature_type
@@ -68,7 +66,7 @@ class PDPIsolate(object):
         self.hist_data = hist_data
 
 
-def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percentile',
+def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None,
                 memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None):
     """Calculate PDP isolation plot
@@ -76,8 +74,10 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     Parameters
     ----------
     model: a fitted sklearn model
-    train_X: pandas DataFrame
+    dataset: pandas DataFrame
         data set on which the model is trained
+    model_features: list or 1-d array
+        list of model features
     feature: string or list
         feature or feature list to investigate,
         for one-hot encoding features, feature list is required
@@ -97,7 +97,11 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     memory_limit: float, (0, 1)
         fraction of memory to use
     n_jobs: integer, default=1
-        number of jobs to run in parallel
+        number of jobs to run in parallel.
+        make sure n_jobs=1 when you are using XGBoost model.
+        check:
+        1. https://pythonhosted.org/joblib/parallel.html#bad-interaction-of-multiprocessing-and-third-party-libraries
+        2. https://github.com/scikit-learn/scikit-learn/issues/6627
     predict_kwds: dict or None, optional, default=None
         keywords to be passed to the model's predict function
     data_transformer: function or None, optional, default=None
@@ -106,19 +110,19 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     Returns
     -------
     pdp_isolate_out: instance of PDPIsolate
+
     """
 
     # check function inputs
-    n_classes, classifier, predict = _check_model(model=model)
+    n_classes, predict = _check_model(model=model)
 
     # avoid polluting the original dataset
     # copy training data set and get the model features
     # it's extremely important to keep the original feature order
-    _check_dataset(df=train_X)
-    _train_X = train_X.copy()
-    model_features = _train_X.columns.values
+    _check_dataset(df=dataset)
+    _dataset = dataset.copy()
 
-    feature_type = _check_feature(feature=feature, df=_train_X)
+    feature_type = _check_feature(feature=feature, df=_dataset)
     _check_grid_type(grid_type=grid_type)
     _check_percentile_range(percentile_range=percentile_range)
     _check_memory_limit(memory_limit=memory_limit)
@@ -126,7 +130,8 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
     if predict_kwds is None:
         predict_kwds = dict()
 
-    # create feature grids
+    # feature_grids: grid points to calculate on
+    # display_columns: xticklabels for grid points
     percentile_info = []
     if feature_type == 'binary':
         feature_grids = np.array([0, 1])
@@ -138,23 +143,21 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
         # calculate grid points for numeric features
         if cust_grid_points is None:
             feature_grids, percentile_info = _get_grids(
-                x=_train_X[feature].values, num_grid_points=num_grid_points, grid_type=grid_type,
+                feature_values=_dataset[feature].values, num_grid_points=num_grid_points, grid_type=grid_type,
                 percentile_range=percentile_range, grid_range=grid_range)
         else:
-            feature_grids = np.array(sorted(cust_grid_points))
-
+            # make sure grid points are unique and in ascending order
+            feature_grids = np.array(sorted(np.unique(cust_grid_points)))
         display_columns = [round(v, 3) for v in feature_grids]
 
-    # calculate memory usage
-    unit_memory = _train_X.memory_usage(deep=True).sum()
-    free_memory = psutil.virtual_memory()[1] * memory_limit
-    num_units = int(np.floor(free_memory / unit_memory))
-    true_n_jobs = np.min([num_units, n_jobs])
-
+    # Parallel calculate ICE lines
+    true_n_jobs = _calc_memory_usage(
+        df=_dataset, total_units=len(feature_grids), n_jobs=n_jobs, memory_limit=memory_limit)
     grid_results = Parallel(n_jobs=true_n_jobs)(
         delayed(_calc_ice_lines)(
-            _train_X, model, classifier, model_features, n_classes, feature, feature_type,
-            feature_grid, predict_kwds, data_transformer) for feature_grid in feature_grids)
+            feature_grid, data=_dataset, model=model, model_features=model_features, n_classes=n_classes,
+            feature=feature, feature_type=feature_type, predict_kwds=predict_kwds, data_transformer=data_transformer)
+        for feature_grid in feature_grids)
 
     if n_classes > 2:
         ice_lines = []
@@ -166,29 +169,27 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, grid_type='percenti
 
     # calculate the counts
     count_data = _prepare_pdp_count_data(
-        feature=feature, feature_type=feature_type, data=_train_X[_make_list(feature)], feature_grids=feature_grids)
+        feature=feature, feature_type=feature_type, data=_dataset[_make_list(feature)], feature_grids=feature_grids)
 
+    # prepare histogram information for numeric feature
     hist_data = None
     if feature_type == 'numeric':
-        hist_data = np.histogram(_train_X[feature].values,
-                                 bins=np.min([100, _train_X[feature].nunique()]), normed=True)[0]
+        hist_data = np.histogram(_dataset[feature].values,
+                                 bins=np.min([100, _dataset[feature].nunique()]), normed=True)[0]
 
     # combine the final results
+    pdp_params = {'n_classes': n_classes, 'feature': feature, 'feature_type': feature_type,
+                  'feature_grids': feature_grids, 'percentile_info': percentile_info,
+                  'display_columns': display_columns, 'count_data': count_data, 'hist_data': hist_data}
     if n_classes > 2:
         pdp_isolate_out = []
         for n_class in range(n_classes):
             pdp = ice_lines[n_class][feature_grids].mean().values
-            pdp_isolate_out.append(PDPIsolate(
-                n_classes=n_classes, classifier=classifier, which_class=n_class, feature=feature,
-                feature_type=feature_type, feature_grids=feature_grids, percentile_info=percentile_info,
-                display_columns=display_columns, ice_lines=ice_lines[n_class], pdp=pdp,
-                count_data=count_data, hist_data=hist_data))
+            pdp_isolate_out.append(
+                PDPIsolate(which_class=n_class, ice_lines=ice_lines[n_class], pdp=pdp, **pdp_params))
     else:
         pdp = ice_lines[feature_grids].mean().values
-        pdp_isolate_out = PDPIsolate(
-            n_classes=n_classes, classifier=classifier, which_class=None, feature=feature,
-            feature_type=feature_type, feature_grids=feature_grids, percentile_info=percentile_info,
-            display_columns=display_columns, ice_lines=ice_lines, pdp=pdp, count_data=count_data, hist_data=hist_data)
+        pdp_isolate_out = PDPIsolate(which_class=None, ice_lines=ice_lines, pdp=pdp, **pdp_params)
 
     return pdp_isolate_out
 
@@ -300,20 +301,21 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     pdp_plot_data = _make_list(x=pdp_isolate_out)
     n_grids = len(pdp_plot_data[0].feature_grids)
 
+    # select the subset to plot
     if len(pdp_plot_data) > 1 and which_classes is not None:
         pdp_plot_data = []
+        which_classes = sorted(which_classes)
         for n_class in which_classes:
             pdp_plot_data.append(pdp_isolate_out[n_class])
 
     # set up graph parameters
     width, height = 15, 9.5
     nrows = 1
-
     if len(pdp_plot_data) > 1:
         nrows = int(np.ceil(len(pdp_plot_data) * 1.0 / ncols))
         ncols = np.min([len(pdp_plot_data), ncols])
         width = np.min([7.5 * len(pdp_plot_data), 15])
-        height = np.min([width * 1.0 / ncols, 8]) * nrows
+        height = np.min([width * 1.0 / ncols, 7.5]) * nrows
 
     if figsize is not None:
         width, height = figsize
@@ -321,24 +323,30 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     if plot_params is None:
         plot_params = dict()
 
+    # construct the chart
     fig = plt.figure(figsize=(width, height))
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height - 2])
+
+    # plot title
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-
     title = plot_params.get('title', 'PDP for feature "%s"' % feature_name)
     subtitle = plot_params.get('subtitle', "Number of unique grid points: %d" % n_grids)
     _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
-    # prepare count data when plot_pts_dist=True
-    # adjust when it is numeric feature
+    # plot pdp
     feature_type = pdp_plot_data[0].feature_type
     pdp_count_hspace = 0.15
     count_data = pdp_plot_data[0].count_data.copy()
     if feature_type == 'numeric':
         pdp_count_hspace = 0.25
 
+    pdp_plot_params = {'center': center, 'plot_lines': plot_lines, 'frac_to_plot': frac_to_plot, 'cluster': cluster,
+                       'n_cluster_centers': n_cluster_centers, 'cluster_method': cluster_method, 'x_quantile': x_quantile,
+                       'show_percentile': show_percentile, 'count_data': count_data, 'plot_params': plot_params}
+
     if len(pdp_plot_data) == 1:
+        # add class information if need
         feature_name_adj = feature_name
         if pdp_plot_data[0].which_class is not None:
             feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[0].which_class)
@@ -352,19 +360,13 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
             fig.add_subplot(_count_ax, sharex=_pdp_ax)
             pdp_ax = {'_pdp_ax': _pdp_ax, '_count_ax': _count_ax}
 
-            _pdp_plot(
-                pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
-                frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
-                cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
-                pdp_ax=_pdp_ax, count_data=count_data, count_ax=_count_ax, plot_params=plot_params)
+            _pdp_plot(pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, pdp_ax=_pdp_ax,
+                      count_ax=_count_ax, **pdp_plot_params)
         else:
             pdp_ax = plt.subplot(outer_grid[1])
             fig.add_subplot(pdp_ax)
-            _pdp_plot(
-                pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, center=center, plot_lines=plot_lines,
-                frac_to_plot=frac_to_plot, cluster=cluster, n_cluster_centers=n_cluster_centers,
-                cluster_method=cluster_method, x_quantile=x_quantile, show_percentile=show_percentile,
-                pdp_ax=pdp_ax, count_data=None, count_ax=None, plot_params=plot_params)
+            _pdp_plot(pdp_isolate_out=pdp_plot_data[0], feature_name=feature_name_adj, pdp_ax=pdp_ax,
+                      count_ax=None, **pdp_plot_params)
 
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.1, hspace=0.2)
@@ -380,11 +382,8 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
                 fig.add_subplot(_count_ax, sharex=_pdp_ax)
 
                 feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[inner_idx].which_class)
-                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, center=center,
-                          plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
-                          n_cluster_centers=n_cluster_centers, cluster_method=cluster_method, x_quantile=x_quantile,
-                          show_percentile=show_percentile, pdp_ax=_pdp_ax,
-                          count_data=count_data, count_ax=_count_ax, plot_params=plot_params)
+                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, pdp_ax=_pdp_ax,
+                          count_ax=_count_ax, **pdp_plot_params)
         else:
             pdp_ax = []
             for inner_idx in range(len(pdp_plot_data)):
@@ -393,11 +392,8 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
                 fig.add_subplot(ax)
 
                 feature_name_adj = '%s (class %d)' % (feature_name, pdp_plot_data[inner_idx].which_class)
-                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, center=center,
-                          plot_lines=plot_lines, frac_to_plot=frac_to_plot, cluster=cluster,
-                          n_cluster_centers=n_cluster_centers, cluster_method=cluster_method, x_quantile=x_quantile,
-                          show_percentile=show_percentile, pdp_ax=ax, count_data=None, count_ax=None,
-                          plot_params=plot_params)
+                _pdp_plot(pdp_isolate_out=pdp_plot_data[inner_idx], feature_name=feature_name_adj, pdp_ax=ax,
+                          count_ax=None, **pdp_plot_params)
 
     axes = {'title_ax': title_ax, 'pdp_ax': pdp_ax}
     return fig, axes
@@ -489,12 +485,14 @@ def pdp_interact(model, train_X, features, num_grid_points=None, grid_types=None
     if type(pdp_isolate_out1) == list:
         feature_grids = [pdp_isolate_out1[0].feature_grids, pdp_isolate_out2[0].feature_grids]
         feature_types = [pdp_isolate_out1[0].feature_type, pdp_isolate_out2[0].feature_type]
-        classifier = pdp_isolate_out1[0].classifier
+        classifier = True
+        # pdp_isolate_out1[0].classifier
         n_classes = pdp_isolate_out1[0].n_classes
     else:
         feature_grids = [pdp_isolate_out1.feature_grids, pdp_isolate_out2.feature_grids]
         feature_types = [pdp_isolate_out1.feature_type, pdp_isolate_out2.feature_type]
-        classifier = pdp_isolate_out1.classifier
+        # classifier = pdp_isolate_out1.classifier
+        classifier = True
         n_classes = pdp_isolate_out1.n_classes
 
     # make features into list

@@ -2,32 +2,30 @@ import pandas as pd
 import numpy as np
 
 
-def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
-    """calculate grid points for numeric feature
+def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, grid_range):
+    """Calculate grid points for numeric feature
 
-    Parameters:
-    -----------
-
-    :param x: Series, 1d-array, or list.
+    Parameters
+    ----------
+    feature_values: Series, 1d-array, or list.
         values to calculate grid points
-    :param num_grid_points: integer
+    num_grid_points: integer
         number of grid points for numeric feature
-    :param grid_type: string
-        'percentile' or 'equal'
+    grid_type: string
+        'percentile' or 'equal',
         type of grid points for numeric feature
-    :param percentile_range: tuple or None
-        percentile range to investigate
+    percentile_range: tuple or None
+        percentile range to investigate,
         for numeric feature when grid_type='percentile'
-    :param grid_range: tuple or None
-        value range to investigate
+    grid_range: tuple or None
+        value range to investigate,
         for numeric feature when grid_type='equal'
 
-    Returns:
-    --------
-
-    :return feature_grids: 1d-array
+    Returns
+    -------
+    feature_grids: 1d-array
         calculated grid points
-    :return percentile_info: 1d-array or []
+    percentile_info: 1d-array or []
         percentile information for feature_grids
         exists when grid_type='percentile'
     """
@@ -40,7 +38,7 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
             start, end = np.min(percentile_range), np.max(percentile_range)
 
         percentile_grids = np.linspace(start=start, stop=end, num=num_grid_points)
-        value_grids = np.percentile(x, percentile_grids)
+        value_grids = np.percentile(feature_values, percentile_grids)
 
         grids_df = pd.DataFrame()
         grids_df['percentile_grids'] = [round(v, 2) for v in percentile_grids]
@@ -48,14 +46,15 @@ def _get_grids(x, num_grid_points, grid_type, percentile_range, grid_range):
         grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
             {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
 
-        return grids_df['value_grids'].values, grids_df['percentile_grids'].values
+        feature_grids, percentile_info = grids_df['value_grids'].values, grids_df['percentile_grids'].values
     else:
         if grid_range is not None:
             value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
         else:
-            value_grids = np.linspace(np.min(x), np.max(x), num_grid_points)
+            value_grids = np.linspace(np.min(feature_values), np.max(feature_values), num_grid_points)
+        feature_grids, percentile_info = value_grids, []
 
-        return value_grids, []
+    return feature_grids, percentile_info
 
 
 def _get_grid_combos(feature_grids, feature_types):
@@ -82,11 +81,18 @@ def _get_grid_combos(feature_grids, feature_types):
     return grid_combos
 
 
-def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature, feature_type,
-                    feature_grid, predict_kwds, data_transformer):
+def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, feature, feature_type,
+                    predict_kwds, data_transformer):
+    """Apply predict function on a feature_grid
+
+    Returns
+    -------
+    Predicted result on this feature_grid
+    """
 
     _data = data.copy()
     if feature_type == 'onehot':
+        # for onehot encoding feature, need to change all levels together
         other_grids = [grid for grid in feature if grid != feature_grid]
         _data[feature_grid] = 1
         for grid in other_grids:
@@ -94,27 +100,35 @@ def _calc_ice_lines(data, model, classifier, model_features, n_classes, feature,
     else:
         _data[feature] = feature_grid
 
+    # if there are other features highly depend on the investigating feature
+    # other features should also adjust based on the changed feature value
+    # Example:
+    # there are 3 features: a, b, a_b_ratio
+    # if feature a is the investigated feature
+    # data_transformer should be:
+    # def data_transformer(df):
+    #   df["a_b_ratio"] = df["a"] / df["b"]
+    #   return df
     if data_transformer is not None:
         _data = data_transformer(_data)
 
-    if classifier:
-        predict = model.predict_proba
-    else:
+    if n_classes == 0:
         predict = model.predict
+    else:
+        predict = model.predict_proba
 
     # get predictions for this chunk
     preds = predict(_data[model_features], **predict_kwds)
 
-    if n_classes > 2:
+    if n_classes == 0:
+        grid_results = pd.DataFrame(preds, columns=[feature_grid])
+    elif n_classes == 2:
+        grid_results = pd.DataFrame(preds[:, 1], columns=[feature_grid])
+    else:
         grid_results = []
         for n_class in range(n_classes):
             grid_result = pd.DataFrame(preds[:, n_class], columns=[feature_grid])
             grid_results.append(grid_result)
-    else:
-        if classifier:
-            grid_results = pd.DataFrame(preds[:, 1], columns=[feature_grid])
-        else:
-            grid_results = pd.DataFrame(preds, columns=[feature_grid])
 
     return grid_results
 
@@ -288,7 +302,7 @@ def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, fe
 
 
 def _pdp_count_dist_xticklabels(feature_grids):
-    # create bucket names
+    """Create bucket names based on feature grids"""
     column_names = []
 
     # number of buckets: len(feature_grids) - 1
@@ -303,6 +317,14 @@ def _pdp_count_dist_xticklabels(feature_grids):
 
 
 def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
+    """Calculate data point distribution
+
+    Returns
+    -------
+    count_data: pandas DataFrame
+        column x: bucket index,
+        column count: number of data points fall in this bucket
+    """
     if feature_type == 'onehot':
         count_data = pd.DataFrame(data[feature_grids].sum(axis=0)).reset_index(drop=False).rename(columns={0: 'count'})
         count_data['x'] = range(count_data.shape[0])
@@ -312,10 +334,11 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
     else:
         data_x = data.copy()
         vmin, vmax = data[feature].min(), data[feature].max()
-
         feature_grids = list(feature_grids)
         count_x = range(len(feature_grids) - 1)
+
         # append lower and upper bound to the grids
+        # make sure all data points are included
         if feature_grids[0] > vmin:
             feature_grids = [vmin] + feature_grids
             count_x = [-1] + count_x
@@ -333,57 +356,3 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
         count_data['x'] = count_x
 
     return count_data
-
-
-def _prepare_pdp_count_data_old(feature, feature_type, data, feature_grids, percentile_info):
-    bound_ups = []
-    bound_lows = []
-    percentile_columns = []
-    percentile_bound_lows = []
-    percentile_bound_ups = []
-
-    if feature_type == 'onehot':
-        count_data = pd.DataFrame(data[feature_grids].sum(axis=0)).reset_index(drop=False).rename(columns={0: 'count'})
-        count_data['x'] = range(count_data.shape[0])
-        display_columns = feature_grids
-    else:
-        data_x = data.copy()
-        if feature_type == 'binary':
-            data_x['x'] = data_x[feature]
-            display_columns = ['%s_0' % feature, '%s_1' % feature]
-        else:
-            data_x['x'] = data_x[feature].apply(
-                lambda x: _find_bucket(x=x, feature_grids=feature_grids, endpoint=False))
-            display_columns, bound_lows, bound_ups = _make_bucket_column_names(
-                feature_grids=feature_grids, endpoint=False)
-            if len(percentile_info) > 0:
-                percentile_columns, percentile_bound_lows, percentile_bound_ups = \
-                    _make_bucket_column_names_percentile(percentile_info=percentile_info, endpoint=False)
-        data_x['count'] = 1
-        count_data = data_x.groupby('x', as_index=False).agg({'count': 'count'}).sort_values(
-            'x', ascending=True).reset_index(drop=True)
-
-    # for numeric features, there is 1 more bucket, < feature_grids[0]
-    if feature_type == 'numeric':
-        summary_df = pd.DataFrame(range(len(feature_grids) + 1), columns=['x'])
-        summary_df = summary_df.merge(count_data, on='x', how='left').fillna(0)
-        summary_df['display_column'] = display_columns
-
-        summary_df['value_lower'] = bound_lows
-        summary_df['value_upper'] = bound_ups
-        if len(percentile_columns) > 0:
-            summary_df['percentile_column'] = percentile_columns
-            summary_df['percentile_lower'] = percentile_bound_lows
-            summary_df['percentile_upper'] = percentile_bound_ups
-
-        if summary_df.iloc[0]['count'] == 0:
-            summary_df = summary_df.iloc[1:]
-        summary_df = summary_df.reset_index(drop=True)
-        summary_df['x'] -= 1
-    else:
-        summary_df = pd.DataFrame(range(len(feature_grids)), columns=['x'])
-        summary_df = summary_df.merge(count_data, on='x', how='left').fillna(0)
-        summary_df['display_column'] = display_columns
-
-    return summary_df
-

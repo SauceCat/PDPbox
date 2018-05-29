@@ -2,10 +2,18 @@ from __future__ import absolute_import
 
 import numpy as np
 import pandas as pd
+import psutil
 
 
 def _check_feature(feature, df):
-    # check feature
+    """Make sure feature exists and infer feature type
+
+    Feature types
+    -------------
+    1. binary
+    2. onehot
+    3. numeric
+    """
     if type(feature) == str:
         if feature not in df.columns.values:
             raise ValueError('feature does not exist: %s' % feature)
@@ -26,6 +34,7 @@ def _check_feature(feature, df):
 
 
 def _check_percentile_range(percentile_range):
+    """Make sure percentile range is valid"""
     if percentile_range is not None:
         if len(percentile_range) != 2:
             raise ValueError('percentile_range: should contain 2 elements')
@@ -57,12 +66,13 @@ def _check_target(target, df):
 
 
 def _check_dataset(df):
-    # check input data set
+    """Make sure input dataset is pandas DataFrame"""
     if type(df) != pd.core.frame.DataFrame:
         raise ValueError('only accept pandas DataFrame')
 
 
 def _make_list(x):
+    """Make list when it is necessary"""
     if type(x) == list:
         return x
     return [x]
@@ -75,19 +85,19 @@ def _expand_default(x, default):
 
 
 def _check_model(model):
+    """Check model input, return class information and predict function"""
     try:
         n_classes = len(model.classes_)
-        classifier = True
         predict = model.predict_proba
     except:
         n_classes = 0
-        classifier = False
         predict = model.predict
 
-    return n_classes, classifier, predict
+    return n_classes, predict
 
 
 def _check_grid_type(grid_type):
+    """Make sure grid type is percentile or equal"""
     if grid_type not in ['percentile', 'equal']:
         raise ValueError('grid_type should be "percentile" or "equal".')
 
@@ -156,11 +166,13 @@ def _check_info_plot_interact_params(num_grid_points, grid_types, percentile_ran
 
 
 def _check_memory_limit(memory_limit):
+    """Make sure memory limit is between 0 and 1"""
     if memory_limit <= 0 or memory_limit >= 1:
         raise ValueError('memory_limit: should be (0, 1)')
 
 
 def _check_frac_to_plot(frac_to_plot):
+    """Make sure frac_to_plot is between 0 and 1 if it is float"""
     if type(frac_to_plot) == float:
         if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
             raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
@@ -177,6 +189,16 @@ def _plot_title(title, subtitle, title_ax, plot_params):
     title_ax.text(y=0.7, s=title, fontsize=title_fontsize, **title_params)
     title_ax.text(y=0.5, s=subtitle, fontsize=subtitle_fontsize, color='grey', **title_params)
     title_ax.axis('off')
+
+
+def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
+    """Calculate n_jobs to use"""
+    unit_memory = df.memory_usage(deep=True).sum()
+    free_memory = psutil.virtual_memory()[1] * memory_limit
+    num_units = int(np.floor(free_memory / unit_memory))
+    true_n_jobs = np.min([num_units, n_jobs, total_units])
+
+    return true_n_jobs
 
 
 
