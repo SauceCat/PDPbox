@@ -1,9 +1,9 @@
 
-from .pdp_calc_utils import _get_grids, _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
+from .pdp_calc_utils import _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data, _get_grid_combos
 from .pdp_plot_utils import (_pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
                     _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default,
-                    _plot_title, _calc_memory_usage)
+                    _plot_title, _calc_memory_usage, _get_grids)
 from .info_plot_utils import _calc_figsize
 
 import pandas as pd
@@ -342,8 +342,9 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
         pdp_count_hspace = 0.25
 
     pdp_plot_params = {'center': center, 'plot_lines': plot_lines, 'frac_to_plot': frac_to_plot, 'cluster': cluster,
-                       'n_cluster_centers': n_cluster_centers, 'cluster_method': cluster_method, 'x_quantile': x_quantile,
-                       'show_percentile': show_percentile, 'count_data': count_data, 'plot_params': plot_params}
+                       'n_cluster_centers': n_cluster_centers, 'cluster_method': cluster_method,
+                       'x_quantile': x_quantile, 'show_percentile': show_percentile, 'count_data': count_data,
+                       'plot_params': plot_params}
 
     if len(pdp_plot_data) == 1:
         # add class information if need

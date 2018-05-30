@@ -1,6 +1,5 @@
 
-from .pdp_calc_utils import _sample_data
-from .info_plot_utils import _axes_modify, _modify_legend_ax
+from .utils import _axes_modify, _sample_data, _modify_legend_ax
 
 import pandas as pd
 import numpy as np
@@ -13,47 +12,51 @@ from sklearn.cluster import MiniBatchKMeans, KMeans
 
 
 def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_columns, plot_params):
+    """Plot data point distribution bar"""
 
     font_family = plot_params.get('font_family', 'Arial')
-    count_data['count_norm'] = count_data['count'] * 1.0 / count_data['count'].sum()
-    count_plot_data = count_data['count_norm'].values
-    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(count_plot_data))
     cmap = plot_params.get('line_cmap', 'Blues')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
     count_xticks_color = '#424242'
     count_xticks_size = 10
+    fill_alpha = 0.8
 
-    _modify_legend_ax(count_ax, font_family=font_family)
+    count_plot_data = count_data['count_norm'].values
+    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(count_plot_data))
+    _modify_legend_ax(ax=count_ax, font_family=font_family)
 
     if feature_type == 'numeric':
-        x = pdp_ax.get_xticks()[:-1] + 0.5
-        count_ax.set_xticklabels(
-            count_data['xticklabels'].values, color=count_xticks_color, fontsize=count_xticks_size, rotation=xticks_rotation)
+        # xticks should be between two grid points
+        xticks = pdp_ax.get_xticks()[:-1] + 0.5
+        count_ax.set_xticklabels(count_data['xticklabels'].values, color=count_xticks_color,
+                                 fontsize=count_xticks_size, rotation=xticks_rotation)
     else:
-        x = count_data['x'].values
-        count_ax.set_xticklabels(
-            display_columns, rotation=xticks_rotation, color=count_xticks_color, fontsize=count_xticks_size)
+        xticks = count_data['x'].values
+        count_ax.set_xticklabels(display_columns, rotation=xticks_rotation, color=count_xticks_color,
+                                 fontsize=count_xticks_size)
 
     count_ax.imshow(np.expand_dims(count_plot_data, 0), aspect="auto", cmap=cmap, norm=norm,
-                    alpha=0.8, extent=(np.min(x)-0.5, np.max(x)+0.5, 0, 0.5))
+                    alpha=fill_alpha, extent=(np.min(xticks)-0.5, np.max(xticks)+0.5, 0, 0.5))
 
     for idx in range(len(count_plot_data)):
         text_color = "black"
         if count_plot_data[idx] >= np.max(count_plot_data) * 0.5:
             text_color = "white"
-        count_ax.text(x[idx], 0.25, round(count_plot_data[idx], 3), ha="center", va="center",
+        count_ax.text(xticks[idx], 0.25, round(count_plot_data[idx], 3), ha="center", va="center",
                       color=text_color, fontdict={'family': font_family})
 
-    count_ax.set_xticks(x+0.5, minor=True)
-    count_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
+    # draw the white gaps
+    count_ax.set_xticks(xticks + 0.5, minor=True)
+    count_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
     count_ax.tick_params(which="minor", bottom=False, left=False)
     count_ax.set_title('distribution of data points',
                        fontdict={'family': font_family, 'color': count_xticks_color}, fontsize=count_xticks_size)
 
-    count_ax.set_xticks(x)
+    count_ax.set_xticks(xticks)
     count_ax.set_xbound(pdp_ax.get_xbound())
 
 
+# todo: change distplot to rugplot
 def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
     font_family = plot_params.get('font_family', 'Arial')
 
@@ -67,12 +70,11 @@ def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, cluster, n_cluster_centers,
               cluster_method, x_quantile, show_percentile, pdp_ax, count_data, count_ax, plot_params):
+    """Internal helper function for pdp plot"""
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
-    # modify axes
-    _axes_modify(font_family, pdp_ax)
     feature_type = pdp_isolate_out.feature_type
     feature_grids = pdp_isolate_out.feature_grids
     display_columns = pdp_isolate_out.display_columns
@@ -87,6 +89,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
         xticklabels = list(display_columns)
 
         if count_ax is not None:
+            # need to plot data distribution
             if x_quantile:
                 count_display_columns = count_data['xticklabels'].values
                 # number of grids = number of bins + 1
@@ -94,9 +97,11 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
                 count_x = range(count_data['x'].min(), count_data['x'].max() + 2)
                 xticks = count_x
                 if count_x[0] == -1:
+                    # include the minimum value
                     xticklabels = [float(count_display_columns[0].split(',')[0].replace('[', ''))] + xticklabels
                     percentile_xticklabels = ['(0.0)'] + percentile_xticklabels
                 if count_x[-1] == len(feature_grids):
+                    # include the maximum value
                     xticklabels = xticklabels + [float(count_display_columns[-1].split(',')[1].replace(']', ''))]
                     percentile_xticklabels = percentile_xticklabels + ['(100.0)']
             else:
@@ -106,39 +111,45 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
         pdp_ax.set_xticks(xticks)
         pdp_ax.set_xticklabels(xticklabels, rotation=xticks_rotation)
     else:
+        # for numeric feature when x_quantile=False
         x = feature_grids
 
     ice_lines = copy.deepcopy(pdp_isolate_out.ice_lines)
     pdp_y = copy.deepcopy(pdp_isolate_out.pdp)
 
-    # whether to fill between std upper and lower
-    # whether to highlight pdp line
+    # default: fill between std upper and lower
+    # don't need to highlight pdp line
     std_fill = True
     pdp_hl = False
 
-    # whether to center the plot
+    # center the plot
     if center:
         pdp_y -= pdp_y[0]
         for col in feature_grids[1:]:
             ice_lines[col] -= ice_lines[feature_grids[0]]
         ice_lines[feature_grids[0]] = 0
 
+    # cluster or plot lines
     if cluster or plot_lines:
         std_fill = False
         pdp_hl = True
+        lines_params = {'x': x, 'feature_grids': feature_grids, 'ax': pdp_ax, 'plot_params': plot_params}
         if cluster:
-            _ice_cluster_plot(x=x, ice_lines=ice_lines, feature_grids=feature_grids, n_cluster_centers=n_cluster_centers,
-                              cluster_method=cluster_method, ax=pdp_ax, plot_params=plot_params)
+            _ice_cluster_plot(ice_lines=ice_lines, n_cluster_centers=n_cluster_centers,
+                              cluster_method=cluster_method, **lines_params)
         else:
             ice_plot_data = _sample_data(ice_lines=ice_lines, frac_to_plot=frac_to_plot)
-            _ice_line_plot(x=x, ice_plot_data=ice_plot_data, feature_grids=feature_grids, ax=pdp_ax, plot_params=plot_params)
+            _ice_line_plot(ice_plot_data=ice_plot_data, **lines_params)
 
+    # pdp
     std = ice_lines[feature_grids].std().values
     _pdp_std_plot(x=x, y=pdp_y, std=std, std_fill=std_fill, pdp_hl=pdp_hl, ax=pdp_ax, plot_params=plot_params)
+    _axes_modify(font_family, pdp_ax)
 
+    # add data distribution plot
     if count_ax is not None:
         if not x_quantile and feature_type == 'numeric':
-            # in this situation, x=feature_grids
+            # todo: distplot -> rugplot
             hist_data = pdp_isolate_out.hist_data.copy()
             _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, vmin=np.min(x), vmax=np.max(x),
                                plot_params=plot_params)
@@ -146,10 +157,10 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
             _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, pdp_ax=pdp_ax, feature_type=feature_type,
                                 display_columns=display_columns, plot_params=plot_params)
         count_ax.set_xlabel(feature_name, fontsize=11, fontdict={'family': font_family})
-
     else:
         pdp_ax.set_xlabel(feature_name, fontsize=11, fontdict={'family': font_family})
 
+    # show grid percentile info
     if show_percentile and len(percentile_info) > 0:
         percentile_pdp_ax = pdp_ax.twiny()
         percentile_pdp_ax.set_xticks(pdp_ax.get_xticks())
@@ -160,9 +171,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
 
 
 def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
-
-    upper = y + std
-    lower = y - std
+    """Simple pdp"""
 
     pdp_color = plot_params.get('pdp_color', '#1A4E5D')
     pdp_hl_color = plot_params.get('pdp_hl_color', '#FEDC00')
@@ -172,6 +181,9 @@ def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
     fill_color = plot_params.get('fill_color', '#66C2D7')
     fill_alpha = plot_params.get('fill_alpha', 0.2)
     markersize = plot_params.get('markersize', 3.5)
+
+    upper = y + std
+    lower = y - std
 
     if pdp_hl:
         ax.plot(x, y, color=pdp_hl_color, linewidth=pdp_linewidth * 3, alpha=0.8)
@@ -187,11 +199,12 @@ def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
 
 
 def _ice_line_plot(x, ice_plot_data, feature_grids, ax, plot_params):
+    """Plot ICE lines"""
+
+    line_cmap = plot_params.get('line_cmap', 'Blues')
 
     linewidth = np.max([1.0 / np.log10(ice_plot_data.shape[0]), 0.3])
     linealpha = np.max([1.0 / np.log10(ice_plot_data.shape[0]), 0.3])
-
-    line_cmap = plot_params.get('line_cmap', 'Blues')
     colors = plt.get_cmap(line_cmap)(np.linspace(0, 1, 20))[5:15]
 
     for i in range(len(ice_plot_data)):
@@ -200,6 +213,7 @@ def _ice_line_plot(x, ice_plot_data, feature_grids, ax, plot_params):
 
 
 def _ice_cluster_plot(x, ice_lines, feature_grids, n_cluster_centers, cluster_method, ax, plot_params):
+    """Cluster ICE lines"""
 
     if cluster_method not in ['approx', 'accurate']:
         raise ValueError('cluster method: should be "approx" or "accurate".')

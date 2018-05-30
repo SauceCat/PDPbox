@@ -2,59 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, grid_range):
-    """Calculate grid points for numeric feature
 
-    Parameters
-    ----------
-    feature_values: Series, 1d-array, or list.
-        values to calculate grid points
-    num_grid_points: integer
-        number of grid points for numeric feature
-    grid_type: string
-        'percentile' or 'equal',
-        type of grid points for numeric feature
-    percentile_range: tuple or None
-        percentile range to investigate,
-        for numeric feature when grid_type='percentile'
-    grid_range: tuple or None
-        value range to investigate,
-        for numeric feature when grid_type='equal'
-
-    Returns
-    -------
-    feature_grids: 1d-array
-        calculated grid points
-    percentile_info: 1d-array or []
-        percentile information for feature_grids
-        exists when grid_type='percentile'
-    """
-
-    if grid_type == 'percentile':
-        # grid points are calculated based on percentile in unique level
-        # thus the final number of grid points might be smaller than num_grid_points
-        start, end = 0, 100
-        if percentile_range is not None:
-            start, end = np.min(percentile_range), np.max(percentile_range)
-
-        percentile_grids = np.linspace(start=start, stop=end, num=num_grid_points)
-        value_grids = np.percentile(feature_values, percentile_grids)
-
-        grids_df = pd.DataFrame()
-        grids_df['percentile_grids'] = [round(v, 2) for v in percentile_grids]
-        grids_df['value_grids'] = value_grids
-        grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
-            {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
-
-        feature_grids, percentile_info = grids_df['value_grids'].values, grids_df['percentile_grids'].values
-    else:
-        if grid_range is not None:
-            value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
-        else:
-            value_grids = np.linspace(np.min(feature_values), np.max(feature_values), num_grid_points)
-        feature_grids, percentile_info = value_grids, []
-
-    return feature_grids, percentile_info
 
 
 def _get_grid_combos(feature_grids, feature_types):
@@ -133,25 +81,7 @@ def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, featur
     return grid_results
 
 
-def _sample_data(ice_lines, frac_to_plot):
-    """
-    Get sample ice lines to plot
 
-    :param ice_lines: all ice lines
-    :param frac_to_plot: fraction to plot
-
-    :return: the sampled ice lines
-    """
-
-    if frac_to_plot < 1.:
-        ice_plot_data = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
-    elif frac_to_plot > 1:
-        ice_plot_data = ice_lines.sample(frac_to_plot)
-    else:
-        ice_plot_data = ice_lines.copy()
-
-    ice_plot_data = ice_plot_data.reset_index(drop=True)
-    return ice_plot_data
 
 
 def _find_onehot_actual(x):
@@ -323,7 +253,9 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
     -------
     count_data: pandas DataFrame
         column x: bucket index,
-        column count: number of data points fall in this bucket
+        column count: number of data points fall in this bucket,
+        column count_norm: normalized count number, notice that it is normalized
+        by data.shape[0], just incase for onehot feature, not every data point has value
     """
     if feature_type == 'onehot':
         count_data = pd.DataFrame(data[feature_grids].sum(axis=0)).reset_index(drop=False).rename(columns={0: 'count'})
@@ -354,5 +286,7 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
                                         'xticklabels': _pdp_count_dist_xticklabels(feature_grids=feature_grids)})
         count_data = count_data.merge(count_data_temp, on='x', how='left').fillna(0)
         count_data['x'] = count_x
+
+    count_data['count_norm'] = count_data['count'] * 1.0 / data.shape[0]
 
     return count_data

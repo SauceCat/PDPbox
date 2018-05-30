@@ -9,9 +9,9 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import ListedColormap
 
-from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
+from .pdp_calc_utils import (_find_bucket, _make_bucket_column_names, _find_onehot_actual,
                              _make_bucket_column_names_percentile)
-from .utils import _plot_title
+from .utils import _plot_title, _get_grids, _axes_modify, _modify_legend_ax
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
@@ -75,32 +75,6 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
     }
 
     return results
-
-
-def _axes_modify(font_family, ax, top=False, right=False, grid=False):
-    # modify the axes
-
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    ax.set_facecolor('white')
-    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
-
-    for d in ['top', 'bottom', 'right', 'left']:
-        ax.spines[d].set_visible(False)
-
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-
-    if top:
-        ax.get_xaxis().tick_top()
-    if right:
-        ax.get_yaxis().tick_right()
-    if not grid:
-        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
 
 
 def _autolabel(rects, ax, bar_color):
@@ -458,20 +432,6 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
 
     _axes_modify(font_family=font_family, ax=plot_ax)
     return value_min, value_max, percentile_ax, percentile_ay
-
-
-def _modify_legend_ax(ax, font_family):
-    for d in ['top', 'bottom', 'right', 'left']:
-        ax.spines[d].set_visible(False)
-
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    ax.set_facecolor('white')
-    ax.set_xticks([])
-    ax.set_yticks([])
 
 
 def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, height="30%", width="100%"):

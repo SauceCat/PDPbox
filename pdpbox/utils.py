@@ -201,4 +201,120 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     return true_n_jobs
 
 
+def _axes_modify(font_family, ax, top=False, right=False, grid=False):
+    """Modify matplotlib Axes
+
+    Parameters
+    ----------
+    top: bool, default=False
+        xticks location=top
+    right: bool, default=False
+        yticks, location=right
+    grid: bool, default=False
+        whether it is for grid plot
+    """
+
+    ax.set_facecolor('white')
+    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
+
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.set_frame_on(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
+
+    if top:
+        ax.get_xaxis().tick_top()
+    if right:
+        ax.get_yaxis().tick_right()
+    if not grid:
+        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
+        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
+
+
+def _modify_legend_ax(ax, font_family):
+    """Modify legend like Axes"""
+    ax.set_frame_on(False)
+
+    for tick in ax.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    ax.set_facecolor('white')
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, grid_range):
+    """Calculate grid points for numeric feature
+
+    Parameters
+    ----------
+    feature_values: Series, 1d-array, or list.
+        values to calculate grid points
+    num_grid_points: integer
+        number of grid points for numeric feature
+    grid_type: string
+        'percentile' or 'equal',
+        type of grid points for numeric feature
+    percentile_range: tuple or None
+        percentile range to investigate,
+        for numeric feature when grid_type='percentile'
+    grid_range: tuple or None
+        value range to investigate,
+        for numeric feature when grid_type='equal'
+
+    Returns
+    -------
+    feature_grids: 1d-array
+        calculated grid points
+    percentile_info: 1d-array or []
+        percentile information for feature_grids
+        exists when grid_type='percentile'
+    """
+
+    if grid_type == 'percentile':
+        # grid points are calculated based on percentile in unique level
+        # thus the final number of grid points might be smaller than num_grid_points
+        start, end = 0, 100
+        if percentile_range is not None:
+            start, end = np.min(percentile_range), np.max(percentile_range)
+
+        percentile_grids = np.linspace(start=start, stop=end, num=num_grid_points)
+        value_grids = np.percentile(feature_values, percentile_grids)
+
+        grids_df = pd.DataFrame()
+        grids_df['percentile_grids'] = [round(v, 2) for v in percentile_grids]
+        grids_df['value_grids'] = value_grids
+        grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
+            {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
+
+        feature_grids, percentile_info = grids_df['value_grids'].values, grids_df['percentile_grids'].values
+    else:
+        if grid_range is not None:
+            value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
+        else:
+            value_grids = np.linspace(np.min(feature_values), np.max(feature_values), num_grid_points)
+        feature_grids, percentile_info = value_grids, []
+
+    return feature_grids, percentile_info
+
+
+def _sample_data(ice_lines, frac_to_plot):
+    """Get sample ice lines to plot"""
+
+    if frac_to_plot < 1.:
+        ice_plot_data = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
+    elif frac_to_plot > 1:
+        ice_plot_data = ice_lines.sample(frac_to_plot)
+    else:
+        ice_plot_data = ice_lines.copy()
+
+    ice_plot_data = ice_plot_data.reset_index(drop=True)
+    return ice_plot_data
+
 
