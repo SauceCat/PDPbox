@@ -1,8 +1,8 @@
 
 from .info_plot_utils import (_target_plot, _info_plot_interact, _actual_plot, _prepare_info_plot_interact_data,
-                              _prepare_info_plot_interact_summary, _prepare_info_plot_data)
-from .utils import (_make_list, _check_model, _check_target, _check_classes,
-					_check_info_plot_interact_params, _check_info_plot_params)
+                              _prepare_info_plot_interact_summary, _prepare_info_plot_data,
+                              _check_info_plot_interact_params, _check_info_plot_params)
+from .utils import _make_list, _check_model, _check_target, _check_classes
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
@@ -281,7 +281,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     """
 
     # check inputs
-    n_classes, classifier, predict = _check_model(model=model)
+    n_classes, predict = _check_model(model=model)
     feature_type, show_outliers = _check_info_plot_params(
         df=X, feature=feature, grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
         cust_grid_points=cust_grid_points, show_outliers=show_outliers)
@@ -551,7 +551,7 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
     """
 
     # check model
-    n_classes, classifier, predict = _check_model(model=model)
+    n_classes, predict = _check_model(model=model)
     check_results = _check_info_plot_interact_params(
         num_grid_points=num_grid_points, grid_types=grid_types, percentile_ranges=percentile_ranges,
         grid_ranges=grid_ranges, cust_grid_points=cust_grid_points, show_outliers=show_outliers,
@@ -614,6 +614,6 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         feature_names=feature_names, display_columns=display_columns,
         percentile_columns=percentile_columns, ys=[col + '_q2' for col in actual_prediction_columns],
         plot_data=actual_plot_data, title=title, subtitle=subtitle, figsize=figsize,
-        ncols=ncols, plot_params=plot_params)
+        ncols=ncols, plot_params=plot_params, is_target_plot=False)
 
     return fig, axes, summary_df

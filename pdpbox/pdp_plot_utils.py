@@ -234,6 +234,7 @@ def _ice_cluster_plot(x, ice_lines, feature_grids, n_cluster_centers, cluster_me
 
 
 def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params):
+    """Interact contour plot"""
 
     contour_color = plot_params.get('contour_color', 'white')
 
@@ -245,6 +246,7 @@ def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, font
 
 
 def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params):
+    """Interact grid plot (heatmap)"""
 
     font_family = plot_params.get('font_family', 'Arial')
     inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower', aspect='auto')
@@ -264,6 +266,17 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
 
 
 def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quantile, plot_params, norm, ticks=True):
+    """Plot single PDP interact
+
+    Parameters
+    ----------
+
+    norm: matplotlib colors normalize
+    ticks: bool, default=True
+        whether to set ticks for the plot,
+        False when it is called by _pdp_inter_three
+
+    """
     cmap = plot_params.get('cmap', 'viridis')
     inter_fill_alpha = plot_params.get('inter_fill_alpha', 0.8)
     fontsize = plot_params.get('inter_fontsize', 9)
@@ -302,7 +315,6 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
     else:
         raise ValueError("plot_type: should be 'contour' or 'grid'")
 
-    # if it is called by _pdp_inter_three, ticks is False
     if ticks:
         _axes_modify(font_family=font_family, ax=inter_ax, grid=True)
 
@@ -320,6 +332,27 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
 
 
 def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plot_type, plot_params, y=False):
+    """PDP isolate on x, y axis
+
+    Parameters
+    ----------
+
+    pdp_values: 1-d array
+        pdp values
+    vmean: float
+        threshold to determine the text color
+    pdp_ax: matplotlib Axes
+        PDP interact axes
+    ticklabels: list
+        list of tick labels
+    feature_name: str
+        name of the feature
+    cmap: matplotlib color map
+    norm: matplotlib color normalize
+    y: bool, default=False
+        whether it is on y axis
+    """
+
     font_family = plot_params.get('font_family', 'Arial')
     fontsize = plot_params.get('inter_fontsize', 9)
     inter_fill_alpha = plot_params.get('inter_fill_alpha', 0.8)
@@ -364,6 +397,13 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
 
 
 def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_quantile, fig, plot_params):
+    """Plot PDP interact with pdp isolate color bar
+
+    Parameters
+    ----------
+    chart_grids: matplotlib subplot gridspec
+
+    """
     cmap = plot_params.get('cmap', 'viridis')
 
     inter_ax = plt.subplot(chart_grids[3])
@@ -373,8 +413,8 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     pdp_y_ax = plt.subplot(chart_grids[2], sharey=inter_ax)
     fig.add_subplot(pdp_y_ax)
 
-    pdp_x = copy.deepcopy(pdp_interact_out.pdp_isolate_out1.pdp)
-    pdp_y = copy.deepcopy(pdp_interact_out.pdp_isolate_out2.pdp)
+    pdp_x = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[0].pdp)
+    pdp_y = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[1].pdp)
     pdp_inter = copy.deepcopy(pdp_interact_out.pdp['preds'].values)
     pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
     pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
@@ -384,8 +424,10 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     feature_grids = pdp_interact_out.feature_grids
 
     pdp_xy_params = {'cmap': cmap, 'norm': norm, 'vmean': vmean, 'plot_params': plot_params, 'plot_type': plot_type}
-    _pdp_xy(pdp_values=pdp_x, pdp_ax=pdp_x_ax, ticklabels=feature_grids[0], feature_name=feature_names[0], y=False, **pdp_xy_params)
-    _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=feature_grids[1], feature_name=feature_names[1], y=True, **pdp_xy_params)
+    _pdp_xy(pdp_values=pdp_x, pdp_ax=pdp_x_ax, ticklabels=feature_grids[0], feature_name=feature_names[0],
+            y=False, **pdp_xy_params)
+    _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=feature_grids[1], feature_name=feature_names[1],
+            y=True, **pdp_xy_params)
 
     _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
                    inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=norm, ticks=False)

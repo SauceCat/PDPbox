@@ -43,6 +43,15 @@ def _check_percentile_range(percentile_range):
 
 
 def _check_target(target, df):
+    """Check and return target type
+
+    target types
+    -------------
+    1. binary
+    2. multi-class
+    3. regression
+    """
+
     if type(target) == str:
         if target not in df.columns.values:
             raise ValueError('target does not exist: %s' % target)
@@ -51,8 +60,6 @@ def _check_target(target, df):
         else:
             target_type = 'regression'
     elif type(target) == list:
-        if len(target) < 2:
-            raise ValueError('multi-class target should contain more than 1 element')
         if not set(target) < set(df.columns.values):
             raise ValueError('target does not exist: %s' % (str(target)))
         for target_idx in range(len(target)):
@@ -79,6 +86,7 @@ def _make_list(x):
 
 
 def _expand_default(x, default):
+    """Create a list of default values"""
     if x is None:
         return [default] * 2
     return x
@@ -103,66 +111,12 @@ def _check_grid_type(grid_type):
 
 
 def _check_classes(classes_list, n_classes):
+    """Makre sure classes list is valid"""
     if len(classes_list) > 0 and n_classes > 2:
         if np.min(classes_list) < 0:
             raise ValueError('class index should be >= 0.')
         if np.max(classes_list) > n_classes - 1:
             raise ValueError('class index should be < n_classes.')
-
-
-def _check_info_plot_params(df, feature, grid_type, percentile_range, grid_range,
-                            cust_grid_points, show_outliers):
-    _check_dataset(df=df)
-    feature_type = _check_feature(feature=feature, df=df)
-    _check_grid_type(grid_type=grid_type)
-    _check_percentile_range(percentile_range=percentile_range)
-
-    # show_outliers should be only turned on when necessary
-    if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
-        show_outliers = False
-    return feature_type, show_outliers
-
-
-def _check_info_plot_interact_params(num_grid_points, grid_types, percentile_ranges, grid_ranges, cust_grid_points,
-                                     show_outliers, plot_params, features, df):
-    _check_dataset(df=df)
-    num_grid_points = _expand_default(num_grid_points, 10)
-    grid_types = _expand_default(grid_types, 'percentile')
-    _check_grid_type(grid_type=grid_types[0])
-    _check_grid_type(grid_type=grid_types[1])
-
-    percentile_ranges = _expand_default(percentile_ranges, None)
-    _check_percentile_range(percentile_range=percentile_ranges[0])
-    _check_percentile_range(percentile_range=percentile_ranges[1])
-
-    grid_ranges = _expand_default(grid_ranges, None)
-    cust_grid_points = _expand_default(cust_grid_points, None)
-
-    if not show_outliers:
-        show_outliers = [False, False]
-    else:
-        show_outliers = [True, True]
-        for i in range(2):
-            if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
-                show_outliers[i] = False
-
-    # set up graph parameters
-    if plot_params is None:
-        plot_params = dict()
-
-    # check features
-    feature_types = [_check_feature(feature=features[0], df=df), _check_feature(feature=features[1], df=df)]
-
-    return {
-        'num_grid_points': num_grid_points,
-        'grid_types': grid_types,
-        'percentile_ranges': percentile_ranges,
-        'grid_ranges': grid_ranges,
-        'cust_grid_points': cust_grid_points,
-        'show_outliers': show_outliers,
-        'plot_params': plot_params,
-        'feature_types': feature_types
-    }
 
 
 def _check_memory_limit(memory_limit):
@@ -252,22 +206,6 @@ def _modify_legend_ax(ax, font_family):
 def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, grid_range):
     """Calculate grid points for numeric feature
 
-    Parameters
-    ----------
-    feature_values: Series, 1d-array, or list.
-        values to calculate grid points
-    num_grid_points: integer
-        number of grid points for numeric feature
-    grid_type: string
-        'percentile' or 'equal',
-        type of grid points for numeric feature
-    percentile_range: tuple or None
-        percentile range to investigate,
-        for numeric feature when grid_type='percentile'
-    grid_range: tuple or None
-        value range to investigate,
-        for numeric feature when grid_type='equal'
-
     Returns
     -------
     feature_grids: 1d-array
@@ -304,6 +242,32 @@ def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, gri
     return feature_grids, percentile_info
 
 
+def _get_grid_combos(feature_grids, feature_types):
+    """Calculate grid combinations of two grid lists"""
+
+    # create grid combination
+    grids1, grids2 = feature_grids
+    if feature_types[0] == 'onehot':
+        grids1 = range(len(grids1))
+    if feature_types[1] == 'onehot':
+        grids2 = range(len(grids2))
+
+    grid_combos_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
+    grid_combos1, grid_combos2 = grid_combos_temp[:, 0], grid_combos_temp[:, 1]
+    if feature_types[0] == 'onehot':
+        grid_combos1_temp = np.array(grid_combos1.T, dtype=np.int64)[0]
+        grid_combos1 = np.zeros((len(grid_combos1), len(grids1)), dtype=int)
+        grid_combos1[range(len(grid_combos1)), grid_combos1_temp] = 1
+    if feature_types[1] == 'onehot':
+        grid_combos2_temp = np.array(grid_combos2.T, dtype=np.int64)[0]
+        grid_combos2 = np.zeros((len(grid_combos2), len(grids2)), dtype=int)
+        grid_combos2[range(len(grid_combos2)), grid_combos2_temp] = 1
+
+    grid_combos = np.array(np.concatenate((grid_combos1, grid_combos2), axis=1))
+
+    return grid_combos
+
+
 def _sample_data(ice_lines, frac_to_plot):
     """Get sample ice lines to plot"""
 
@@ -316,5 +280,118 @@ def _sample_data(ice_lines, frac_to_plot):
 
     ice_plot_data = ice_plot_data.reset_index(drop=True)
     return ice_plot_data
+
+
+def _find_onehot_actual(x):
+    """Map one-hot value to one-hot name"""
+    try:
+        value = list(x).index(1)
+    except:
+        value = np.nan
+    return value
+
+
+def _find_bucket(x, feature_grids, endpoint):
+    """Find bucket that x falls in"""
+    # map value into value bucket
+    if x < feature_grids[0]:
+        bucket = 0
+    else:
+        if endpoint:
+            if x > feature_grids[-1]:
+                bucket = len(feature_grids)
+            else:
+                bucket = len(feature_grids) - 1
+                for i in range(len(feature_grids) - 2):
+                    if feature_grids[i] <= x < feature_grids[i + 1]:
+                        bucket = i + 1
+        else:
+            if x >= feature_grids[-1]:
+                bucket = len(feature_grids)
+            else:
+                bucket = len(feature_grids) - 1
+                for i in range(len(feature_grids) - 2):
+                    if feature_grids[i] <= x < feature_grids[i + 1]:
+                        bucket = i + 1
+    return bucket
+
+
+def _make_bucket_column_names(feature_grids, endpoint):
+    """Create bucket names based on feature grids"""
+    # create bucket names
+    column_names = []
+    bound_lows = [np.nan]
+    bound_ups = [feature_grids[0]]
+
+    # number of buckets: len(feature_grids) - 1
+    for i in range(len(feature_grids) - 1):
+        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+        bound_lows.append(feature_grids[i])
+        bound_ups.append(feature_grids[i + 1])
+
+        if (i == len(feature_grids) - 2) and endpoint:
+            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+
+        column_names.append(column_name)
+
+    if endpoint:
+        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
+    else:
+        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['>= %.2f' % feature_grids[-1]]
+    bound_lows.append(feature_grids[-1])
+    bound_ups.append(np.nan)
+
+    return column_names, bound_lows, bound_ups
+
+
+def _make_bucket_column_names_percentile(percentile_info, endpoint):
+    """Create bucket names based on percentile info"""
+    # create percentile bucket names
+    percentile_column_names = []
+    percentile_bound_lows = [0]
+    percentile_bound_ups = [np.min(np.array(percentile_info[0].replace('(', '').replace(
+        ')', '').split(', ')).astype(np.float64))]
+
+    for i in range(len(percentile_info) - 1):
+        # for each grid point, percentile information is in tuple format
+        # (percentile1, percentile2, ...)
+        # some grid points would belong to multiple percentiles
+        low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+        percentile_column_name = '[%.2f, %.2f)' % (low, high)
+        percentile_bound_lows.append(low)
+        percentile_bound_ups.append(high)
+
+        if i == len(percentile_info) - 2:
+            if endpoint:
+                percentile_column_name = '[%.2f, %.2f]' % (low, high)
+            else:
+                percentile_column_name = '[%.2f, %.2f)' % (low, high)
+
+        percentile_column_names.append(percentile_column_name)
+
+    low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+    high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+    if endpoint:
+        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+    else:
+        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['>= %.2f' % high]
+    percentile_bound_lows.append(high)
+    percentile_bound_ups.append(100)
+
+    return percentile_column_names, percentile_bound_lows, percentile_bound_ups
+
+
+def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
+    """Calculate figure size"""
+    if num_charts > 1:
+        nrows = int(np.ceil(num_charts * 1.0 / ncols))
+        ncols = np.min([num_charts, ncols])
+        width = np.min([unit_figsize[0] * ncols, 15])
+        height = np.min([width * 1.0 / ncols, unit_figsize[1]]) * nrows
+    else:
+        width, height, nrows = unit_figsize[0], unit_figsize[1] + title_height, 1
+
+    return width, height, nrows, ncols
 
 

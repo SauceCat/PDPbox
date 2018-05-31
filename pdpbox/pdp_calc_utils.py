@@ -1,32 +1,5 @@
+
 import pandas as pd
-import numpy as np
-
-
-
-
-
-def _get_grid_combos(feature_grids, feature_types):
-    # create grid combination
-    grids1, grids2 = feature_grids
-    if feature_types[0] == 'onehot':
-        grids1 = range(len(grids1))
-    if feature_types[1] == 'onehot':
-        grids2 = range(len(grids2))
-
-    grid_combos_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
-    grid_combos1, grid_combos2 = grid_combos_temp[:, 0], grid_combos_temp[:, 1]
-    if feature_types[0] == 'onehot':
-        grid_combos1_temp = np.array(grid_combos1.T, dtype=np.int64)[0]
-        grid_combos1 = np.zeros((len(grid_combos1), len(grids1)), dtype=int)
-        grid_combos1[range(len(grid_combos1)), grid_combos1_temp] = 1
-    if feature_types[1] == 'onehot':
-        grid_combos2_temp = np.array(grid_combos2.T, dtype=np.int64)[0]
-        grid_combos2 = np.zeros((len(grid_combos2), len(grids2)), dtype=int)
-        grid_combos2[range(len(grid_combos2)), grid_combos2_temp] = 1
-
-    grid_combos = np.array(np.concatenate((grid_combos1, grid_combos2), axis=1))
-
-    return grid_combos
 
 
 def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, feature, feature_type,
@@ -81,129 +54,15 @@ def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, featur
     return grid_results
 
 
+def _calc_ice_lines_inter(feature_grids_combo, data, model, model_features, n_classes, feature_list,
+                          predict_kwds, data_transformer):
+    """Apply predict function on a grid combo
 
-
-
-def _find_onehot_actual(x):
-    """map one-hot value to one-hot name
-
-    :param x: 1-d array
-        example: [0, 1, 0, 0]
-
-    :return value: string
-        index of the mapped one-hot name
+    Returns
+    -------
+    Predicted result on this feature_grid
     """
 
-    try:
-        value = list(x).index(1)
-    except:
-        value = np.nan
-    return value
-
-
-def _find_closest(x, feature_grids):
-    """
-    Find the closest feature grid for x
-
-    :param x: value
-    :param feature_grids: array of feature grids
-
-    :return:
-    """
-    values = list(feature_grids)
-    return values.index(min(values, key=lambda y: abs(y-x)))
-
-
-def _find_bucket(x, feature_grids, endpoint):
-    # map value into value bucket
-    if x < feature_grids[0]:
-        bucket = 0
-    else:
-        if endpoint:
-            if x > feature_grids[-1]:
-                bucket = len(feature_grids)
-            else:
-                bucket = len(feature_grids) - 1
-                for i in range(len(feature_grids) - 2):
-                    if feature_grids[i] <= x < feature_grids[i + 1]:
-                        bucket = i + 1
-        else:
-            if x >= feature_grids[-1]:
-                bucket = len(feature_grids)
-            else:
-                bucket = len(feature_grids) - 1
-                for i in range(len(feature_grids) - 2):
-                    if feature_grids[i] <= x < feature_grids[i + 1]:
-                        bucket = i + 1
-    return bucket
-
-
-def _make_bucket_column_names(feature_grids, endpoint):
-    # create bucket names
-    column_names = []
-    bound_lows = [np.nan]
-    bound_ups = [feature_grids[0]]
-
-    # number of buckets: len(feature_grids) - 1
-    for i in range(len(feature_grids) - 1):
-        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
-        bound_lows.append(feature_grids[i])
-        bound_ups.append(feature_grids[i + 1])
-
-        if (i == len(feature_grids) - 2) and endpoint:
-            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
-
-        column_names.append(column_name)
-
-    if endpoint:
-        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
-    else:
-        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['>= %.2f' % feature_grids[-1]]
-    bound_lows.append(feature_grids[-1])
-    bound_ups.append(np.nan)
-
-    return column_names, bound_lows, bound_ups
-
-
-def _make_bucket_column_names_percentile(percentile_info, endpoint):
-    # create percentile bucket names
-    percentile_column_names = []
-    percentile_bound_lows = [0]
-    percentile_bound_ups = [np.min(np.array(percentile_info[0].replace('(', '').replace(
-        ')', '').split(', ')).astype(np.float64))]
-
-    for i in range(len(percentile_info) - 1):
-        # for each grid point, percentile information is in tuple format
-        # (percentile1, percentile2, ...)
-        # some grid points would belong to multiple percentiles
-        low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-        high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-        percentile_column_name = '[%.2f, %.2f)' % (low, high)
-        percentile_bound_lows.append(low)
-        percentile_bound_ups.append(high)
-
-        if i == len(percentile_info) - 2:
-            if endpoint:
-                percentile_column_name = '[%.2f, %.2f]' % (low, high)
-            else:
-                percentile_column_name = '[%.2f, %.2f)' % (low, high)
-
-        percentile_column_names.append(percentile_column_name)
-
-    low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-    high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-    if endpoint:
-        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
-    else:
-        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['>= %.2f' % high]
-    percentile_bound_lows.append(high)
-    percentile_bound_ups.append(100)
-
-    return percentile_column_names, percentile_bound_lows, percentile_bound_ups
-
-
-def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, feature_list,
-                          feature_grids_combo, predict_kwds, data_transformer):
     _data = data.copy()
     for idx in range(len(feature_list)):
         _data[feature_list[idx]] = feature_grids_combo[idx]
@@ -211,24 +70,23 @@ def _calc_ice_lines_inter(data, model, classifier, model_features, n_classes, fe
     if data_transformer is not None:
         _data = data_transformer(_data)
 
-    if classifier:
-        predict = model.predict_proba
-    else:
+    if n_classes == 0:
         predict = model.predict
+    else:
+        predict = model.predict_proba
 
     preds = predict(_data[model_features], **predict_kwds)
-    result = _data[feature_list].copy()
+    grid_result = _data[feature_list].copy()
 
-    if n_classes > 2:
-        for n_class in range(n_classes):
-            result['class_%d_preds' % n_class] = preds[:, n_class]
+    if n_classes == 0:
+        grid_result['preds'] = preds
+    elif n_classes == 2:
+        grid_result['preds'] = preds[:, 1]
     else:
-        if classifier:
-            result['preds'] = preds[:, 1]
-        else:
-            result['preds'] = preds
+        for n_class in range(n_classes):
+            grid_result['class_%d_preds' % n_class] = preds[:, n_class]
 
-    return result
+    return grid_result
 
 
 def _pdp_count_dist_xticklabels(feature_grids):
