@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 import copy
 from sklearn.cluster import MiniBatchKMeans, KMeans
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+from mpl_toolkits.axes_grid1.colorbar import colorbar
 
 
 def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_columns, plot_params):
@@ -243,12 +245,14 @@ def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, font
     inter_ax.clabel(c2, contour_label_fontsize=fontsize, inline=1)
     inter_ax.set_aspect('auto')
 
+    return c1
+
 
 def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params):
     """Interact grid plot (heatmap)"""
 
     font_family = plot_params.get('font_family', 'Arial')
-    inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower', aspect='auto')
+    im = inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower', aspect='auto')
 
     for r in range(pdp_mx.shape[0]):
         for c in range(pdp_mx.shape[1]):
@@ -262,6 +266,8 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
     inter_ax.set_xticks(np.arange(pdp_mx.shape[1] - 1) + 0.5, minor=True)
     inter_ax.set_yticks(np.arange(pdp_mx.shape[0] - 1) + 0.5, minor=True)
     inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
+
+    return im
 
 
 def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quantile, plot_params, norm, ticks=True):
@@ -308,9 +314,9 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
             X, Y = np.meshgrid(range(pdp_mx.shape[1]), range(pdp_mx.shape[0]))
         else:
             X, Y = np.meshgrid(pdp_interact_out.feature_grids[0], pdp_interact_out.feature_grids[1])
-        _pdp_contour_plot(X=X, Y=Y, **inter_params)
+        im = _pdp_contour_plot(X=X, Y=Y, **inter_params)
     elif plot_type == 'grid':
-        _pdp_inter_grid(**inter_params)
+        im = _pdp_inter_grid(**inter_params)
     else:
         raise ValueError("plot_type: should be 'contour' or 'grid'")
 
@@ -327,7 +333,13 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
 
         inter_ax.set_xlabel(feature_names[0], fontsize=11, fontdict={'family': font_family})
         inter_ax.set_ylabel(feature_names[1], fontsize=11, fontdict={'family': font_family})
+        inter_ax_divider = make_axes_locatable(inter_ax)
+        cax = inter_ax_divider.append_axes("right", size="5%", pad="5%")
+        cb = colorbar(im, cax=cax)
+        _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
+        cax.set_frame_on(False)
     inter_ax.tick_params(which="minor", bottom=False, left=False)
+    return im
 
 
 def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plot_type, plot_params, y=False):
@@ -404,6 +416,7 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
 
     """
     cmap = plot_params.get('cmap', 'viridis')
+    font_family = plot_params.get('font_family', 'Arial')
 
     inter_ax = plt.subplot(chart_grids[3])
     fig.add_subplot(inter_ax)
@@ -428,8 +441,8 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=feature_grids[1], feature_name=feature_names[1],
             y=True, **pdp_xy_params)
 
-    _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
-                   inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=norm, ticks=False)
+    im = _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
+                        inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=norm, ticks=False)
 
     inter_ax.set_frame_on(False)
     plt.setp(inter_ax.get_xticklabels(), visible=False)
