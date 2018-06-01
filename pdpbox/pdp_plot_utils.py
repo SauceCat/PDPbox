@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import copy
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-from mpl_toolkits.axes_grid1.colorbar import colorbar
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_columns, plot_params):
@@ -252,7 +252,7 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
     """Interact grid plot (heatmap)"""
 
     font_family = plot_params.get('font_family', 'Arial')
-    im = inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, alpha=inter_fill_alpha, origin='lower', aspect='auto')
+    im = inter_ax.imshow(pdp_mx, cmap=cmap, norm=norm, origin='lower', aspect='auto', alpha=inter_fill_alpha)
 
     for r in range(pdp_mx.shape[0]):
         for c in range(pdp_mx.shape[1]):
@@ -265,7 +265,7 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
     # draw the white gaps
     inter_ax.set_xticks(np.arange(pdp_mx.shape[1] - 1) + 0.5, minor=True)
     inter_ax.set_yticks(np.arange(pdp_mx.shape[0] - 1) + 0.5, minor=True)
-    inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
+    inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
 
     return im
 
@@ -333,11 +333,17 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
 
         inter_ax.set_xlabel(feature_names[0], fontsize=11, fontdict={'family': font_family})
         inter_ax.set_ylabel(feature_names[1], fontsize=11, fontdict={'family': font_family})
+
+        # insert colorbar
         inter_ax_divider = make_axes_locatable(inter_ax)
-        cax = inter_ax_divider.append_axes("right", size="5%", pad="5%")
-        cb = colorbar(im, cax=cax)
+        cax = inter_ax_divider.append_axes("right", size="5%", pad="2%")
+        if plot_type == 'grid':
+            boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, np.min([n_grids_x, n_grids_y]))]
+            cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
+        else:
+            cb = plt.colorbar(im, cax=cax)
         _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
-        cax.set_frame_on(False)
+        cb.outline.set_visible(False)
     inter_ax.tick_params(which="minor", bottom=False, left=False)
     return im
 
@@ -402,7 +408,7 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
             pdp_ax.get_xaxis().set_label_position('top')
         pdp_ax.set_yticks([])
 
-    pdp_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
+    pdp_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
     pdp_ax.tick_params(which="minor", top=False, left=False)
     pdp_ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
 
@@ -449,6 +455,18 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     plt.setp(inter_ax.get_yticklabels(), visible=False)
     inter_ax.tick_params(which="minor", bottom=False, left=False)
     inter_ax.tick_params(which="major", bottom=False, left=False)
+
+    if plot_type == 'grid':
+        cax = inset_axes(inter_ax, width="5%", height="100%", loc='right', bbox_to_anchor=(1.05, 0, ),
+                         bbox_transform=inter_ax.transAxes)
+        boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax,
+                                                       np.min([len(feature_grids[0]), len(feature_grids[1])]))]
+        cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
+    else:
+        cax = inset_axes(inter_ax, width="5%", height="80%", loc='right')
+        cb = plt.colorbar(im, cax=cax)
+    _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
+    cb.outline.set_visible(False)
 
     return {
         'pdp_x_ax': pdp_x_ax,
