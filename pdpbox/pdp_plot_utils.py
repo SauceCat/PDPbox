@@ -46,7 +46,7 @@ def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_colu
                       color=text_color, fontdict={'family': font_family})
 
     # draw the white gaps
-    count_ax.set_xticks(xticks + 0.5, minor=True)
+    count_ax.set_xticks(xticks[:-1] + 0.5, minor=True)
     count_ax.grid(which="minor", color="w", linestyle='-', linewidth=1.5)
     count_ax.tick_params(which="minor", bottom=False, left=False)
     count_ax.set_title('distribution of data points',
@@ -56,16 +56,17 @@ def _draw_pdp_countplot(count_data, count_ax, pdp_ax, feature_type, display_colu
     count_ax.set_xbound(pdp_ax.get_xbound())
 
 
-# todo: change distplot to rugplot
-def _draw_pdp_distplot(hist_data, hist_ax, vmin, vmax, plot_params):
+def _draw_pdp_distplot(hist_data, hist_ax, plot_params):
+    """Data point distribution plot for numeric feature"""
     font_family = plot_params.get('font_family', 'Arial')
+    color = plot_params.get('pdp_color', '#1A4E5D')
+    dist_xticks_color = '#424242'
+    dist_xticks_size = 10
 
-    norm = mpl.colors.Normalize(vmin=0, vmax=np.max(hist_data))
-    cmap = plot_params.get('line_cmap', 'Blues')
-
-    hist_ax.imshow(np.expand_dims(hist_data, 0), aspect="auto", cmap=cmap, norm=norm,
-                   extent=(vmin, vmax, 0, 0.5), alpha=0.8)
+    hist_ax.plot(hist_data, [1] * len(hist_data), '|', color=color, markersize=20)
     _modify_legend_ax(hist_ax, font_family=font_family)
+    hist_ax.set_title('distribution of data points',
+                      fontdict={'family': font_family, 'color': dist_xticks_color}, fontsize=dist_xticks_size)
 
 
 def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, cluster, n_cluster_centers,
@@ -149,10 +150,8 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     # add data distribution plot
     if count_ax is not None:
         if not x_quantile and feature_type == 'numeric':
-            # todo: distplot -> rugplot
             hist_data = pdp_isolate_out.hist_data.copy()
-            _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, vmin=np.min(x), vmax=np.max(x),
-                               plot_params=plot_params)
+            _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, plot_params=plot_params)
         else:
             _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, pdp_ax=pdp_ax, feature_type=feature_type,
                                 display_columns=display_columns, plot_params=plot_params)
@@ -326,8 +325,8 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
             inter_ax.set_yticks(range(len(pdp_interact_out.feature_grids[1])))
             inter_ax.set_yticklabels(pdp_interact_out.feature_grids[1])
 
-        inter_ax.set_xlabel(feature_names[0], fontsize=10, fontdict={'family': font_family})
-        inter_ax.set_ylabel(feature_names[1], fontsize=10, fontdict={'family': font_family})
+        inter_ax.set_xlabel(feature_names[0], fontsize=11, fontdict={'family': font_family})
+        inter_ax.set_ylabel(feature_names[1], fontsize=11, fontdict={'family': font_family})
     inter_ax.tick_params(which="minor", bottom=False, left=False)
 
 
@@ -377,7 +376,7 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
         pdp_ax.set_yticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_yticks(range(len(ticklabels)))
         pdp_ax.set_yticklabels(ticklabels)
-        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 10})
+        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 11})
         if plot_type == 'contour':
             pdp_ax.get_yaxis().set_label_position('right')
         pdp_ax.set_xticks([])
@@ -386,7 +385,7 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
         pdp_ax.set_xticks(range(len(ticklabels)))
         pdp_ax.get_xaxis().tick_top()
         pdp_ax.set_xticklabels(ticklabels)
-        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 10})
+        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 11})
         if plot_type == 'grid':
             pdp_ax.get_xaxis().set_label_position('top')
         pdp_ax.set_yticks([])

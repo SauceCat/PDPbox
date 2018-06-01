@@ -172,8 +172,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
     # prepare histogram information for numeric feature
     hist_data = None
     if feature_type == 'numeric':
-        hist_data = np.histogram(_dataset[feature].values,
-                                 bins=np.min([100, _dataset[feature].nunique()]), normed=True)[0]
+        hist_data = _dataset[feature].values
 
     # combine the final results
     pdp_params = {'n_classes': n_classes, 'feature': feature, 'feature_type': feature_type,
@@ -237,61 +236,6 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     fig: matplotlib Figure
     axes: a dictionary of matplotlib Axes
         Returns the Axes objects for further tweaking
-
-    Examples
-    --------
-
-    PDP for binary features
-
-    .. highlight:: python
-    .. code-block:: python
-
-        from pdpbox import pdp, get_dataset
-
-        test_titanic = get_dataset.titanic()
-        titanic_data = test_titanic['data']
-        titanic_target = test_titanic['target']
-
-        pdp_sex = pdp.pdp_isolate(model=titanic_model,
-                                  train_X=titanic_data[titanic_features],
-                                  feature='Sex')
-        fig, axes = pdp.pdp_plot(pdp_sex, 'sex')
-
-
-    PDP for one-hot encoding features
-
-    .. highlight:: python
-    .. code-block:: python
-
-        pdp_embark = pdp.pdp_isolate(titanic_model,
-                                     titanic_data[titanic_features],
-                                     ['Embarked_C', 'Embarked_S', 'Embarked_Q'])
-        fig, axes = pdp.pdp_plot(pdp_embark, 'Embark', center=True, plot_lines=True, frac_to_plot=100)
-
-
-    PDP for numeric features
-
-    .. highlight:: python
-    .. code-block:: python
-
-        pdp_fare = pdp.pdp_isolate(titanic_model, titanic_data[titanic_features], 'Fare')
-        fig, axes = pdp.pdp_plot(pdp_fare, 'Fare')
-
-
-    PDP for multi-class problem
-
-    .. highlight:: python
-    .. code-block:: python
-
-        from pdpbox import pdp, get_dataset
-
-        test_otto = get_dataset.otto()
-        otto_data = test_otto['data']
-        otto_target = test_otto['target']
-
-        pdp_feat_67_rf = pdp.pdp_isolate(otto_model, otto_data[otto_features], 'feat_67', n_jobs=2)
-        fig, axes = pdp.pdp_plot(pdp_feat_67_rf, 'feat_67', center=True, x_quantile=True, ncols=2,
-                                 plot_lines=True, frac_to_plot=100, which_classes=[0, 3, 7])
     """
 
     # check function inputs
@@ -620,7 +564,7 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
 
-    n_grids = [pdp_interact_plot_data[0].feature_grids[0], pdp_interact_plot_data[0].feature_grids[1]]
+    n_grids = [len(pdp_interact_plot_data[0].feature_grids[0]), len(pdp_interact_plot_data[0].feature_grids[1])]
     title = plot_params.get('title', 'PDP interact for "%s" and "%s"' % (feature_names[0], feature_names[1]))
     subtitle = plot_params.get('subtitle', "Number of unique grid points: (%s: %d, %s: %d)"
                                % (feature_names[0], n_grids[0], feature_names[1], n_grids[1]))

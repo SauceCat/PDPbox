@@ -6,8 +6,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import ListedColormap
+import matplotlib.patheffects as PathEffects
 
 from .utils import (_axes_modify, _modify_legend_ax, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
                     _make_bucket_column_names_percentile, _check_dataset, _check_percentile_range, _check_feature,
@@ -259,15 +259,14 @@ def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, box_color, p
     whiskerprops = dict(linewidth=box_line_width, color=box_color)
     capprops = dict(linewidth=box_line_width, color=box_color)
 
-    box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width,
-                   whiskerprops=whiskerprops, capprops=capprops, boxprops=boxprops, medianprops=medianprops)
+    box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width, whiskerprops=whiskerprops, capprops=capprops,
+                   boxprops=boxprops, medianprops=medianprops)
 
     _axes_modify(font_family=font_family, ax=box_ax)
 
     box_ax.plot(box_line_data['x'], box_line_data['y'], linewidth=1, c=box_color, linestyle='--')
     for idx in box_line_data.index.values:
-        bbox_props = {'facecolor': 'white', 'edgecolor': box_color,
-                      'boxstyle': "square,pad=0.5", 'lw': 1}
+        bbox_props = {'facecolor': 'white', 'edgecolor': box_color, 'boxstyle': "square,pad=0.5", 'lw': 1}
         box_ax.text(box_line_data.loc[idx, 'x'], box_line_data.loc[idx, 'y'], '%.3f' % box_line_data.loc[idx, 'y'],
                     ha="center", va="top", size=10, bbox=bbox_props, color=box_color)
 
@@ -405,7 +404,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
 
 
 def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percentile_columns,
-                   marker_sizes, cmap, line_width, xticks_rotation, font_family):
+                   marker_sizes, cmap, line_width, xticks_rotation, font_family, annotate):
     """Interact scatter plot"""
 
     plot_ax.set_xticks(range(len(display_columns[0])))
@@ -425,6 +424,7 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
         percentile_ax.set_xticklabels(percentile_columns[0], rotation=xticks_rotation)
         percentile_ax.set_xlabel('percentile buckets')
         _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+        percentile_ax.grid(False)
 
     # display percentile
     if len(percentile_columns[1]) > 0:
@@ -434,13 +434,23 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
         percentile_ay.set_yticklabels(percentile_columns[1])
         percentile_ay.set_ylabel('percentile buckets')
         _axes_modify(font_family=font_family, ax=percentile_ay, right=True)
+        percentile_ay.grid(False)
 
     value_min, value_max = plot_data[y].min(), plot_data[y].max()
-    colors = [plt.get_cmap(cmap)(float(v - value_min) / (value_max - value_min))
-              for v in plot_data[y].values]
+    colors = [plt.get_cmap(cmap)(float(v - value_min) / (value_max - value_min)) for v in plot_data[y].values]
 
-    plot_ax.scatter(plot_data['x1'].values, plot_data['x2'].values,
-                    s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.))
+    plot_ax.scatter(plot_data['x1'].values, plot_data['x2'].values, s=marker_sizes, c=colors,
+                    linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.))
+
+    if annotate:
+        for text_idx in range(plot_data.shape[0]):
+            plot_data_idx = plot_data.iloc[text_idx]
+            text_s = '%d\n%.3f' % (plot_data_idx['fake_count'], plot_data_idx[y])
+            txt = plot_ax.text(x=plot_data_idx['x1'], y=plot_data_idx['x2'], s=text_s,
+                               fontdict={'family': font_family, 'color': plt.get_cmap(cmap)(1.), 'size': 11},
+                               va='center', ha='left')
+            txt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
+
     plot_ax.set_xlabel(feature_names[0])
     plot_ax.set_ylabel(feature_names[1])
 
@@ -448,7 +458,7 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
     return value_min, value_max, percentile_ax, percentile_ay
 
 
-def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, height="30%", width="100%"):
+def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, height="50%", width="100%"):
     """Plot colorbar legend"""
 
     norm = mpl.colors.Normalize(vmin=float(value_min), vmax=float(value_max))
@@ -460,32 +470,31 @@ def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, 
     cb.set_ticks([])
 
     width_float = float(width.replace('%', '')) / 100
-    cb.ax.text((1. - width_float) / 2, 0.5, round(value_min, 3), fontdict={'color': '#424242', 'fontsize': 10},
-               transform=colorbar_ax.transAxes, horizontalalignment='left', verticalalignment='center')
+    text_params = {'fontdict': {'color': plt.get_cmap(cmap)(1.), 'fontsize': 10},
+                   'transform': colorbar_ax.transAxes, 'va': 'center'}
+    tmin = cb.ax.text((1. - width_float) / 2, 0.5, '%.3f ' % value_min, ha='left', **text_params)
+    tmin.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
 
-    cb.ax.text(1. - (1. - width_float) / 2, 0.5, round(value_max, 3), fontdict={'color': '#ffffff', 'fontsize': 10},
-               transform=colorbar_ax.transAxes, horizontalalignment='right', verticalalignment='center')
+    tmax = cb.ax.text(1. - (1. - width_float) / 2, 0.5, '%.3f ' % value_max, ha='right', **text_params)
+    tmax.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
     _modify_legend_ax(colorbar_ax, font_family)
 
 
 def _plot_legend_circles(count_min, count_max, circle_ax, cmap, font_family):
     """Plot circle legend"""
     # circle size
-    circle_ax.scatter([0.75, 2], [1] * 2, s=[500, 1500],
-                      edgecolors=plt.get_cmap(cmap)(1.), color='white')
+    circle_ax.plot([0.75, 2], [1] * 2, color=plt.get_cmap(cmap)(1.), zorder=1, ls='--')
+    circle_ax.scatter([0.75, 2], [1] * 2, s=[500, 1500], edgecolors=plt.get_cmap(cmap)(1.), color='white', zorder=2)
     circle_ax.set_xlim(0., 3)
 
-    circle_ax.text(0.75, 1., count_min, fontdict={'color': '#424242', 'fontsize': 10},
-                   horizontalalignment='center', verticalalignment='center')
-    circle_ax.text(1.275, 1., '-->', fontdict={'color': '#424242', 'fontsize': 10, 'weight': 'bold'},
-                   horizontalalignment='center', verticalalignment='center')
-    circle_ax.text(2, 1., count_max, fontdict={'color': '#424242', 'fontsize': 10},
-                   horizontalalignment='center', verticalalignment='center')
+    text_params = {'fontdict': {'color': '#424242', 'fontsize': 10}, 'ha': 'center', 'va': 'center'}
+    circle_ax.text(0.75, 1., count_min, **text_params)
+    circle_ax.text(2, 1., count_max, **text_params)
     _modify_legend_ax(circle_ax, font_family)
 
 
 def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, plot_data, title, subtitle,
-                        figsize, ncols, plot_params, is_target_plot=True):
+                        figsize, ncols, annotate, plot_params, is_target_plot=True):
     """Internal call for _info_plot_interact"""
 
     width, height = 15, 10
@@ -495,7 +504,7 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, 
         nrows = int(np.ceil(len(ys) * 1.0 / ncols))
         ncols = np.min([len(ys), ncols])
         width = np.min([7.5 * len(ys), 15])
-        height = width * 1.0 / ncols * nrows
+        height = width * 1.2 / ncols * nrows
 
     if figsize is not None:
         width, height = figsize
@@ -522,18 +531,18 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, 
         size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
 
+    interact_params = {'plot_data': plot_data, 'feature_names': feature_names, 'display_columns': display_columns,
+                       'percentile_columns': percentile_columns, 'marker_sizes': marker_sizes, 'line_width': line_width,
+                       'xticks_rotation': xticks_rotation, 'font_family': font_family, 'annotate': annotate}
     if len(ys) == 1:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[height-3, 1])
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[height-3, 1], hspace=0.25)
         value_ax = plt.subplot(inner_grid[0])
         fig.add_subplot(value_ax)
         value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
-            plot_data=plot_data, y=ys[0], plot_ax=value_ax, feature_names=feature_names,
-            display_columns=display_columns, percentile_columns=percentile_columns,
-            marker_sizes=marker_sizes, cmap=cmap, line_width=line_width, xticks_rotation=xticks_rotation,
-            font_family=font_family)
+            y=ys[0], plot_ax=value_ax, cmap=cmap, **interact_params)
 
         # draw legend
-        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[1], wspace=0)
+        legend_grid = GridSpecFromSubplotSpec(1, 4, subplot_spec=inner_grid[1], wspace=0)
         legend_ax = [plt.subplot(legend_grid[0]), plt.subplot(legend_grid[1])]
         fig.add_subplot(legend_ax[0])
         fig.add_subplot(legend_ax[1])
@@ -552,33 +561,30 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, 
             subplot_title += '\n\n\n'
         value_ax.set_title(subplot_title, fontdict={'fontsize': 11, 'fontname': font_family})
     else:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[1, height - 3])
-        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[0], wspace=0)
-        legend_ax = plt.subplot(legend_grid[0])
-        fig.add_subplot(legend_ax)
-
-        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax,
-                             cmap=cmap, font_family=font_family)
-
-        value_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=inner_grid[1], wspace=0.2, hspace=0.35)
+        value_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.2)
         value_ax = []
-        for y_idx in range(len(ys)):
-            ax = plt.subplot(value_grid[y_idx])
-            value_ax.append(ax)
-            fig.add_subplot(ax)
+        legend_ax = []
 
         for idx in range(len(ys)):
+            inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=value_grid[idx], height_ratios=[7, 1], hspace=0.3)
+            inner_value_ax = plt.subplot(inner_grid[0])
+            fig.add_subplot(inner_value_ax)
+            value_ax.append(inner_value_ax)
 
             cmap_idx = cmaps[idx % len(cmaps)]
             value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
-                plot_data=plot_data, y=ys[idx], plot_ax=value_ax[idx], feature_names=feature_names,
-                display_columns=display_columns, percentile_columns=percentile_columns,
-                marker_sizes=marker_sizes, cmap=cmap_idx, line_width=line_width,
-                xticks_rotation=xticks_rotation, font_family=font_family)
+                y=ys[idx], plot_ax=inner_value_ax, cmap=cmap_idx, **interact_params)
 
-            colorbar_ax = make_axes_locatable(value_ax[idx]).append_axes('bottom', size='5%', pad=0.5)
-            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=colorbar_ax,
-                                  cmap=cmap_idx, font_family=font_family, height="90%", width="80%")
+            # draw legend
+            inner_legend_grid = GridSpecFromSubplotSpec(1, 4, subplot_spec=inner_grid[1], wspace=0)
+            inner_legend_ax = [plt.subplot(inner_legend_grid[0]), plt.subplot(inner_legend_grid[1])]
+            fig.add_subplot(inner_legend_ax[0])
+            fig.add_subplot(inner_legend_ax[1])
+            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=inner_legend_ax[0],
+                                  cmap=cmap_idx, font_family=font_family)
+            _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=inner_legend_ax[1],
+                                 cmap=cmap_idx, font_family=font_family)
+            legend_ax.append(inner_legend_ax)
 
             if is_target_plot:
                 subplot_title = 'Average %s' % ys[idx]
@@ -586,10 +592,10 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, 
                 subplot_title = 'target_%s: median prediction' % ys[idx].split('_')[-2]
             if len(percentile_columns[0]) > 0:
                 subplot_title += '\n\n\n'
-            value_ax[idx].set_title(subplot_title, fontdict={'fontsize': 11, 'fontname': font_family})
+            inner_value_ax.set_title(subplot_title, fontdict={'fontsize': 11, 'fontname': font_family})
 
             if idx % ncols != 0:
-                value_ax[idx].set_yticklabels([])
+                inner_value_ax.set_yticklabels([])
 
             if (idx % ncols + 1 != ncols) and idx != len(value_ax) - 1:
                 if percentile_ay is not None:

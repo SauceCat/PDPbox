@@ -334,7 +334,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
+                         show_outliers=False, endpoint=True, figsize=None, ncols=2, annotate=False, plot_params=None):
     """Plot average target value across different feature value combinations (feature grid combinations)
 
     Parameters
@@ -371,6 +371,8 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         size of the figure, (width, height)
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
+    annotate: bool, default=False
+        whether to annotate the points
     plot_params: dict or None, optional, default=None
         parameters for the plot
 
@@ -459,7 +461,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     fig, axes = _info_plot_interact(
         feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
         ys=target, plot_data=target_plot_data, title=title, subtitle=subtitle, figsize=figsize,
-        ncols=ncols, plot_params=plot_params)
+        ncols=ncols, annotate=annotate, plot_params=plot_params)
 
     return fig, axes, summary_df
 
@@ -467,7 +469,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
                          show_outliers=False, endpoint=True, which_classes=None, predict_kwds={}, ncols=2,
-                         figsize=None, plot_params=None):
+                         figsize=None, annotate=False, plot_params=None):
     """Plot prediction distribution across different feature value combinations (feature grid combinations)
 
     Parameters
@@ -506,6 +508,8 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         size of the figure, (width, height)
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
+    annotate: bool, default=False
+        whether to annotate the points
     plot_params: dict or None, optional, default=None
         parameters for the plot
 
@@ -614,6 +618,6 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         feature_names=feature_names, display_columns=display_columns,
         percentile_columns=percentile_columns, ys=[col + '_q2' for col in actual_prediction_columns],
         plot_data=actual_plot_data, title=title, subtitle=subtitle, figsize=figsize,
-        ncols=ncols, plot_params=plot_params, is_target_plot=False)
+        ncols=ncols, annotate=annotate, plot_params=plot_params, is_target_plot=False)
 
     return fig, axes, summary_df
