@@ -46,7 +46,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'pdpbox'
+project = u'PDPbox'
 copyright = u'2018, SauceCat'
 author = u'SauceCat'
 

@@ -1,11 +1,13 @@
 
-==========
 pdpbox.pdp
-==========
-
+----------
 
 .. toctree::
    :maxdepth: 2
 
-   PDP isolate
-   PDP interact
+   PDPIsolate
+   pdp_isolate
+   pdp_plot
+   PDPInteract
+   pdp_interact
+   pdp_interact_plot
