@@ -573,16 +573,20 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
 
     inter_params = {'plot_type': plot_type, 'x_quantile': x_quantile, 'plot_params': plot_params}
     if num_charts == 1:
+        feature_names_adj = feature_names
+        if pdp_interact_plot_data[0].which_class is not None:
+            feature_names_adj = ['%s (class %d)' % (
+                feature_names[0], pdp_interact_plot_data[0].which_class), feature_names[1]]
         if plot_pdp:
             inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=outer_grid[1], height_ratios=[0.5, 7],
                                                  width_ratios=[0.5, 7], hspace=inner_hspace, wspace=inner_wspace)
             inter_ax = _pdp_inter_three(pdp_interact_out=pdp_interact_plot_data[0], chart_grids=inner_grid,
-                                        fig=fig, feature_names=feature_names, **inter_params)
+                                        fig=fig, feature_names=feature_names_adj, **inter_params)
         else:
             inter_ax = plt.subplot(outer_grid[1])
             fig.add_subplot(inter_ax)
             _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], inter_ax=inter_ax, norm=None,
-                           feature_names=feature_names, **inter_params)
+                           feature_names=feature_names_adj, **inter_params)
     else:
         wspace = 0.3
         if plot_pdp and plot_type == 'grid':
@@ -590,8 +594,8 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=wspace, hspace=0.2)
         inter_ax = []
         for inner_idx in range(num_charts):
-            feature_names_adj = ['%s (class %d)' % (feature_name, pdp_interact_plot_data[inner_idx].which_class)
-                                 for feature_name in feature_names]
+            feature_names_adj = ['%s (class %d)' % (
+                feature_names[0], pdp_interact_plot_data[inner_idx].which_class), feature_names[1]]
             if plot_pdp:
                 inner_inner_grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=inner_grid[inner_idx],
                                                            height_ratios=[0.5, 7], width_ratios=[0.5, 7],
