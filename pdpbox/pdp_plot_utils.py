@@ -457,8 +457,8 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     inter_ax.tick_params(which="major", bottom=False, left=False)
 
     if plot_type == 'grid':
-        cax = inset_axes(inter_ax, width="5%", height="100%", loc='right', bbox_to_anchor=(1.05, 0, ),
-                         bbox_transform=inter_ax.transAxes)
+        cax = inset_axes(inter_ax, width="100%", height="100%", loc='right', bbox_to_anchor=(1.05, 0., 0.05, 1),
+                         bbox_transform=inter_ax.transAxes, borderpad=0)
         boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax,
                                                        np.min([len(feature_grids[0]), len(feature_grids[1])]))]
         cb = plt.colorbar(im, cax=cax, boundaries=boundaries)

@@ -584,7 +584,10 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
             _pdp_inter_one(pdp_interact_out=pdp_interact_plot_data[0], inter_ax=inter_ax, norm=None,
                            feature_names=feature_names, **inter_params)
     else:
-        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.3, hspace=0.2)
+        wspace = 0.3
+        if plot_pdp and plot_type == 'grid':
+            wspace = 0.35
+        inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=wspace, hspace=0.2)
         inter_ax = []
         for inner_idx in range(num_charts):
             feature_names_adj = ['%s (class %d)' % (feature_name, pdp_interact_plot_data[inner_idx].which_class)
