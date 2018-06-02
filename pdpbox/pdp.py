@@ -236,6 +236,84 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     fig: matplotlib Figure
     axes: a dictionary of matplotlib Axes
         Returns the Axes objects for further tweaking
+
+    Examples
+    --------
+
+    Quick start with pdp_plot
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_target = test_titanic['target']
+        titanic_features = test_titanic['features']
+        titanic_model = test_titanic['xgb_model']
+
+        pdp_sex = pdp.pdp_isolate(model=titanic_model,
+                                  dataset=titanic_data,
+                                  model_features=titanic_features,
+                                  feature='Sex')
+        fig, axes = pdp.pdp_plot(pdp_isolate_out=pdp_sex, feature_name='sex')
+
+
+    With One-hot encoding features
+
+    .. highlight:: python
+    .. code-block:: python
+
+        pdp_embark = pdp.pdp_isolate(model=titanic_model, dataset=titanic_data,
+                                     model_features=titanic_features,
+                                     feature=['Embarked_C', 'Embarked_S', 'Embarked_Q'])
+        fig, axes = pdp.pdp_plot(pdp_isolate_out=pdp_embark,
+                                 feature_name='Embark',
+                                 center=True,
+                                 plot_lines=True,
+                                 frac_to_plot=100,
+                                 plot_pts_dist=True)
+
+    With numeric features
+
+    .. highlight:: python
+    .. code-block:: python
+
+        pdp_fare = pdp.pdp_isolate(model=titanic_model,
+                                   dataset=titanic_data,
+                                   model_features=titanic_features,
+                                   feature='Fare')
+        fig, axes = pdp.pdp_plot(pdp_isolate_out=pdp_fare,
+                                 feature_name='Fare',
+                                 plot_pts_dist=True)
+
+
+    With multi-class
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_otto = get_dataset.otto()
+        otto_data = test_otto['data']
+        otto_features = test_otto['features']
+        otto_model = test_otto['rf_model']
+        otto_target = test_otto['target']
+
+        pdp_feat_67_rf = pdp.pdp_isolate(model=otto_model,
+                                         dataset=otto_data,
+                                         model_features=otto_features,
+                                         feature='feat_67')
+        fig, axes = pdp.pdp_plot(pdp_isolate_out=pdp_feat_67_rf,
+                                 feature_name='feat_67',
+                                 center=True,
+                                 x_quantile=True,
+                                 ncols=3,
+                                 plot_lines=True,
+                                 frac_to_plot=100)
+
     """
 
     # check function inputs
@@ -524,6 +602,63 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     fig: matplotlib Figure
     axes: a dictionary of matplotlib Axes
         Returns the Axes objects for further tweaking
+
+    Examples
+    --------
+
+    Quick start with pdp_interact_plot
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_titanic = get_dataset.titanic()
+        titanic_data = test_titanic['data']
+        titanic_target = test_titanic['target']
+        titanic_features = test_titanic['features']
+        titanic_model = test_titanic['xgb_model']
+
+        inter1 = pdp.pdp_interact(model=titanic_model,
+                                  dataset=titanic_data,
+                                  model_features=titanic_features,
+                                  features=['Age', 'Fare'],
+                                  num_grid_points=[10, 10],
+                                  percentile_ranges=[(5, 95), (5, 95)])
+        fig, axes = pdp.pdp_interact_plot(pdp_interact_out=inter1,
+                                          feature_names=['age', 'fare'],
+                                          plot_type='contour',
+                                          x_quantile=True,
+                                          plot_pdp=True)
+
+
+    With multi-class
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from pdpbox import pdp, get_dataset
+
+        test_otto = get_dataset.otto()
+        otto_data = test_otto['data']
+        otto_features = test_otto['features']
+        otto_model = test_otto['rf_model']
+        otto_target = test_otto['target']
+
+        pdp_67_24_rf = pdp.pdp_interact(model=otto_model,
+                                        dataset=otto_data,
+                                        model_features=otto_features,
+                                        features=['feat_67', 'feat_24'],
+                                        num_grid_points=[10, 10],
+                                        percentile_ranges=[None, None],
+                                        n_jobs=4)
+        fig, axes = pdp.pdp_interact_plot(pdp_interact_out=pdp_67_24_rf,
+                                          feature_names=['feat_67', 'feat_24'],
+                                          plot_type='grid',
+                                          x_quantile=True,
+                                          ncols=2,
+                                          plot_pdp=False,
+                                          which_classes=[1, 2, 3])
 
     """
 

@@ -1,4 +1,8 @@
 
+from .utils import (_axes_modify, _modify_legend_ax, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
+                    _make_bucket_column_names_percentile, _check_dataset, _check_percentile_range, _check_feature,
+                    _check_grid_type, _expand_default, _plot_title, _get_grids)
+
 import numpy as np
 import pandas as pd
 
@@ -8,10 +12,6 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.colors import ListedColormap
 import matplotlib.patheffects as PathEffects
-
-from .utils import (_axes_modify, _modify_legend_ax, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
-                    _make_bucket_column_names_percentile, _check_dataset, _check_percentile_range, _check_feature,
-                    _check_grid_type, _expand_default, _plot_title, _get_grids)
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
