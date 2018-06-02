@@ -1,5 +1,7 @@
 
-from __future__ import absolute_import
+from .utils import (_axes_modify, _modify_legend_ax, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
+                    _make_bucket_column_names_percentile, _check_dataset, _check_percentile_range, _check_feature,
+                    _check_grid_type, _expand_default, _plot_title, _get_grids)
 
 import numpy as np
 import pandas as pd
@@ -8,18 +10,19 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import ListedColormap
-
-from .pdp_plot_utils import _axes_modify
-from .pdp_calc_utils import (_get_grids, _find_bucket, _make_bucket_column_names, _find_onehot_actual,
-                             _make_bucket_column_names_percentile)
+import matplotlib.patheffects as PathEffects
 
 
 def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
                     grid_range, cust_grid_points, show_percentile, show_outliers, endpoint):
-    display_columns = bound_ups = bound_lows = []
-    percentile_columns = percentile_bound_lows = percentile_bound_ups = []
+    """Map value to bucket based on feature grids"""
+    display_columns = []
+    bound_ups = []
+    bound_lows = []
+    percentile_columns = []
+    percentile_bound_lows = []
+    percentile_bound_ups = []
     data_x = data.copy()
 
     if feature_type == 'binary':
@@ -30,7 +33,7 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
         percentile_info = None
         if cust_grid_points is None:
             feature_grids, percentile_info = _get_grids(
-                x=data_x[feature].values, num_grid_points=num_grid_points, grid_type=grid_type,
+                feature_values=data_x[feature].values, num_grid_points=num_grid_points, grid_type=grid_type,
                 percentile_range=percentile_range, grid_range=grid_range)
         else:
             feature_grids = np.array(sorted(cust_grid_points))
@@ -76,6 +79,7 @@ def _prepare_data_x(feature, feature_type, data, num_grid_points, grid_type, per
 
 
 def _autolabel(rects, ax, bar_color):
+    """Create label for bar plot"""
     for rect in rects:
         height = rect.get_height()
         bbox_props = {'facecolor': 'white', 'edgecolor': bar_color, 'boxstyle': "square,pad=0.5"}
@@ -84,6 +88,7 @@ def _autolabel(rects, ax, bar_color):
 
 
 def _draw_barplot(bar_data, bar_ax, display_columns, plot_params):
+    """Draw bar plot"""
 
     font_family = plot_params.get('font_family', 'Arial')
     bar_color = plot_params.get('bar_color', '#5BB573')
@@ -96,6 +101,7 @@ def _draw_barplot(bar_data, bar_ax, display_columns, plot_params):
 
 
 def _draw_lineplot(line_data, line_ax, line_color, plot_params):
+    """Draw line plot"""
 
     font_family = plot_params.get('font_family', 'Arial')
     line_width = plot_params.get('line_width', 1)
@@ -110,8 +116,9 @@ def _draw_lineplot(line_data, line_ax, line_color, plot_params):
     _axes_modify(font_family=font_family, ax=line_ax)
 
 
-def _draw_bar_line(bar_data, bar_ax, line_data, line_ax, line_color,
-                   feature_name, display_columns, percentile_columns, plot_params):
+def _draw_bar_line(bar_data, bar_ax, line_data, line_ax, line_color, feature_name, display_columns,
+                   percentile_columns, plot_params, target_ylabel):
+    """Draw bar and line plot"""
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
@@ -138,22 +145,13 @@ def _draw_bar_line(bar_data, bar_ax, line_data, line_ax, line_color,
     _draw_lineplot(line_data=line_data, line_ax=line_ax, line_color=line_color, plot_params=plot_params)
     line_ax.get_yaxis().tick_right()
     line_ax.grid(False)
-    line_ax.set_ylabel('target_avg')
-
-
-def _info_plot_title(title, subtitle, ax, plot_params):
-    font_family = plot_params.get('font_family', 'Arial')
-    title_fontsize = plot_params.get('title_fontsize', 15)
-    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
-
-    ax.set_facecolor('white')
-    ax.text(0, 0.7, title, va="top", ha="left", fontsize=title_fontsize, fontname=font_family)
-    ax.text(0, 0.5, subtitle, va="top", ha="left", fontsize=subtitle_fontsize, fontname=font_family, color='grey')
-    ax.axis('off')
+    line_ax.set_ylabel(target_ylabel)
 
 
 def _target_plot(feature_name, display_columns, percentile_columns, target, bar_data,
                  target_lines, figsize, ncols, plot_params):
+    """Internal call for target_plot"""
+
     # set up graph parameters
     width, height = 15, 9
     nrows = 1
@@ -170,7 +168,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     if plot_params is None:
         plot_params = dict()
 
-    font_family = plot_params.get('font_family', 'Arial')
+    # font_family = plot_params.get('font_family', 'Arial')
     line_color = plot_params.get('line_color', '#1A4E5D')
     line_colors_cmap = plot_params.get('line_colors_cmap', 'tab20')
     line_colors = plot_params.get('line_colors', plt.get_cmap(line_colors_cmap)(
@@ -182,7 +180,10 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
+
+    bar_line_params = {'bar_data': bar_data, 'feature_name': feature_name, 'display_columns': display_columns,
+                       'percentile_columns': percentile_columns, 'plot_params': plot_params}
 
     if len(target) == 1:
         bar_ax = plt.subplot(outer_grid[1])
@@ -190,9 +191,8 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
         line_ax = bar_ax.twinx()
 
         line_data = target_lines[0].rename(columns={target[0]: 'y'}).sort_values('x', ascending=True)
-        _draw_bar_line(bar_data=bar_data, bar_ax=bar_ax, line_data=line_data, line_ax=line_ax, line_color=line_color,
-                       feature_name=feature_name, display_columns=display_columns,
-                       percentile_columns=percentile_columns, plot_params=plot_params)
+        _draw_bar_line(bar_ax=bar_ax, line_data=line_data, line_ax=line_ax, line_color=line_color,
+                       target_ylabel='Average %s' % target[0], **bar_line_params)
 
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35)
@@ -219,14 +219,9 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
             line_data = target_lines[target_idx].rename(
                 columns={target[target_idx]: 'y'}).sort_values('x', ascending=True)
 
-            _draw_bar_line(bar_data=bar_data, bar_ax=inner_bar_ax, line_data=line_data, line_ax=inner_line_ax,
-                           line_color=inner_line_color, feature_name=feature_name, display_columns=display_columns,
-                           percentile_columns=percentile_columns, plot_params=plot_params)
-
-            subplot_title = target[target_idx]
-            if len(percentile_columns) > 0:
-                subplot_title += '\n\n'
-            plot_axes[target_idx].set_title(subplot_title, fontdict={'fontsize': 13, 'fontname': font_family})
+            _draw_bar_line(
+                bar_ax=inner_bar_ax, line_data=line_data, line_ax=inner_line_ax, line_color=inner_line_color,
+                target_ylabel='Average %s' % target[target_idx], **bar_line_params)
 
             inner_line_ax.set_ylim(0., y_max)
             bar_ax.append(inner_bar_ax)
@@ -234,9 +229,11 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
 
             if target_idx % ncols != 0:
                 inner_bar_ax.set_yticklabels([])
+                inner_bar_ax.tick_params(which="major", left=False)
 
             if (target_idx % ncols + 1 != ncols) and target_idx != len(plot_axes) - 1:
                 inner_line_ax.set_yticklabels([])
+                inner_line_ax.tick_params(which="major", right=False)
 
         if len(plot_axes) > len(target):
             for idx in range(len(target), len(plot_axes)):
@@ -247,6 +244,7 @@ def _target_plot(feature_name, display_columns, percentile_columns, target, bar_
 
 
 def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, box_color, plot_params):
+    """Draw box plot"""
     font_family = plot_params.get('font_family', 'Arial')
     box_line_width = plot_params.get('box_line_width', 1.5)
     box_width = plot_params.get('box_width', np.min([0.4, 0.4 / (10.0 / len(display_columns))]))
@@ -261,28 +259,28 @@ def _draw_boxplot(box_data, box_line_data, box_ax, display_columns, box_color, p
     whiskerprops = dict(linewidth=box_line_width, color=box_color)
     capprops = dict(linewidth=box_line_width, color=box_color)
 
-    box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width,
-                   whiskerprops=whiskerprops, capprops=capprops, boxprops=boxprops, medianprops=medianprops)
+    box_ax.boxplot(ys, positions=xs, showfliers=False, widths=box_width, whiskerprops=whiskerprops, capprops=capprops,
+                   boxprops=boxprops, medianprops=medianprops)
 
     _axes_modify(font_family=font_family, ax=box_ax)
 
     box_ax.plot(box_line_data['x'], box_line_data['y'], linewidth=1, c=box_color, linestyle='--')
     for idx in box_line_data.index.values:
-        bbox_props = {'facecolor': 'white', 'edgecolor': box_color,
-                      'boxstyle': "square,pad=0.5", 'lw': 1}
+        bbox_props = {'facecolor': 'white', 'edgecolor': box_color, 'boxstyle': "square,pad=0.5", 'lw': 1}
         box_ax.text(box_line_data.loc[idx, 'x'], box_line_data.loc[idx, 'y'], '%.3f' % box_line_data.loc[idx, 'y'],
                     ha="center", va="top", size=10, bbox=bbox_props, color=box_color)
 
 
 def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_color, box_ax,
-                  feature_name, display_columns, percentile_columns, plot_params):
+                  feature_name, display_columns, percentile_columns, plot_params, target_ylabel):
+    """Draw box plot and bar plot"""
 
     font_family = plot_params.get('font_family', 'Arial')
     xticks_rotation = plot_params.get('xticks_rotation', 0)
 
     _draw_boxplot(box_data=box_data, box_line_data=box_line_data, box_ax=box_ax,
                   display_columns=display_columns, box_color=box_color, plot_params=plot_params)
-    box_ax.set_ylabel('actual_prediction')
+    box_ax.set_ylabel('%sprediction dist' % target_ylabel)
     box_ax.set_xticklabels([])
 
     _draw_barplot(bar_data=bar_data, bar_ax=bar_ax, display_columns=display_columns, plot_params=plot_params)
@@ -309,6 +307,8 @@ def _draw_box_bar(bar_data, bar_ax, box_data, box_line_data, box_color, box_ax,
 
 def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feature_name,
                  display_columns, percentile_columns, figsize, ncols, plot_params):
+    """Internal call for actual_plot"""
+
     # set up graph parameters
     width, height = 15, 9
     nrows = 1
@@ -316,7 +316,7 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
     if plot_params is None:
         plot_params = dict()
 
-    font_family = plot_params.get('font_family', 'Arial')
+    # font_family = plot_params.get('font_family', 'Arial')
     box_color = plot_params.get('box_color', '#3288bd')
     box_colors_cmap = plot_params.get('box_colors_cmap', 'tab20')
     box_colors = plot_params.get('box_colors', plt.get_cmap(box_colors_cmap)(
@@ -340,7 +340,10 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
+
+    box_bar_params = {'bar_data': bar_data, 'feature_name': feature_name, 'display_columns': display_columns,
+                      'percentile_columns': percentile_columns, 'plot_params': plot_params}
 
     if len(actual_prediction_columns) == 1:
         inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1])
@@ -350,11 +353,15 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
         fig.add_subplot(box_ax)
         fig.add_subplot(bar_ax)
 
+        if actual_prediction_columns[0] == 'actual_prediction':
+            target_ylabel = ''
+        else:
+            target_ylabel = 'target_%s: ' % actual_prediction_columns[0].split('_')[-1]
+
         box_data = plot_data[['x', actual_prediction_columns[0]]].rename(columns={actual_prediction_columns[0]: 'y'})
         box_line_data = box_lines[0].rename(columns={actual_prediction_columns[0] + '_q2': 'y'})
-        _draw_box_bar(bar_data=bar_data, bar_ax=bar_ax, box_data=box_data, box_line_data=box_line_data,
-                      box_color=box_color, box_ax=box_ax, feature_name=feature_name, display_columns=display_columns,
-                      percentile_columns=percentile_columns, plot_params=plot_params)
+        _draw_box_bar(bar_ax=bar_ax, box_data=box_data, box_line_data=box_line_data, box_color=box_color,
+                      box_ax=box_ax, target_ylabel=target_ylabel, **box_bar_params)
     else:
         inner_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35)
 
@@ -379,15 +386,10 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
             inner_box_data = plot_data[['x', actual_prediction_columns[idx]]].rename(
                 columns={actual_prediction_columns[idx]: 'y'})
             inner_box_line_data = box_lines[idx].rename(columns={actual_prediction_columns[idx] + '_q2': 'y'})
-            _draw_box_bar(bar_data=bar_data, bar_ax=inner_bar_ax, box_data=inner_box_data,
-                          box_line_data=inner_box_line_data, box_color=box_color,
-                          box_ax=inner_box_ax, feature_name=feature_name, display_columns=display_columns,
-                          percentile_columns=percentile_columns, plot_params=plot_params)
+            _draw_box_bar(bar_ax=inner_bar_ax, box_data=inner_box_data,
+                          box_line_data=inner_box_line_data, box_color=box_color, box_ax=inner_box_ax,
+                          target_ylabel='target_%s: ' % actual_prediction_columns[idx].split('_')[-1], **box_bar_params)
 
-            subplot_title = 'target_%s' % actual_prediction_columns[idx].split('_')[-1]
-            if len(percentile_columns) > 0:
-                subplot_title += '\n\n'
-            inner_box_ax.set_title(subplot_title, fontdict={'fontsize': 13, 'fontname': font_family})
             inner_box_ax.set_ylim(0., y_max)
 
             if idx % ncols != 0:
@@ -402,7 +404,9 @@ def _actual_plot(plot_data, bar_data, box_lines, actual_prediction_columns, feat
 
 
 def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percentile_columns,
-                   marker_sizes, cmap, line_width, xticks_rotation, font_family):
+                   marker_sizes, cmap, line_width, xticks_rotation, font_family, annotate):
+    """Interact scatter plot"""
+
     plot_ax.set_xticks(range(len(display_columns[0])))
     plot_ax.set_xticklabels(display_columns[0], rotation=xticks_rotation)
     plot_ax.set_yticks(range(len(display_columns[1])))
@@ -420,6 +424,7 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
         percentile_ax.set_xticklabels(percentile_columns[0], rotation=xticks_rotation)
         percentile_ax.set_xlabel('percentile buckets')
         _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
+        percentile_ax.grid(False)
 
     # display percentile
     if len(percentile_columns[1]) > 0:
@@ -429,13 +434,23 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
         percentile_ay.set_yticklabels(percentile_columns[1])
         percentile_ay.set_ylabel('percentile buckets')
         _axes_modify(font_family=font_family, ax=percentile_ay, right=True)
+        percentile_ay.grid(False)
 
     value_min, value_max = plot_data[y].min(), plot_data[y].max()
-    colors = [plt.get_cmap(cmap)(float(v - value_min) / (value_max - value_min))
-              for v in plot_data[y].values]
+    colors = [plt.get_cmap(cmap)(float(v - value_min) / (value_max - value_min)) for v in plot_data[y].values]
 
-    plot_ax.scatter(plot_data['x1'].values, plot_data['x2'].values,
-                    s=marker_sizes, c=colors, linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.))
+    plot_ax.scatter(plot_data['x1'].values, plot_data['x2'].values, s=marker_sizes, c=colors,
+                    linewidth=line_width, edgecolors=plt.get_cmap(cmap)(1.))
+
+    if annotate:
+        for text_idx in range(plot_data.shape[0]):
+            plot_data_idx = plot_data.iloc[text_idx]
+            text_s = '%d\n%.3f' % (plot_data_idx['fake_count'], plot_data_idx[y])
+            txt = plot_ax.text(x=plot_data_idx['x1'], y=plot_data_idx['x2'], s=text_s,
+                               fontdict={'family': font_family, 'color': plt.get_cmap(cmap)(1.), 'size': 11},
+                               va='center', ha='left')
+            txt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
+
     plot_ax.set_xlabel(feature_names[0])
     plot_ax.set_ylabel(feature_names[1])
 
@@ -443,21 +458,9 @@ def _plot_interact(plot_data, y, plot_ax, feature_names, display_columns, percen
     return value_min, value_max, percentile_ax, percentile_ay
 
 
-def _modify_legend_ax(ax, font_family):
-    for d in ['top', 'bottom', 'right', 'left']:
-        ax.spines[d].set_visible(False)
+def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, height="50%", width="100%"):
+    """Plot colorbar legend"""
 
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    ax.set_facecolor('white')
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-
-def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, height="30%", width="100%"):
     norm = mpl.colors.Normalize(vmin=float(value_min), vmax=float(value_max))
 
     # color bar
@@ -467,40 +470,41 @@ def _plot_legend_colorbar(value_min, value_max, colorbar_ax, cmap, font_family, 
     cb.set_ticks([])
 
     width_float = float(width.replace('%', '')) / 100
-    cb.ax.text((1. - width_float) / 2, 0.5, round(value_min, 3), fontdict={'color': '#424242', 'fontsize': 10},
-               transform=colorbar_ax.transAxes, horizontalalignment='left', verticalalignment='center')
+    text_params = {'fontdict': {'color': plt.get_cmap(cmap)(1.), 'fontsize': 10},
+                   'transform': colorbar_ax.transAxes, 'va': 'center'}
+    tmin = cb.ax.text((1. - width_float) / 2, 0.5, '%.3f ' % value_min, ha='left', **text_params)
+    tmin.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
 
-    cb.ax.text(1. - (1. - width_float) / 2, 0.5, round(value_max, 3), fontdict={'color': '#ffffff', 'fontsize': 10},
-               transform=colorbar_ax.transAxes, horizontalalignment='right', verticalalignment='center')
+    tmax = cb.ax.text(1. - (1. - width_float) / 2, 0.5, '%.3f ' % value_max, ha='right', **text_params)
+    tmax.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='w')])
     _modify_legend_ax(colorbar_ax, font_family)
 
 
 def _plot_legend_circles(count_min, count_max, circle_ax, cmap, font_family):
+    """Plot circle legend"""
     # circle size
-    circle_ax.scatter([0.75, 2], [1] * 2, s=[500, 1500],
-                      edgecolors=plt.get_cmap(cmap)(1.), color='white')
+    circle_ax.plot([0.75, 2], [1] * 2, color=plt.get_cmap(cmap)(1.), zorder=1, ls='--')
+    circle_ax.scatter([0.75, 2], [1] * 2, s=[500, 1500], edgecolors=plt.get_cmap(cmap)(1.), color='white', zorder=2)
     circle_ax.set_xlim(0., 3)
 
-    circle_ax.text(0.75, 1., count_min, fontdict={'color': '#424242', 'fontsize': 10},
-                   horizontalalignment='center', verticalalignment='center')
-    circle_ax.text(1.275, 1., '-->', fontdict={'color': '#424242', 'fontsize': 10, 'weight': 'bold'},
-                   horizontalalignment='center', verticalalignment='center')
-    circle_ax.text(2, 1., count_max, fontdict={'color': '#424242', 'fontsize': 10},
-                   horizontalalignment='center', verticalalignment='center')
+    text_params = {'fontdict': {'color': '#424242', 'fontsize': 10}, 'ha': 'center', 'va': 'center'}
+    circle_ax.text(0.75, 1., count_min, **text_params)
+    circle_ax.text(2, 1., count_max, **text_params)
     _modify_legend_ax(circle_ax, font_family)
 
 
-def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
-                        plot_data, title, subtitle, figsize, ncols, plot_params):
+def _info_plot_interact(feature_names, display_columns, percentile_columns, ys, plot_data, title, subtitle,
+                        figsize, ncols, annotate, plot_params, is_target_plot=True):
+    """Internal call for _info_plot_interact"""
 
-    width, height = 15, 9
+    width, height = 15, 10
     nrows = 1
 
     if len(ys) > 1:
         nrows = int(np.ceil(len(ys) * 1.0 / ncols))
         ncols = np.min([len(ys), ncols])
         width = np.min([7.5 * len(ys), 15])
-        height = width * 1.0 / ncols * nrows
+        height = width * 1.2 / ncols * nrows
 
     if figsize is not None:
         width, height = figsize
@@ -518,7 +522,7 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
     outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height-2])
     title_ax = plt.subplot(outer_grid[0])
     fig.add_subplot(title_ax)
-    _info_plot_title(title=title, subtitle=subtitle, ax=title_ax, plot_params=plot_params)
+    _plot_title(title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params)
 
     # draw value plots and legend
     count_min, count_max = plot_data['fake_count'].min(), plot_data['fake_count'].max()
@@ -527,19 +531,18 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
         size = float(count - count_min) / (count_max - count_min) * (marker_size_max - marker_size_min) + marker_size_min
         marker_sizes.append(size)
 
+    interact_params = {'plot_data': plot_data, 'feature_names': feature_names, 'display_columns': display_columns,
+                       'percentile_columns': percentile_columns, 'marker_sizes': marker_sizes, 'line_width': line_width,
+                       'xticks_rotation': xticks_rotation, 'font_family': font_family, 'annotate': annotate}
     if len(ys) == 1:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[height-3, 1])
+        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[height-3, 1], hspace=0.25)
         value_ax = plt.subplot(inner_grid[0])
         fig.add_subplot(value_ax)
         value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
-            plot_data=plot_data, y=ys[0], plot_ax=value_ax, feature_names=feature_names,
-            display_columns=display_columns, percentile_columns=percentile_columns,
-            marker_sizes=marker_sizes, cmap=cmap, line_width=line_width, xticks_rotation=xticks_rotation,
-            font_family=font_family)
+            y=ys[0], plot_ax=value_ax, cmap=cmap, **interact_params)
 
         # draw legend
-        # _, legend_ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(legend_width, 1))
-        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[1], wspace=0)
+        legend_grid = GridSpecFromSubplotSpec(1, 4, subplot_spec=inner_grid[1], wspace=0)
         legend_ax = [plt.subplot(legend_grid[0]), plt.subplot(legend_grid[1])]
         fig.add_subplot(legend_ax[0])
         fig.add_subplot(legend_ax[1])
@@ -548,43 +551,51 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
         _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax[1],
                              cmap=cmap, font_family=font_family)
 
+        if is_target_plot:
+            subplot_title = 'Average %s' % ys[0]
+        elif ys[0] == 'actual_prediction_q2':
+            subplot_title = 'Median Prediction'
+        else:
+            subplot_title = 'target_%s: median prediction' % ys[0].split('_')[-2]
+        if len(percentile_columns[0]) > 0:
+            subplot_title += '\n\n\n'
+        value_ax.set_title(subplot_title, fontdict={'fontsize': 11, 'fontname': font_family})
     else:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1], height_ratios=[1, height - 3])
-        legend_grid = GridSpecFromSubplotSpec(1, 2, subplot_spec=inner_grid[0], wspace=0)
-        legend_ax = plt.subplot(legend_grid[0])
-        fig.add_subplot(legend_ax)
-
-        _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=legend_ax,
-                             cmap=cmap, font_family=font_family)
-
-        value_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=inner_grid[1], wspace=0.2, hspace=0.35)
+        value_grid = GridSpecFromSubplotSpec(nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.2)
         value_ax = []
-        for y_idx in range(len(ys)):
-            ax = plt.subplot(value_grid[y_idx])
-            value_ax.append(ax)
-            fig.add_subplot(ax)
+        legend_ax = []
 
         for idx in range(len(ys)):
+            inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=value_grid[idx], height_ratios=[7, 1], hspace=0.3)
+            inner_value_ax = plt.subplot(inner_grid[0])
+            fig.add_subplot(inner_value_ax)
+            value_ax.append(inner_value_ax)
 
             cmap_idx = cmaps[idx % len(cmaps)]
-
             value_min, value_max, percentile_ax, percentile_ay = _plot_interact(
-                plot_data=plot_data, y=ys[idx], plot_ax=value_ax[idx], feature_names=feature_names,
-                display_columns=display_columns, percentile_columns=percentile_columns,
-                marker_sizes=marker_sizes, cmap=cmap_idx, line_width=line_width,
-                xticks_rotation=xticks_rotation, font_family=font_family)
+                y=ys[idx], plot_ax=inner_value_ax, cmap=cmap_idx, **interact_params)
 
-            colorbar_ax = make_axes_locatable(value_ax[idx]).append_axes('bottom', size='5%', pad=0.5)
-            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=colorbar_ax,
-                                  cmap=cmap_idx, font_family=font_family, height="90%", width="80%")
+            # draw legend
+            inner_legend_grid = GridSpecFromSubplotSpec(1, 4, subplot_spec=inner_grid[1], wspace=0)
+            inner_legend_ax = [plt.subplot(inner_legend_grid[0]), plt.subplot(inner_legend_grid[1])]
+            fig.add_subplot(inner_legend_ax[0])
+            fig.add_subplot(inner_legend_ax[1])
+            _plot_legend_colorbar(value_min=value_min, value_max=value_max, colorbar_ax=inner_legend_ax[0],
+                                  cmap=cmap_idx, font_family=font_family)
+            _plot_legend_circles(count_min=count_min, count_max=count_max, circle_ax=inner_legend_ax[1],
+                                 cmap=cmap_idx, font_family=font_family)
+            legend_ax.append(inner_legend_ax)
 
-            subplot_title = ys[idx]
-            if len(percentile_columns[1]) > 0:
+            if is_target_plot:
+                subplot_title = 'Average %s' % ys[idx]
+            else:
+                subplot_title = 'target_%s: median prediction' % ys[idx].split('_')[-2]
+            if len(percentile_columns[0]) > 0:
                 subplot_title += '\n\n\n'
-            value_ax[idx].set_title(subplot_title, fontdict={'fontsize': 12, 'fontname': font_family})
+            inner_value_ax.set_title(subplot_title, fontdict={'fontsize': 11, 'fontname': font_family})
 
             if idx % ncols != 0:
-                value_ax[idx].set_yticklabels([])
+                inner_value_ax.set_yticklabels([])
 
             if (idx % ncols + 1 != ncols) and idx != len(value_ax) - 1:
                 if percentile_ay is not None:
@@ -600,6 +611,7 @@ def _info_plot_interact(feature_names, display_columns, percentile_columns, ys,
 
 def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_type, percentile_range,
                             grid_range, cust_grid_points, show_percentile, show_outliers, endpoint):
+    """Prepare data for information plots"""
     prepared_results = _prepare_data_x(
         feature=feature, feature_type=feature_type, data=data, num_grid_points=num_grid_points, grid_type=grid_type,
         percentile_range=percentile_range, grid_range=grid_range, cust_grid_points=cust_grid_points,
@@ -632,6 +644,7 @@ def _prepare_info_plot_data(feature, feature_type, data, num_grid_points, grid_t
 def _prepare_info_plot_interact_data(data_input, features, feature_types, num_grid_points, grid_types,
                                      percentile_ranges, grid_ranges, cust_grid_points, show_percentile,
                                      show_outliers, endpoint, agg_dict):
+    """Prepare data for information interact plots"""
     prepared_results = []
     for i in range(2):
         prepared_result = _prepare_data_x(
@@ -651,6 +664,8 @@ def _prepare_info_plot_interact_data(data_input, features, feature_types, num_gr
 
 
 def _prepare_info_plot_interact_summary(data_x, plot_data, prepared_results, feature_types):
+    """Prepare summary data frame for interact plots"""
+
     x1_values = []
     x2_values = []
     for x1_value in range(data_x['x1'].min(), data_x['x1'].max() + 1):
@@ -690,3 +705,61 @@ def _prepare_info_plot_interact_summary(data_x, plot_data, prepared_results, fea
 
     return summary_df, info_cols, display_columns, percentile_columns
 
+
+def _check_info_plot_params(df, feature, grid_type, percentile_range, grid_range,
+                            cust_grid_points, show_outliers):
+    """Check information plot parameters"""
+
+    _check_dataset(df=df)
+    feature_type = _check_feature(feature=feature, df=df)
+    _check_grid_type(grid_type=grid_type)
+    _check_percentile_range(percentile_range=percentile_range)
+
+    # show_outliers should be only turned on when necessary
+    if (percentile_range is None) and (grid_range is None) and (cust_grid_points is None):
+        show_outliers = False
+    return feature_type, show_outliers
+
+
+def _check_info_plot_interact_params(num_grid_points, grid_types, percentile_ranges, grid_ranges, cust_grid_points,
+                                     show_outliers, plot_params, features, df):
+    """Check interact information plot parameters"""
+
+    _check_dataset(df=df)
+    num_grid_points = _expand_default(num_grid_points, 10)
+    grid_types = _expand_default(grid_types, 'percentile')
+    _check_grid_type(grid_type=grid_types[0])
+    _check_grid_type(grid_type=grid_types[1])
+
+    percentile_ranges = _expand_default(percentile_ranges, None)
+    _check_percentile_range(percentile_range=percentile_ranges[0])
+    _check_percentile_range(percentile_range=percentile_ranges[1])
+
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+
+    if not show_outliers:
+        show_outliers = [False, False]
+    else:
+        show_outliers = [True, True]
+        for i in range(2):
+            if (percentile_ranges[i] is None) and (grid_ranges[i] is None) and (cust_grid_points[i] is None):
+                show_outliers[i] = False
+
+    # set up graph parameters
+    if plot_params is None:
+        plot_params = dict()
+
+    # check features
+    feature_types = [_check_feature(feature=features[0], df=df), _check_feature(feature=features[1], df=df)]
+
+    return {
+        'num_grid_points': num_grid_points,
+        'grid_types': grid_types,
+        'percentile_ranges': percentile_ranges,
+        'grid_ranges': grid_ranges,
+        'cust_grid_points': cust_grid_points,
+        'show_outliers': show_outliers,
+        'plot_params': plot_params,
+        'feature_types': feature_types
+    }

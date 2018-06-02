@@ -1,8 +1,8 @@
 
 from .info_plot_utils import (_target_plot, _info_plot_interact, _actual_plot, _prepare_info_plot_interact_data,
-                              _prepare_info_plot_interact_summary, _prepare_info_plot_data)
-from .other_utils import (_make_list, _check_model, _check_target, _check_classes,
-                          _check_info_plot_interact_params, _check_info_plot_params)
+                              _prepare_info_plot_interact_summary, _prepare_info_plot_data,
+                              _check_info_plot_interact_params, _check_info_plot_params)
+from .utils import _make_list, _check_model, _check_target, _check_classes
 
 
 def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type='percentile',
@@ -17,7 +17,7 @@ def target_plot(df, feature, feature_name, target, num_grid_points=10, grid_type
         data set to investigate on, should contain at least
         the feature to investigate as well as the target
     feature: string or list
-        feature or feature list to investigate
+        feature or feature list to investigate,
         for one-hot encoding features, feature list is required
     feature_name: string
         name of the feature, not necessary a column name
@@ -174,8 +174,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
     model: a fitted sklearn model
     X: pandas DataFrame
-        data set to investigate on, should contain at least
-        the feature to investigate as well as the target
+        data set on which the model is trained
     feature: string or list
         feature or feature list to investigate
         for one-hot encoding features, feature list is required
@@ -184,19 +183,18 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
     grid_type: string, optional, default='percentile'
-        'percentile' or 'equal'
+        'percentile' or 'equal',
         type of grid points for numeric feature
     percentile_range: tuple or None, optional, default=None
-        percentile range to investigate
+        percentile range to investigate,
         for numeric feature when grid_type='percentile'
     grid_range: tuple or None, optional, default=None
-        value range to investigate
+        value range to investigate,
         for numeric feature when grid_type='equal'
     cust_grid_points: Series, 1d-array, list or None, optional, default=None
-        customized list of grid points
-        for numeric feature
+        customized list of grid points for numeric feature
     show_percentile: bool, optional, default=False
-        whether to display the percentile buckets
+        whether to display the percentile buckets,
         for numeric feature when grid_type='percentile'
     show_outliers: bool, optional, default=False
         whether to display the out of range buckets
@@ -283,7 +281,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
     """
 
     # check inputs
-    n_classes, classifier, predict = _check_model(model=model)
+    n_classes, predict = _check_model(model=model)
     feature_type, show_outliers = _check_info_plot_params(
         df=X, feature=feature, grid_type=grid_type, percentile_range=percentile_range, grid_range=grid_range,
         cust_grid_points=cust_grid_points, show_outliers=show_outliers)
@@ -336,7 +334,7 @@ def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='
 
 def target_plot_interact(df, features, feature_names, target, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
-                         show_outliers=False, endpoint=True, figsize=None, ncols=2, plot_params=None):
+                         show_outliers=False, endpoint=True, figsize=None, ncols=2, annotate=False, plot_params=None):
     """Plot average target value across different feature value combinations (feature grid combinations)
 
     Parameters
@@ -373,6 +371,8 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
         size of the figure, (width, height)
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
+    annotate: bool, default=False
+        whether to annotate the points
     plot_params: dict or None, optional, default=None
         parameters for the plot
 
@@ -461,7 +461,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
     fig, axes = _info_plot_interact(
         feature_names=feature_names, display_columns=display_columns, percentile_columns=percentile_columns,
         ys=target, plot_data=target_plot_data, title=title, subtitle=subtitle, figsize=figsize,
-        ncols=ncols, plot_params=plot_params)
+        ncols=ncols, annotate=annotate, plot_params=plot_params)
 
     return fig, axes, summary_df
 
@@ -469,7 +469,7 @@ def target_plot_interact(df, features, feature_names, target, num_grid_points=No
 def actual_plot_interact(model, X, features, feature_names, num_grid_points=None, grid_types=None,
                          percentile_ranges=None, grid_ranges=None, cust_grid_points=None, show_percentile=False,
                          show_outliers=False, endpoint=True, which_classes=None, predict_kwds={}, ncols=2,
-                         figsize=None, plot_params=None):
+                         figsize=None, annotate=False, plot_params=None):
     """Plot prediction distribution across different feature value combinations (feature grid combinations)
 
     Parameters
@@ -508,6 +508,8 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         size of the figure, (width, height)
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
+    annotate: bool, default=False
+        whether to annotate the points
     plot_params: dict or None, optional, default=None
         parameters for the plot
 
@@ -553,7 +555,7 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
     """
 
     # check model
-    n_classes, classifier, predict = _check_model(model=model)
+    n_classes, predict = _check_model(model=model)
     check_results = _check_info_plot_interact_params(
         num_grid_points=num_grid_points, grid_types=grid_types, percentile_ranges=percentile_ranges,
         grid_ranges=grid_ranges, cust_grid_points=cust_grid_points, show_outliers=show_outliers,
@@ -616,6 +618,6 @@ def actual_plot_interact(model, X, features, feature_names, num_grid_points=None
         feature_names=feature_names, display_columns=display_columns,
         percentile_columns=percentile_columns, ys=[col + '_q2' for col in actual_prediction_columns],
         plot_data=actual_plot_data, title=title, subtitle=subtitle, figsize=figsize,
-        ncols=ncols, plot_params=plot_params)
+        ncols=ncols, annotate=annotate, plot_params=plot_params, is_target_plot=False)
 
     return fig, axes, summary_df
