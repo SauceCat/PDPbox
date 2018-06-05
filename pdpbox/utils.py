@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 
 import numpy as np
 import pandas as pd
@@ -14,21 +13,20 @@ def _check_feature(feature, df):
     2. onehot
     3. numeric
     """
-    if type(feature) == str:
-        if feature not in df.columns.values:
-            raise ValueError('feature does not exist: %s' % feature)
-        if sorted(list(np.unique(df[feature]))) == [0, 1]:
-            feature_type = 'binary'
-        else:
-            feature_type = 'numeric'
-    elif type(feature) == list:
+
+    if type(feature) == list:
         if len(feature) < 2:
             raise ValueError('one-hot encoding feature should contain more than 1 element')
         if not set(feature) < set(df.columns.values):
             raise ValueError('feature does not exist: %s' % str(feature))
         feature_type = 'onehot'
     else:
-        raise ValueError('feature: please pass a string or a list (for onehot encoding feature)')
+        if feature not in df.columns.values:
+            raise ValueError('feature does not exist: %s' % feature)
+        if sorted(list(np.unique(df[feature]))) == [0, 1]:
+            feature_type = 'binary'
+        else:
+            feature_type = 'numeric'
 
     return feature_type
 
@@ -36,7 +34,7 @@ def _check_feature(feature, df):
 def _check_percentile_range(percentile_range):
     """Make sure percentile range is valid"""
     if percentile_range is not None:
-        if len(percentile_range) != 2:
+        if len(_make_list(percentile_range)) != 2:
             raise ValueError('percentile_range: should contain 2 elements')
         if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
             raise ValueError('percentile_range: should be between 0 and 100')
@@ -52,14 +50,7 @@ def _check_target(target, df):
     3. regression
     """
 
-    if type(target) == str:
-        if target not in df.columns.values:
-            raise ValueError('target does not exist: %s' % target)
-        if sorted(list(np.unique(df[target]))) == [0, 1]:
-            target_type = 'binary'
-        else:
-            target_type = 'regression'
-    elif type(target) == list:
+    if type(target) == list:
         if not set(target) < set(df.columns.values):
             raise ValueError('target does not exist: %s' % (str(target)))
         for target_idx in range(len(target)):
@@ -67,7 +58,12 @@ def _check_target(target, df):
                 raise ValueError('multi-class targets should be one-hot encoded: %s' % (str(target[target_idx])))
         target_type = 'multi-class'
     else:
-        raise ValueError('target: please pass a string or a list (for multi-class targets)')
+        if target not in df.columns.values:
+            raise ValueError('target does not exist: %s' % target)
+        if sorted(list(np.unique(df[target]))) == [0, 1]:
+            target_type = 'binary'
+        else:
+            target_type = 'regression'
 
     return target_type
 
@@ -111,7 +107,13 @@ def _check_grid_type(grid_type):
 
 
 def _check_classes(classes_list, n_classes):
-    """Makre sure classes list is valid"""
+    """Makre sure classes list is valid
+
+    Notes
+    -----
+    class index starts from 0
+
+    """
     if len(classes_list) > 0 and n_classes > 2:
         if np.min(classes_list) < 0:
             raise ValueError('class index should be >= 0.')
@@ -130,6 +132,11 @@ def _check_frac_to_plot(frac_to_plot):
     if type(frac_to_plot) == float:
         if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
             raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
+    elif type(frac_to_plot) == int:
+        if frac_to_plot <= 0:
+            raise ValueError('frac_to_plot: should be larger than 0.')
+    else:
+        raise ValueError('frac_to_plot: should be float or integer')
 
 
 def _plot_title(title, subtitle, title_ax, plot_params):
