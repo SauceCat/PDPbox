@@ -42,12 +42,12 @@ between predictors and model prediction.
 
 ## Installation
 
-- through pip
+- through pip (stable version)
   ```
   $ pip install pdpbox
   ```
 
-- through git
+- through git (latest develop version)
   ```
   $ git clone https://github.com/SauceCat/PDPbox.git
   $ cd PDPbox
@@ -55,3 +55,26 @@ between predictors and model prediction.
   ```
 
 ## Gallery
+- **PDP:** PDP for a single feature
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_plot.png' width=90%>
+
+- **PDP:** PDP for a multi-class
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_plot_multiclass.png' width=90%>
+
+- **PDP Interact:** PDP Interact for two features with contour plot
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_contour.png' width=60%>
+
+- **PDP Interact:** PDP Interact for two features with grid plot
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_grid.png' width=60%>
+
+- **PDP Interact:** PDP Interact for multi-class
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_multiclass.png' width=90%>
+
+- **Information plot:** target plot for a single feature
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/target_plot.png' width=90%>
+
+- **Information plot:** target interact plot for two features
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_interact.png' width=90%>
+
+- **Information plot:** actual prediction plot for a single feature
+<img src='https://github.com/SauceCat/PDPbox/blob/master/images/actual_plot.png' width=90%>
