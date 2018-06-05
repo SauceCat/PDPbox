@@ -4,7 +4,8 @@
 
 #### pdpbox.pdp.pdp_isolate
 ```python
-def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, cust_grid_points=None, predict_kwds={}):
+def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=None, 
+		cust_grid_points=None, predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -27,7 +28,7 @@ def pdp_isolate(model, train_X, feature, num_grid_points=10, percentile_range=No
 #### pdpbox.pdp.pdp_interact
 ```python
 def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_ranges=[None, None], 
-				 cust_grid_points=[None, None], predict_kwds={}):
+		 cust_grid_points=[None, None], predict_kwds={}):
 	'''
 	model: sklearn model
 		a fitted model
@@ -50,8 +51,8 @@ def pdp_interact(model, train_X, features, num_grid_points=[10, 10], percentile_
 #### pdpbox.pdp.pdp_plot
 ```python
 def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plot_lines=False, frac_to_plot=1, 
-			 cluster=False, n_cluster_centers=None, cluster_method=None, x_quantile=False, figsize=None, ncols=None, 
-			 plot_params=None, multi_flag=False, which_class=None):
+	     cluster=False, n_cluster_centers=None, cluster_method=None, x_quantile=False, figsize=None, 
+	     ncols=None, plot_params=None, multi_flag=False, which_class=None):
 	'''
 	pdp_isolate_out: instance of pdp_isolate_obj
 		a calculated pdp_isolate_obj instance
@@ -90,8 +91,9 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_org_pts=False, plo
 #### pdpbox.pdp.pdp_interact_plot
 ```python
 def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts=False, plot_lines=False, 
-					  frac_to_plot=1., cluster=False, n_cluster_centers=None, cluster_method=None, x_quantile=False, 
-					  figsize=None, plot_params=None, multi_flag=False, which_class=None, only_inter=False, ncols=None):
+		      frac_to_plot=1., cluster=False, n_cluster_centers=None, cluster_method=None, 
+		      x_quantile=False, figsize=None, plot_params=None, multi_flag=False, 
+		      which_class=None, only_inter=False, ncols=None):
 	'''
 	pdp_interact_out: pdp_interact_obj
 		a calculated pdp_interact_obj
@@ -131,7 +133,8 @@ def pdp_interact_plot(pdp_interact_out, feature_names, center=True, plot_org_pts
 
 #### pdpbox.pdp.actual_plot
 ```python
-def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, which_class=None, ncols=None):
+def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, multi_flag=False, 
+		which_class=None, ncols=None):
 	'''
 	pdp_isolate_out: instance of pdp_isolate_obj
 		a calculated pdp_isolate_obj instance
@@ -154,7 +157,7 @@ def actual_plot(pdp_isolate_out, feature_name, figsize=None, plot_params=None, m
 #### pdpbox.pdp.target_plot
 ```python
 def target_plot(df, feature, feature_name, target, num_grid_points=10, percentile_range=None, cust_grid_points=None, 
-			    figsize=None, plot_params=None):
+		figsize=None, plot_params=None):
 	'''
 	df: pandas DataFrame
 		the whole dataset to investigate, including at least the feature to investigate as well as the target values
