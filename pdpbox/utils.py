@@ -255,28 +255,26 @@ def _get_grid_combos(feature_grids, feature_types):
     # create grid combination
     grids1, grids2 = feature_grids
     if feature_types[0] == 'onehot':
-        grids1 = range(len(grids1))
+        grids1 = np.eye(len(grids1)).astype(int).tolist()
     if feature_types[1] == 'onehot':
-        grids2 = range(len(grids2))
+        grids2 = np.eye(len(grids2)).astype(int).tolist()
 
-    grid_combos_temp = np.matrix(np.array(np.meshgrid(grids1, grids2)).T.reshape(-1, 2))
-    grid_combos1, grid_combos2 = grid_combos_temp[:, 0], grid_combos_temp[:, 1]
-    if feature_types[0] == 'onehot':
-        grid_combos1_temp = np.array(grid_combos1.T, dtype=np.int64)[0]
-        grid_combos1 = np.zeros((len(grid_combos1), len(grids1)), dtype=int)
-        grid_combos1[range(len(grid_combos1)), grid_combos1_temp] = 1
-    if feature_types[1] == 'onehot':
-        grid_combos2_temp = np.array(grid_combos2.T, dtype=np.int64)[0]
-        grid_combos2 = np.zeros((len(grid_combos2), len(grids2)), dtype=int)
-        grid_combos2[range(len(grid_combos2)), grid_combos2_temp] = 1
+    grid_combos = []
+    for g1 in grids1:
+        for g2 in grids2:
+            grid_combos.append(_make_list(g1) + _make_list(g2))
 
-    grid_combos = np.array(np.concatenate((grid_combos1, grid_combos2), axis=1))
-
-    return grid_combos
+    return np.array(grid_combos)
 
 
 def _sample_data(ice_lines, frac_to_plot):
-    """Get sample ice lines to plot"""
+    """Get sample ice lines to plot
+
+    Notes
+    -----
+    If frac_to_plot==1, will plot all lines instead of sampling one line
+
+    """
 
     if frac_to_plot < 1.:
         ice_plot_data = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
@@ -323,6 +321,17 @@ def _find_bucket(x, feature_grids, endpoint):
     return bucket
 
 
+def _get_string(x):
+    if int(x) == x:
+        x_str = str(int(x))
+    elif round(x, 1) == x:
+        x_str = str(round(x, 1))
+    else:
+        x_str = str(round(x, 2))
+
+    return x_str
+
+
 def _make_bucket_column_names(feature_grids, endpoint):
     """Create bucket names based on feature grids"""
     # create bucket names
@@ -330,21 +339,26 @@ def _make_bucket_column_names(feature_grids, endpoint):
     bound_lows = [np.nan]
     bound_ups = [feature_grids[0]]
 
-    # number of buckets: len(feature_grids) - 1
-    for i in range(len(feature_grids) - 1):
-        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+    feature_grids_str = []
+    for g in feature_grids:
+        feature_grids_str.append(_get_string(x=g))
+
+    # number of buckets: len(feature_grids_str) - 1
+    for i in range(len(feature_grids_str) - 1):
+        column_name = '[%s, %s)' % (feature_grids_str[i], feature_grids_str[i + 1])
         bound_lows.append(feature_grids[i])
         bound_ups.append(feature_grids[i + 1])
 
-        if (i == len(feature_grids) - 2) and endpoint:
-            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+        if (i == len(feature_grids_str) - 2) and endpoint:
+            column_name = '[%s, %s]' % (feature_grids_str[i], feature_grids_str[i + 1])
 
         column_names.append(column_name)
 
     if endpoint:
-        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['> %.2f' % feature_grids[-1]]
+        column_names = ['< %s' % feature_grids_str[0]] + column_names + ['> %s' % feature_grids_str[-1]]
     else:
-        column_names = ['< %.2f' % feature_grids[0]] + column_names + ['>= %.2f' % feature_grids[-1]]
+        column_names = ['< %s' % feature_grids_str[0]] + column_names + ['>= %s' % feature_grids_str[-1]]
+
     bound_lows.append(feature_grids[-1])
     bound_ups.append(np.nan)
 
@@ -355,34 +369,44 @@ def _make_bucket_column_names_percentile(percentile_info, endpoint):
     """Create bucket names based on percentile info"""
     # create percentile bucket names
     percentile_column_names = []
+    percentile_info_numeric = []
+    for p_idx, p in enumerate(percentile_info):
+        p_array = np.array(p.replace('(', '').replace(')', '').split(', ')).astype(np.float64)
+        if p_idx == 0 or p_idx == len(percentile_info) - 1:
+            p_numeric = np.min(p_array)
+        else:
+            p_numeric = np.max(p_array)
+        percentile_info_numeric.append(p_numeric)
+
     percentile_bound_lows = [0]
-    percentile_bound_ups = [np.min(np.array(percentile_info[0].replace('(', '').replace(
-        ')', '').split(', ')).astype(np.float64))]
+    percentile_bound_ups = [percentile_info_numeric[0]]
 
     for i in range(len(percentile_info) - 1):
         # for each grid point, percentile information is in tuple format
         # (percentile1, percentile2, ...)
         # some grid points would belong to multiple percentiles
-        low = np.min(np.array(percentile_info[i].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-        high = np.max(np.array(percentile_info[i + 1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-        percentile_column_name = '[%.2f, %.2f)' % (low, high)
+        low, high = percentile_info_numeric[i], percentile_info_numeric[i + 1]
+        low_str, high_str = _get_string(x=low), _get_string(x=high)
+
+        percentile_column_name = '[%s, %s)' % (low_str, high_str)
         percentile_bound_lows.append(low)
         percentile_bound_ups.append(high)
 
         if i == len(percentile_info) - 2:
             if endpoint:
-                percentile_column_name = '[%.2f, %.2f]' % (low, high)
+                percentile_column_name = '[%s, %s]' % (low_str, high_str)
             else:
-                percentile_column_name = '[%.2f, %.2f)' % (low, high)
+                percentile_column_name = '[%s, %s)' % (low_str, high_str)
 
         percentile_column_names.append(percentile_column_name)
 
-    low = np.min(np.array(percentile_info[0].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
-    high = np.max(np.array(percentile_info[-1].replace('(', '').replace(')', '').split(', ')).astype(np.float64))
+    low, high = percentile_info_numeric[0], percentile_info_numeric[-1]
+    low_str, high_str = _get_string(x=low), _get_string(x=high)
+
     if endpoint:
-        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['> %.2f' % high]
+        percentile_column_names = ['< %s' % low_str] + percentile_column_names + ['> %s' % high_str]
     else:
-        percentile_column_names = ['< %.2f' % low] + percentile_column_names + ['>= %.2f' % high]
+        percentile_column_names = ['< %s' % low_str] + percentile_column_names + ['>= %s' % high_str]
     percentile_bound_lows.append(high)
     percentile_bound_ups.append(100)
 
@@ -395,9 +419,9 @@ def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
         nrows = int(np.ceil(num_charts * 1.0 / ncols))
         ncols = np.min([num_charts, ncols])
         width = np.min([unit_figsize[0] * ncols, 15])
-        height = np.min([width * 1.0 / ncols, unit_figsize[1]]) * nrows
+        height = np.min([width * 1.0 / ncols, unit_figsize[1]]) * nrows + title_height
     else:
-        width, height, nrows = unit_figsize[0], unit_figsize[1] + title_height, 1
+        width, height, nrows, ncols = unit_figsize[0], unit_figsize[1] + title_height, 1, 1
 
     return width, height, nrows, ncols
 
