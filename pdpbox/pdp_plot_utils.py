@@ -88,6 +88,8 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
         # x for original pdp
         # anyway, pdp is started from x=0
         x = range(len(feature_grids))
+
+        # xticks is for the major plot
         xticks = x
         xticklabels = list(display_columns)
 
@@ -96,11 +98,12 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
             if x_quantile:
                 count_display_columns = count_data['xticklabels'].values
                 # number of grids = number of bins + 1
-                # need to include the final point: + 2
+                # count_x: min -> max + 1
                 count_x = range(count_data['x'].min(), count_data['x'].max() + 2)
+                # instead of just x
                 xticks = count_x
                 if count_x[0] == -1:
-                    # include the minimum value
+                    # xticklabels include the minimum value
                     xticklabels = [float(count_display_columns[0].split(',')[0].replace('[', ''))] + xticklabels
                     percentile_xticklabels = ['(0.0)'] + percentile_xticklabels
                 if count_x[-1] == len(feature_grids):
@@ -108,6 +111,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
                     xticklabels = xticklabels + [float(count_display_columns[-1].split(',')[1].replace(']', ''))]
                     percentile_xticklabels = percentile_xticklabels + ['(100.0)']
             else:
+                # if it is not numeric feature, xticks can be ignored
                 xticklabels = []
             pdp_ax.set_xlim(xticks[0] - 0.5, xticks[-1] + 0.5)
 
@@ -115,6 +119,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
         pdp_ax.set_xticklabels(xticklabels, rotation=xticks_rotation)
     else:
         # for numeric feature when x_quantile=False
+        # no need to set xticks
         x = feature_grids
 
     ice_lines = copy.deepcopy(pdp_isolate_out.ice_lines)
@@ -152,7 +157,7 @@ def _pdp_plot(pdp_isolate_out, feature_name, center, plot_lines, frac_to_plot, c
     # add data distribution plot
     if count_ax is not None:
         if not x_quantile and feature_type == 'numeric':
-            hist_data = pdp_isolate_out.hist_data.copy()
+            hist_data = copy.deepcopy(pdp_isolate_out.hist_data)
             _draw_pdp_distplot(hist_data=hist_data, hist_ax=count_ax, plot_params=plot_params)
         else:
             _draw_pdp_countplot(count_data=count_data, count_ax=count_ax, pdp_ax=pdp_ax, feature_type=feature_type,
@@ -196,6 +201,7 @@ def _pdp_std_plot(x, y, std, std_fill, pdp_hl, ax, plot_params):
         ax.fill_between(x, upper, lower, alpha=fill_alpha, color=fill_color)
 
     ymin, ymax = np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0])
+    # set ylim
     ax.set_ylim(ymin, ymax)
 
 
@@ -245,6 +251,7 @@ def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, font
     inter_ax.clabel(c2, contour_label_fontsize=fontsize, inline=1)
     inter_ax.set_aspect('auto')
 
+    # return the color mapping object for colorbar
     return c1
 
 
@@ -259,6 +266,7 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
             text_color = 'w'
             if pdp_mx[r, c] >= norm.vmin + (norm.vmax - norm.vmin) * 0.5:
                 text_color = 'black'
+            # column -> x, row -> y
             inter_ax.text(c, r, round(pdp_mx[r, c], 3), ha="center", va="center", color=text_color,
                           size=fontsize, fontdict={'family': font_family})
 
@@ -267,6 +275,7 @@ def _pdp_inter_grid(pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, pl
     inter_ax.set_yticks(np.arange(pdp_mx.shape[0] - 1) + 0.5, minor=True)
     inter_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
 
+    # return the color mapping object for colorbar
     return im
 
 
@@ -293,11 +302,14 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
         if feature_type in ['numeric', 'binary']:
             pdp_mx_temp[mark] = pdp_mx_temp[feature]
         else:
-            pdp_mx_temp[mark] = pdp_mx_temp[feature].apply(lambda x : list(x).index(1), axis=1)
+            # for onehot encoding feature, need to map to numeric representation
+            pdp_mx_temp[mark] = pdp_mx_temp[feature].apply(lambda x: list(x).index(1), axis=1)
     pdp_mx_temp = pdp_mx_temp[['x', 'y', 'preds']].sort_values(by=['x', 'y'], ascending=True)
 
     pdp_inter = copy.deepcopy(pdp_mx_temp['preds'].values)
     n_grids_x, n_grids_y = len(pdp_interact_out.feature_grids[0]), len(pdp_interact_out.feature_grids[1])
+    # pdp_inter.reshape((n_grids_x, n_grids_y)): each row represents grids_x
+    # pdp_inter.reshape((n_grids_x, n_grids_y)).T: each row represents grids_y
     pdp_mx = pdp_inter.reshape((n_grids_x, n_grids_y)).T
 
     # if it is called by _pdp_inter_three, norm is not None
@@ -311,8 +323,11 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
     }
     if plot_type == 'contour':
         if x_quantile:
+            # because we have transpose the matrix
+            # pdp_max.shape[1]: x, pdp_max.shape[0]: y
             X, Y = np.meshgrid(range(pdp_mx.shape[1]), range(pdp_mx.shape[0]))
         else:
+            # for numeric not quantile
             X, Y = np.meshgrid(pdp_interact_out.feature_grids[0], pdp_interact_out.feature_grids[1])
         im = _pdp_contour_plot(X=X, Y=Y, **inter_params)
     elif plot_type == 'grid':
@@ -321,6 +336,7 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
         raise ValueError("plot_type: should be 'contour' or 'grid'")
 
     if ticks:
+        # if it is call by _pdp_inter_three, no need to set ticks
         _axes_modify(font_family=font_family, ax=inter_ax, grid=True)
 
         if pdp_interact_out.feature_types[0] != 'numeric' or x_quantile:
@@ -344,6 +360,7 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
             cb = plt.colorbar(im, cax=cax)
         _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
         cb.outline.set_visible(False)
+
     inter_ax.tick_params(which="minor", bottom=False, left=False)
     return im
 
@@ -456,6 +473,7 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     inter_ax.tick_params(which="minor", bottom=False, left=False)
     inter_ax.tick_params(which="major", bottom=False, left=False)
 
+    # insert colorbar
     if plot_type == 'grid':
         cax = inset_axes(inter_ax, width="100%", height="100%", loc='right', bbox_to_anchor=(1.05, 0., 0.05, 1),
                          bbox_transform=inter_ax.transAxes, borderpad=0)
