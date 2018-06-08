@@ -29,6 +29,8 @@ def test_check_percentile_range():
     with pytest.raises(ValueError):
         _check_percentile_range(percentile_range=(5))
         _check_percentile_range(percentile_range=(5, 105))
+        _check_percentile_range(percentile_range=5)
+        _check_percentile_range(percentile_range=(5, 105, 110))
 
 
 # @pytest.mark.skip(reason="slow")

@@ -34,7 +34,9 @@ def _check_feature(feature, df):
 def _check_percentile_range(percentile_range):
     """Make sure percentile range is valid"""
     if percentile_range is not None:
-        if len(_make_list(percentile_range)) != 2:
+        if type(percentile_range) != tuple:
+            raise ValueError('percentile_range: should be a tuple')
+        if len(percentile_range) != 2:
             raise ValueError('percentile_range: should contain 2 elements')
         if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
             raise ValueError('percentile_range: should be between 0 and 100')
