@@ -1,9 +1,10 @@
 
 import pandas as pd
+from pdpbox.utils import _get_string, _find_bucket
 
 
 def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, feature, feature_type,
-                    predict_kwds, data_transformer):
+                    predict_kwds, data_transformer, unit_test=False):
     """Apply predict function on a feature_grid
 
     Returns
@@ -51,11 +52,15 @@ def _calc_ice_lines(feature_grid, data, model, model_features, n_classes, featur
             grid_result = pd.DataFrame(preds[:, n_class], columns=[feature_grid])
             grid_results.append(grid_result)
 
-    return grid_results
+    # _data is returned for unit test
+    if unit_test:
+        return grid_results, _data
+    else:
+        return grid_results
 
 
 def _calc_ice_lines_inter(feature_grids_combo, data, model, model_features, n_classes, feature_list,
-                          predict_kwds, data_transformer):
+                          predict_kwds, data_transformer, unit_test=False):
     """Apply predict function on a grid combo
 
     Returns
@@ -86,19 +91,24 @@ def _calc_ice_lines_inter(feature_grids_combo, data, model, model_features, n_cl
         for n_class in range(n_classes):
             grid_result['class_%d_preds' % n_class] = preds[:, n_class]
 
-    return grid_result
+    # _data is returned for unit test
+    if unit_test:
+        return grid_result, _data
+    else:
+        return grid_result
 
 
 def _pdp_count_dist_xticklabels(feature_grids):
     """Create bucket names based on feature grids"""
     column_names = []
+    feature_grids_str = [_get_string(grid) for grid in feature_grids]
 
     # number of buckets: len(feature_grids) - 1
-    for i in range(len(feature_grids) - 1):
-        column_name = '[%.2f, %.2f)' % (feature_grids[i], feature_grids[i + 1])
+    for i in range(len(feature_grids_str) - 1):
+        column_name = '[%s, %s)' % (feature_grids_str[i], feature_grids_str[i + 1])
 
-        if i == len(feature_grids) - 2:
-            column_name = '[%.2f, %.2f]' % (feature_grids[i], feature_grids[i + 1])
+        if i == len(feature_grids_str) - 2:
+            column_name = '[%s, %s]' % (feature_grids_str[i], feature_grids_str[i + 1])
         column_names.append(column_name)
 
     return column_names
@@ -136,10 +146,12 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
             feature_grids = feature_grids + [vmax]
             count_x = count_x + [count_x[-1] + 1]
 
-        data_x['x'] = pd.cut(x=data_x[feature].values, bins=feature_grids, labels=False, include_lowest=True)
+        data_x['x'] = data_x[feature].apply(lambda x: _find_bucket(x=x, feature_grids=feature_grids, endpoint=True))
+        data_x = data_x[~data_x['x'].isnull()]
         data_x['count'] = 1
         count_data_temp = data_x.groupby('x', as_index=False).agg(
             {'count': 'count'}).sort_values('x', ascending=True).reset_index(drop=True)
+        count_data_temp['x'] = count_data_temp['x'] - count_data_temp['x'].min()
         count_data = pd.DataFrame(data={'x': range(len(feature_grids) - 1),
                                         'xticklabels': _pdp_count_dist_xticklabels(feature_grids=feature_grids)})
         count_data = count_data.merge(count_data_temp, on='x', how='left').fillna(0)
