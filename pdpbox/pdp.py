@@ -3,7 +3,8 @@ from .pdp_calc_utils import _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp
 from .pdp_plot_utils import (_pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
                     _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default,
-                    _plot_title, _calc_memory_usage, _get_grids, _get_grid_combos, _check_classes, _calc_figsize)
+                    _plot_title, _calc_memory_usage, _get_grids, _get_grid_combos, _check_classes, _calc_figsize,
+                    _get_string)
 
 import pandas as pd
 import numpy as np
@@ -146,7 +147,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
         else:
             # make sure grid points are unique and in ascending order
             feature_grids = np.array(sorted(np.unique(cust_grid_points)))
-        display_columns = [round(v, 3) for v in feature_grids]
+        display_columns = [_get_string(v) for v in feature_grids]
 
     # Parallel calculate ICE lines
     true_n_jobs = _calc_memory_usage(

@@ -160,6 +160,8 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     free_memory = psutil.virtual_memory()[1] * memory_limit
     num_units = int(np.floor(free_memory / unit_memory))
     true_n_jobs = np.min([num_units, n_jobs, total_units])
+    if true_n_jobs < 1:
+        true_n_jobs = 1
 
     return true_n_jobs
 
