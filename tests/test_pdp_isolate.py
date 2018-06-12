@@ -4,8 +4,9 @@ import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 from pandas.testing import assert_frame_equal
 import pandas as pd
+import matplotlib
 
-from pdpbox.pdp import pdp_isolate, pdp_interact
+from pdpbox.pdp import pdp_isolate, pdp_plot
 
 
 # @pytest.mark.skip(reason="slow")
@@ -256,3 +257,51 @@ def test_pdp_isolate_multiclass(otto_model, otto_data, otto_features):
 
     assert_array_equal(pdp_isolate_out[0].hist_data[[0, 10000, 20000, 30000, 40000, 50000, 60000]],
                        np.array([7, 0, 0, 0, 1, 4, 10]))
+
+
+def test_pdp_plot_single(titanic_data, titanic_model, titanic_features):
+    # single chart without data dist plot
+    pdp_sex = pdp_isolate(model=titanic_model, dataset=titanic_data, model_features=titanic_features, feature='Sex')
+    fig, axes = pdp_plot(pdp_sex, 'sex')
+
+    assert type(fig) == matplotlib.figure.Figure
+    assert sorted(axes.keys()) == ['pdp_ax', 'title_ax']
+    assert type(axes['pdp_ax']) == matplotlib.axes._subplots.Subplot
+    assert type(axes['title_ax']) == matplotlib.axes._subplots.Subplot
+
+    # single chart with data dist plot
+    fig, axes = pdp_plot(pdp_sex, 'sex', plot_pts_dist=True)
+    assert sorted(axes.keys()) == ['pdp_ax', 'title_ax']
+    assert sorted(axes['pdp_ax'].keys()) == ['_count_ax', '_pdp_ax']
+    assert type(axes['pdp_ax']['_pdp_ax']) == matplotlib.axes._subplots.Subplot
+    assert type(axes['pdp_ax']['_count_ax']) == matplotlib.axes._subplots.Subplot
+    assert type(axes['title_ax']) == matplotlib.axes._subplots.Subplot
+
+
+def test_pdp_plot_multi(otto_data, otto_model, otto_features):
+    # multi charts without data dist plot
+    pdp_feat_67_rf = pdp_isolate(model=otto_model, dataset=otto_data, model_features=otto_features, feature='feat_67')
+    fig, axes = pdp_plot(pdp_isolate_out=pdp_feat_67_rf, feature_name='feat_67', center=True, x_quantile=True)
+    assert type(fig) == matplotlib.figure.Figure
+    assert sorted(axes.keys()) == ['pdp_ax', 'title_ax']
+    assert len(axes['pdp_ax']) == 9
+    assert type(axes['title_ax']) == matplotlib.axes._subplots.Subplot
+    assert type(axes['pdp_ax'][0]) == matplotlib.axes._subplots.Subplot
+
+    # change which classes
+    fig, axes = pdp_plot(pdp_feat_67_rf, 'feat_67', center=True, x_quantile=True, ncols=2, which_classes=[0, 3, 7])
+    assert len(axes['pdp_ax']) == 3
+
+    # only keep 1 class
+    fig, axes = pdp_plot(pdp_feat_67_rf, 'feat_67', center=True, x_quantile=True, ncols=2, which_classes=[5])
+    assert type(axes['pdp_ax']) == matplotlib.axes._subplots.Subplot
+
+    # multi charts with data dist plot
+    fig, axes = pdp_plot(pdp_isolate_out=pdp_feat_67_rf, feature_name='feat_67', center=True,
+                         x_quantile=True, plot_pts_dist=True)
+    assert sorted(axes.keys()) == ['pdp_ax', 'title_ax']
+    assert len(axes['pdp_ax']) == 9
+    assert sorted(axes['pdp_ax'][0].keys()) == ['_count_ax', '_pdp_ax']
+    assert type(axes['pdp_ax'][0]['_count_ax']) == matplotlib.axes._subplots.Subplot
+    assert type(axes['pdp_ax'][0]['_pdp_ax']) == matplotlib.axes._subplots.Subplot
+

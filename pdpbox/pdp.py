@@ -194,7 +194,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
 
 def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, plot_lines=False, frac_to_plot=1,
              cluster=False, n_cluster_centers=None, cluster_method='accurate', x_quantile=False,
-             show_percentile=False, figsize=None, ncols=None, plot_params=None, which_classes=None):
+             show_percentile=False, figsize=None, ncols=2, plot_params=None, which_classes=None):
     """Plot partial dependent plot
 
     Parameters
