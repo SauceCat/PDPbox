@@ -228,7 +228,33 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
     plot_params:  dict or None, optional, default=None
-        parameters for the plot
+        parameters for the plot, possible parameters as well as default as below:
+
+        .. highlight:: python
+        .. code-block:: python
+
+            plot_params = {
+                # plot title and subtitle
+                'title': 'PDP for feature "%s"' % feature_name,
+                'subtitle': "Number of unique grid points: %d" % n_grids,
+                'font_family': 'Arial',
+                # matplotlib color map for ICE lines
+                'line_cmap': 'Blues',
+                'xticks_rotation': 0,
+                # pdp line color, highlight color and line width
+                'pdp_color': '#1A4E5D',
+                'pdp_hl_color': '#FEDC00',
+                'pdp_linewidth': 1.5,
+                # horizon zero line color and with
+                'zero_color': '#E75438',
+                'zero_linewidth': 1,
+                # pdp std fill color and alpha
+                'fill_color': '#66C2D7',
+                'fill_alpha': 0.2,
+                # marker size for pdp line
+                'markersize': 3.5,
+            }
+
     which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
 
