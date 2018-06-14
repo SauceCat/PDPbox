@@ -49,7 +49,6 @@ fig, axes = pdp.pdp_plot(
     plot_pts_dist=True,
     figsize=(12, 8)
 )
-_ = axes['pdp_ax']['_count_ax'].set_xticklabels(['Female', 'Male'])
 """
 """
 
@@ -60,7 +59,6 @@ fig, axes = pdp.pdp_plot(
     plot_lines=True,
     frac_to_plot=0.1
 )
-_ = axes['pdp_ax']['_count_ax'].set_xticklabels(['Female', 'Male'])
 """
 """
 
@@ -72,7 +70,6 @@ fig, axes = pdp.pdp_plot(
     frac_to_plot=0.1,
     center=False
 )
-_ = axes['pdp_ax']['_count_ax'].set_xticklabels(['Female', 'Male'])
 """
 """
 
@@ -84,7 +81,6 @@ fig, axes = pdp.pdp_plot(
     n_cluster_centers=10,
     cluster_method='approx'
 )
-_ = axes['pdp_ax']['_count_ax'].set_xticklabels(['Female', 'Male'])
 """
 """
 """
