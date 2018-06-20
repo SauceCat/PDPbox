@@ -237,6 +237,8 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
                 # plot title and subtitle
                 'title': 'PDP for feature "%s"' % feature_name,
                 'subtitle': "Number of unique grid points: %d" % n_grids,
+                'title_fontsize': 15,
+                'subtitle_fontsize': 12,
                 'font_family': 'Arial',
                 # matplotlib color map for ICE lines
                 'line_cmap': 'Blues',
@@ -622,7 +624,27 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
     plot_params: dict or None, optional, default=None
-        parameters for the plot
+        parameters for the plot, possible parameters as well as default as below:
+
+        .. highlight:: python
+        .. code-block:: python
+
+            plot_params = {
+                # plot title and subtitle
+                'title': 'PDP interact for "%s" and "%s"',
+                'subtitle': 'Number of unique grid points: (%s: %d, %s: %d)',
+                'title_fontsize': 15,
+                'subtitle_fontsize': 12,
+                # color for contour line
+                'contour_color':  'white',
+                'font_family': 'Arial',
+                # matplotlib color map for interact plot
+                'cmap': 'viridis',
+                # fill alpha for interact plot
+                'inter_fill_alpha': 0.8,
+                # fontsize for interact plot text
+                'inter_fontsize': 9,
+            }
 
     Returns
     -------

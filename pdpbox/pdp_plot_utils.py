@@ -1,5 +1,5 @@
 
-from .utils import _axes_modify, _sample_data, _modify_legend_ax
+from .utils import _axes_modify, _sample_data, _modify_legend_ax, _get_string
 
 import pandas as pd
 import numpy as np
@@ -354,10 +354,11 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
         inter_ax_divider = make_axes_locatable(inter_ax)
         cax = inter_ax_divider.append_axes("right", size="5%", pad="2%")
         if plot_type == 'grid':
-            boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, np.min([n_grids_x, n_grids_y]))]
+            cb_num_grids = np.max([np.min([n_grids_x, n_grids_y, 8]), 8])
+            boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)]
             cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
         else:
-            cb = plt.colorbar(im, cax=cax)
+            cb = plt.colorbar(im, cax=cax, format='%.3f')
         _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
         cb.outline.set_visible(False)
 
@@ -477,14 +478,15 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     if plot_type == 'grid':
         cax = inset_axes(inter_ax, width="100%", height="100%", loc='right', bbox_to_anchor=(1.05, 0., 0.05, 1),
                          bbox_transform=inter_ax.transAxes, borderpad=0)
-        boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax,
-                                                       np.min([len(feature_grids[0]), len(feature_grids[1])]))]
+        cb_num_grids = np.max([np.min([len(feature_grids[0]), len(feature_grids[1]), 8]), 8])
+        boundaries = [round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)]
         cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
     else:
         cax = inset_axes(inter_ax, width="5%", height="80%", loc='right')
-        cb = plt.colorbar(im, cax=cax)
+        cb = plt.colorbar(im, cax=cax, format='%.3f')
     _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
     cb.outline.set_visible(False)
+
 
     return {
         '_pdp_x_ax': pdp_x_ax,

@@ -146,7 +146,7 @@ def generate_notebook(output_path):
 
 # @pytest.mark.skip(reason="slow")
 def test_display_binary():
-    output_path = 'displays/pdp_isolate_binary.py'
+    output_path = 'tests/displays/pdp_isolate_binary.py'
 
     # delete potential generated script and notebook
     if os.path.isfile(output_path):
@@ -305,7 +305,7 @@ def test_display_binary():
 
 # @pytest.mark.skip(reason="slow")
 def test_display_regression():
-    output_path = 'displays/pdp_isolate_regression.py'
+    output_path = 'tests/displays/pdp_isolate_regression.py'
 
     # delete potential generated script and notebook
     if os.path.isfile(output_path):
@@ -378,7 +378,7 @@ def test_display_regression():
 
 # @pytest.mark.skip(reason="slow")
 def test_display_multiclass():
-    output_path = 'displays/pdp_isolate_multiclass.py'
+    output_path = 'tests/displays/pdp_isolate_multiclass.py'
 
     # delete potential generated script and notebook
     if os.path.isfile(output_path):
