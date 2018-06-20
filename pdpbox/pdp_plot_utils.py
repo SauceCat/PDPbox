@@ -340,15 +340,15 @@ def _pdp_inter_one(pdp_interact_out, feature_names, plot_type, inter_ax, x_quant
         _axes_modify(font_family=font_family, ax=inter_ax, grid=True)
 
         if pdp_interact_out.feature_types[0] != 'numeric' or x_quantile:
-            inter_ax.set_xticks(range(len(pdp_interact_out.feature_grids[0])))
-            inter_ax.set_xticklabels(pdp_interact_out.feature_grids[0])
+            inter_ax.set_xticks(range(len(pdp_interact_out.pdp_isolate_outs[0].display_columns)))
+            inter_ax.set_xticklabels(pdp_interact_out.pdp_isolate_outs[0].display_columns)
 
         if pdp_interact_out.feature_types[1] != 'numeric' or x_quantile:
-            inter_ax.set_yticks(range(len(pdp_interact_out.feature_grids[1])))
-            inter_ax.set_yticklabels(pdp_interact_out.feature_grids[1])
+            inter_ax.set_yticks(range(len(pdp_interact_out.pdp_isolate_outs[1].display_columns)))
+            inter_ax.set_yticklabels(pdp_interact_out.pdp_isolate_outs[1].display_columns)
 
-        inter_ax.set_xlabel(feature_names[0], fontsize=11, fontdict={'family': font_family})
-        inter_ax.set_ylabel(feature_names[1], fontsize=11, fontdict={'family': font_family})
+        inter_ax.set_xlabel(feature_names[0], fontsize=12, fontdict={'family': font_family})
+        inter_ax.set_ylabel(feature_names[1], fontsize=12, fontdict={'family': font_family})
 
         # insert colorbar
         inter_ax_divider = make_axes_locatable(inter_ax)
@@ -411,7 +411,7 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
         pdp_ax.set_yticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_yticks(range(len(ticklabels)))
         pdp_ax.set_yticklabels(ticklabels)
-        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 11})
+        pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
         if plot_type == 'contour':
             pdp_ax.get_yaxis().set_label_position('right')
         pdp_ax.set_xticks([])
@@ -420,7 +420,7 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
         pdp_ax.set_xticks(range(len(ticklabels)))
         pdp_ax.get_xaxis().tick_top()
         pdp_ax.set_xticklabels(ticklabels)
-        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 11})
+        pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
         if plot_type == 'grid':
             pdp_ax.get_xaxis().set_label_position('top')
         pdp_ax.set_yticks([])
@@ -459,10 +459,10 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     feature_grids = pdp_interact_out.feature_grids
 
     pdp_xy_params = {'cmap': cmap, 'norm': norm, 'vmean': vmean, 'plot_params': plot_params, 'plot_type': plot_type}
-    _pdp_xy(pdp_values=pdp_x, pdp_ax=pdp_x_ax, ticklabels=feature_grids[0], feature_name=feature_names[0],
-            y=False, **pdp_xy_params)
-    _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=feature_grids[1], feature_name=feature_names[1],
-            y=True, **pdp_xy_params)
+    _pdp_xy(pdp_values=pdp_x, pdp_ax=pdp_x_ax, ticklabels=pdp_interact_out.pdp_isolate_outs[0].display_columns,
+            feature_name=feature_names[0], y=False, **pdp_xy_params)
+    _pdp_xy(pdp_values=pdp_y, pdp_ax=pdp_y_ax, ticklabels=pdp_interact_out.pdp_isolate_outs[1].display_columns,
+            feature_name=feature_names[1], y=True, **pdp_xy_params)
 
     im = _pdp_inter_one(pdp_interact_out=pdp_interact_out, feature_names=feature_names, plot_type=plot_type,
                         inter_ax=inter_ax, x_quantile=x_quantile, plot_params=plot_params, norm=norm, ticks=False)
@@ -487,9 +487,9 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     cb.outline.set_visible(False)
 
     return {
-        'pdp_x_ax': pdp_x_ax,
-        'pdp_y_ax': pdp_y_ax,
-        'pdp_inter_ax': inter_ax
+        '_pdp_x_ax': pdp_x_ax,
+        '_pdp_y_ax': pdp_y_ax,
+        '_pdp_inter_ax': inter_ax
     }
 
 
