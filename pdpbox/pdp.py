@@ -3,7 +3,8 @@ from .pdp_calc_utils import _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp
 from .pdp_plot_utils import (_pdp_plot, _pdp_inter_three, _pdp_inter_one)
 from .utils import (_check_model, _check_dataset, _check_percentile_range, _check_feature,
                     _check_grid_type, _check_memory_limit, _check_frac_to_plot, _make_list, _expand_default,
-                    _plot_title, _calc_memory_usage, _get_grids, _get_grid_combos, _check_classes, _calc_figsize)
+                    _plot_title, _calc_memory_usage, _get_grids, _get_grid_combos, _check_classes, _calc_figsize,
+                    _get_string)
 
 import pandas as pd
 import numpy as np
@@ -146,7 +147,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
         else:
             # make sure grid points are unique and in ascending order
             feature_grids = np.array(sorted(np.unique(cust_grid_points)))
-        display_columns = [round(v, 3) for v in feature_grids]
+        display_columns = [_get_string(v) for v in feature_grids]
 
     # Parallel calculate ICE lines
     true_n_jobs = _calc_memory_usage(
@@ -193,7 +194,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
 
 def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, plot_lines=False, frac_to_plot=1,
              cluster=False, n_cluster_centers=None, cluster_method='accurate', x_quantile=False,
-             show_percentile=False, figsize=None, ncols=None, plot_params=None, which_classes=None):
+             show_percentile=False, figsize=None, ncols=2, plot_params=None, which_classes=None):
     """Plot partial dependent plot
 
     Parameters
@@ -227,7 +228,35 @@ def pdp_plot(pdp_isolate_out, feature_name, center=True, plot_pts_dist=False, pl
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
     plot_params:  dict or None, optional, default=None
-        parameters for the plot
+        parameters for the plot, possible parameters as well as default as below:
+
+        .. highlight:: python
+        .. code-block:: python
+
+            plot_params = {
+                # plot title and subtitle
+                'title': 'PDP for feature "%s"' % feature_name,
+                'subtitle': "Number of unique grid points: %d" % n_grids,
+                'title_fontsize': 15,
+                'subtitle_fontsize': 12,
+                'font_family': 'Arial',
+                # matplotlib color map for ICE lines
+                'line_cmap': 'Blues',
+                'xticks_rotation': 0,
+                # pdp line color, highlight color and line width
+                'pdp_color': '#1A4E5D',
+                'pdp_hl_color': '#FEDC00',
+                'pdp_linewidth': 1.5,
+                # horizon zero line color and with
+                'zero_color': '#E75438',
+                'zero_linewidth': 1,
+                # pdp std fill color and alpha
+                'fill_color': '#66C2D7',
+                'fill_alpha': 0.2,
+                # marker size for pdp line
+                'markersize': 3.5,
+            }
+
     which_classes: list, optional, default=None
         which classes to plot, only use when it is a multi-class problem
 
@@ -595,7 +624,27 @@ def pdp_interact_plot(pdp_interact_out, feature_names, plot_type='contour', x_qu
     ncols: integer, optional, default=2
         number subplot columns, used when it is multi-class problem
     plot_params: dict or None, optional, default=None
-        parameters for the plot
+        parameters for the plot, possible parameters as well as default as below:
+
+        .. highlight:: python
+        .. code-block:: python
+
+            plot_params = {
+                # plot title and subtitle
+                'title': 'PDP interact for "%s" and "%s"',
+                'subtitle': 'Number of unique grid points: (%s: %d, %s: %d)',
+                'title_fontsize': 15,
+                'subtitle_fontsize': 12,
+                # color for contour line
+                'contour_color':  'white',
+                'font_family': 'Arial',
+                # matplotlib color map for interact plot
+                'cmap': 'viridis',
+                # fill alpha for interact plot
+                'inter_fill_alpha': 0.8,
+                # fontsize for interact plot text
+                'inter_fontsize': 9,
+            }
 
     Returns
     -------

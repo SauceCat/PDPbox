@@ -34,7 +34,9 @@ def _check_feature(feature, df):
 def _check_percentile_range(percentile_range):
     """Make sure percentile range is valid"""
     if percentile_range is not None:
-        if len(_make_list(percentile_range)) != 2:
+        if type(percentile_range) != tuple:
+            raise ValueError('percentile_range: should be a tuple')
+        if len(percentile_range) != 2:
             raise ValueError('percentile_range: should contain 2 elements')
         if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
             raise ValueError('percentile_range: should be between 0 and 100')
@@ -158,6 +160,8 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     free_memory = psutil.virtual_memory()[1] * memory_limit
     num_units = int(np.floor(free_memory / unit_memory))
     true_n_jobs = np.min([num_units, n_jobs, total_units])
+    if true_n_jobs < 1:
+        true_n_jobs = 1
 
     return true_n_jobs
 
