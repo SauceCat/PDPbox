@@ -54,6 +54,12 @@ between predictors and model prediction.
   $ python setup.py install
   ```
 
+## TODO
+- [ ] complete unit test
+- [ ] test compatibility with python3
+- [ ] change logs
+- [ ] release new version
+
 ## Gallery
 - **PDP:** PDP for a single feature
     <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_plot.png' width=90%>
