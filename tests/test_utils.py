@@ -264,7 +264,7 @@ class TestGetGridCombos(object):
 def test_sample_data():
     from pdpbox.utils import _sample_data
 
-    fake_ice_lines = pd.DataFrame(range(100), columns=['line'])
+    fake_ice_lines = pd.DataFrame(np.arange(100), columns=['line'])
 
     ice_plot_data = _sample_data(ice_lines=fake_ice_lines, frac_to_plot=10)
     assert ice_plot_data.shape[0] == 10

@@ -1,5 +1,6 @@
 
 import pandas as pd
+import numpy as np
 from pdpbox.utils import _get_string, _find_bucket
 
 
@@ -135,7 +136,7 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
         data_x = data.copy()
         vmin, vmax = data[feature].min(), data[feature].max()
         feature_grids = list(feature_grids)
-        count_x = range(len(feature_grids) - 1)
+        count_x = list(np.arange(len(feature_grids) - 1))
 
         # append lower and upper bound to the grids
         # make sure all data points are included

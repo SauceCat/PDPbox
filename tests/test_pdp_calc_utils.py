@@ -4,6 +4,7 @@ from numpy.testing import assert_array_equal
 from pandas.testing import assert_frame_equal
 import pandas as pd
 from pdpbox.pdp_calc_utils import _calc_ice_lines, _calc_ice_lines_inter, _prepare_pdp_count_data
+import pytest
 
 
 # @pytest.mark.skip(reason="slow")

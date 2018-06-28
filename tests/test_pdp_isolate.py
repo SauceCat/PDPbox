@@ -58,7 +58,7 @@ class TestPDPIsolateBinary(object):
         assert pdp_isolate_out.feature == ['Embarked_C', 'Embarked_S', 'Embarked_Q']
         assert pdp_isolate_out.feature_type == 'onehot'
         assert_array_equal(pdp_isolate_out.feature_grids,
-                           np.array(['Embarked_C', 'Embarked_S', 'Embarked_Q'], dtype='|S10'))
+                           np.array(['Embarked_C', 'Embarked_S', 'Embarked_Q']))
         assert pdp_isolate_out.percentile_info == []
         assert pdp_isolate_out.display_columns == ['Embarked_C', 'Embarked_S', 'Embarked_Q']
 
