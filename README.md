@@ -59,6 +59,7 @@ between predictors and model prediction.
 - [ ] test compatibility with python3
 - [ ] change logs
 - [ ] release new version
+- [ ] notebooks for examples
 
 ## Gallery
 - **PDP:** PDP for a single feature
