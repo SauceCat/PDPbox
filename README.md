@@ -38,6 +38,9 @@ between predictors and model prediction.
 - Latest version: http://pdpbox.readthedocs.io/en/latest/
 - Historical versions:
   - [v0.1](https://github.com/SauceCat/PDPbox/blob/master/docs_history/v0.1/docs.md)
+  
+## Tutorials
+https://github.com/SauceCat/PDPbox/tree/master/tutorials
 
 
 ## Installation
