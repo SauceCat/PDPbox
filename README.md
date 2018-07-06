@@ -61,8 +61,8 @@ https://github.com/SauceCat/PDPbox/tree/master/tutorials
 - [ ] complete unit test
 - [ ] test compatibility with python3
 - [ ] change logs
-- [ ] release new version
-- [ ] notebooks for examples
+- [ ] release new version 
+- [x] notebook tutorials 
 
 ## Gallery
 - **PDP:** PDP for a single feature
