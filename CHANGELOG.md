@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Formal documentation hosted on readthedocs.org
 - Keep trace of historical documentations
 - Unit tests
-- `info_plots.target_plot_interact` for visualising average target value across interaction between two features
-- `info_plots.actual_plot_interact` for visualising prediction distribution across interaction between two features
-- `get_dataset` for storing model and dataset for three different problems 
+- `info_plots.target_plot_interact`: visualise average target value across interaction between two features
+- `info_plots.actual_plot_interact`: visualise prediction distribution across interaction between two features
+- `get_dataset`: store models and datasets for three different problems 
     (binary classification, multi-class classification, regression)
 - Tutorials in jupyter notebook format
 
