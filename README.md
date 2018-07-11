@@ -42,6 +42,8 @@ between predictors and model prediction.
 ## Tutorials
 https://github.com/SauceCat/PDPbox/tree/master/tutorials
 
+## Change Logs
+https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
 
 ## Installation
 
@@ -59,9 +61,13 @@ https://github.com/SauceCat/PDPbox/tree/master/tutorials
 
 ## TODO
 - [ ] complete unit test
-- [ ] test compatibility with python3
-- [ ] change logs
+
+- [ ] test compatibility with python3 
+
+- [x] change logs 
+
 - [ ] release new version 
+
 - [x] notebook tutorials 
 
 ## Gallery
