@@ -87,3 +87,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 	- Set `predict_kwds` default value into `None` instead of `{}`
 
 ### Fixed
+- Python3 compatibility
+- All plotting related functions would return a `matplotlib.figure.Figure` object 
+    as well as `Matplotlib.axes` for further modification
