@@ -144,7 +144,7 @@ def generate_notebook(output_path):
     os.system("mv %s %s" % (output_path.replace('.py', '.nbconvert.ipynb'), output_path.replace('.py', '.ipynb')))
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.skip(reason="display")
 def test_display_binary():
     output_path = 'tests/displays/pdp_isolate_binary.py'
 
@@ -303,7 +303,7 @@ def test_display_binary():
     generate_notebook(output_path)
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.skip(reason="display")
 def test_display_regression():
     output_path = 'tests/displays/pdp_isolate_regression.py'
 
@@ -376,7 +376,7 @@ def test_display_regression():
     generate_notebook(output_path=output_path)
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.skip(reason="display")
 def test_display_multiclass():
     output_path = 'tests/displays/pdp_isolate_multiclass.py'
 
