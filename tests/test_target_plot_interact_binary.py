@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from numpy import nan
 from pandas.testing import assert_frame_equal
-from pandas.testing import assert_series_equal
 
 
 def test_binary_onehot(titanic_data, titanic_target):
@@ -71,7 +70,7 @@ def test_onehot_numeric_endpoint(titanic_data, titanic_target):
     assert summary_df['count'].sum() == len(titanic_data)
 
 
-def test_onehot_numeric_gridpoints(titanic_data, titanic_target):
+def test_onehot_numeric_num_grid_points(titanic_data, titanic_target):
     fare_grid_points = 15
     fig, axes, summary_df = target_plot_interact(
         df=titanic_data,
@@ -242,7 +241,7 @@ def test_onehot_numeric_gridranges_outliers_endpoint(titanic_data, titanic_targe
     assert summary_df['count'].sum() == len(titanic_data)
 
 
-def test_onehot_numeric_gridpoints(titanic_data, titanic_target):
+def test_onehot_numeric_cust_grid_points(titanic_data, titanic_target):
     fig, axes, summary_df = target_plot_interact(
         df=titanic_data,
         features=['Fare', ['Embarked_C', 'Embarked_Q', 'Embarked_S']],
