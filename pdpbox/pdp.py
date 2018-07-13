@@ -486,8 +486,8 @@ class PDPInteract:
 
 
 def pdp_interact(model, dataset, model_features, features, num_grid_points=None, grid_types=None,
-                 percentile_ranges=None, grid_ranges=None, cust_grid_points=None, memory_limit=0.5, n_jobs=1,
-                 predict_kwds=None, data_transformer=None):
+                 percentile_ranges=None, grid_ranges=None, cust_grid_points=None, memory_limit=0.5,
+                 n_jobs=1, predict_kwds=None, data_transformer=None):
     """Calculate PDP interaction plot
 
     Parameters
@@ -526,6 +526,8 @@ def pdp_interact(model, dataset, model_features, features, num_grid_points=None,
     -------
     pdp_interact_out: instance of PDPInteract
     """
+    if predict_kwds is None:
+        predict_kwds = dict()
 
     # check function inputs
     n_classes, predict = _check_model(model=model)
