@@ -9,7 +9,6 @@ import matplotlib
 from pdpbox.pdp import pdp_isolate, pdp_plot
 
 
-# @pytest.mark.skip(reason="slow")
 class TestPDPIsolateBinary(object):
     def test_pdp_isolate_binary_feature(self, titanic_model, titanic_data, titanic_features):
         # feature_type: binary
@@ -170,7 +169,6 @@ class TestPDPIsolateBinary(object):
         assert_array_equal(pdp_isolate_out.hist_data[[0, 200, 400, 600, 800]], np.array([7.25, 9.5, 7.925, 27., 13.]))
 
 
-# @pytest.mark.skip(reason="slow")
 class TestPDPIsolateRegression(object):
     def test_pdp_isolate_regression(self, ross_model, ross_data, ross_features):
         pdp_isolate_out = pdp_isolate(
@@ -212,7 +210,6 @@ class TestPDPIsolateRegression(object):
             memory_limit=0.5, n_jobs=2, predict_kwds=None, data_transformer=None)
 
 
-# @pytest.mark.skip(reason="slow")
 def test_pdp_isolate_multiclass(otto_model, otto_data, otto_features):
     pdp_isolate_out = pdp_isolate(
         model=otto_model, dataset=otto_data, model_features=otto_features, feature='feat_67',

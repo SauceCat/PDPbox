@@ -4,6 +4,22 @@ import joblib
 from pathlib import Path
 
 
+def pytest_addoption(parser):
+    parser.addoption("--runslow", action="store_true",
+                     help="run slow tests")
+
+    parser.addoption("--rundisplay", action="store_true",
+                     help="run display tests")
+
+
+def pytest_runtest_setup(item):
+    if 'slow' in item.keywords and not item.config.getvalue("runslow"):
+        pytest.skip("need --runslow option to run")
+
+    if 'display' in item.keywords and not item.config.getvalue("rundisplay"):
+        pytest.skip("need --rundisplay option to run")
+
+
 @pytest.fixture(scope='session')
 def titanic():
     root_path = Path(__file__).resolve().parents[1]

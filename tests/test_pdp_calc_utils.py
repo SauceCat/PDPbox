@@ -7,7 +7,6 @@ from pdpbox.pdp_calc_utils import _calc_ice_lines, _calc_ice_lines_inter, _prepa
 import pytest
 
 
-# @pytest.mark.skip(reason="slow")
 class TestCalcICELinesBinary(object):
     def test_ice_binary(self, titanic_data, titanic_model, titanic_features):
         # binary feature
@@ -75,7 +74,6 @@ class TestCalcICELinesBinary(object):
         assert_array_equal(_data['Fare'].unique(), np.array([10.]))
 
 
-# @pytest.mark.skip(reason="slow")
 def test_calc_ice_lines_regression(ross_data, ross_model, ross_features):
     grid_results, _data = _calc_ice_lines(
         feature_grid=1, data=ross_data, model=ross_model, model_features=ross_features, n_classes=0,
@@ -88,7 +86,6 @@ def test_calc_ice_lines_regression(ross_data, ross_model, ross_features):
                        expected, check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
 def test_calc_ice_lines_multiclass(otto_data, otto_model, otto_features):
     grid_results, _data = _calc_ice_lines(
         feature_grid=1, data=otto_data, model=otto_model, model_features=otto_features, n_classes=9,
@@ -112,7 +109,6 @@ def test_calc_ice_lines_multiclass(otto_data, otto_model, otto_features):
                        expected_target_7, check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
 class TestCalcICELinesInterBinary(object):
     def test_ice_inter_binary_numeric(self, titanic_data, titanic_model, titanic_features):
         # binary and numeric
@@ -199,7 +195,6 @@ class TestCalcICELinesInterBinary(object):
                            check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
 def test_calc_ice_lines_inter_regression(ross_data, ross_model, ross_features):
     grid_results, _data = _calc_ice_lines_inter(
         feature_grids_combo=[1, 1, 0, 0, 0], data=ross_data, model=ross_model, model_features=ross_features,
@@ -258,7 +253,6 @@ def test_calc_ice_lines_inter_multiclass(otto_data, otto_model, otto_features):
                        check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
 class TestPreparePDPCountData(object):
     def test_count_data_binary(self, titanic_data):
         # binary feature
