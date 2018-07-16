@@ -1,7 +1,7 @@
 
 import pytest
 import joblib
-from pathlib import Path
+from os import path
 
 
 def pytest_addoption(parser):
@@ -20,10 +20,14 @@ def pytest_runtest_setup(item):
         pytest.skip("need --rundisplay option to run")
 
 
+@pytest.fixture(scope='function')
+def root_path():
+    return path.abspath(path.join(path.dirname(path.abspath(__file__)), '..'))
+
+
 @pytest.fixture(scope='session')
-def titanic():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_titanic.pkl'
+def titanic(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_titanic.pkl')
     return joblib.load(file)
 
 
@@ -48,9 +52,8 @@ def titanic_model(titanic):
 
 
 @pytest.fixture(scope='session')
-def ross():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_ross.pkl'
+def ross(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_ross.pkl')
     return joblib.load(file)
 
 
@@ -75,9 +78,8 @@ def ross_model(ross):
 
 
 @pytest.fixture(scope='session')
-def otto():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_otto.pkl'
+def otto(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_otto.pkl')
     return joblib.load(file)
 
 

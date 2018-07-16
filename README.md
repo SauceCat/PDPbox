@@ -1,6 +1,7 @@
 
 # PDPbox
 [![PyPI version](https://badge.fury.io/py/PDPbox.svg)](https://badge.fury.io/py/PDPbox)
+[![Build Status](https://travis-ci.com/SauceCat/PDPbox.svg?branch=master)](https://travis-ci.com/SauceCat/PDPbox)
 
 python partial dependence plot toolbox
 
