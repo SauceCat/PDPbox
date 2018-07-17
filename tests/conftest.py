@@ -20,7 +20,7 @@ def pytest_runtest_setup(item):
         pytest.skip("need --rundisplay option to run")
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='session')
 def root_path():
     return path.abspath(path.join(path.dirname(path.abspath(__file__)), '..'))
 
