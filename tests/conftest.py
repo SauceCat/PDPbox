@@ -1,13 +1,33 @@
 
 import pytest
 import joblib
-from pathlib import Path
+from os import path
+
+
+def pytest_addoption(parser):
+    parser.addoption("--runslow", action="store_true",
+                     help="run slow tests")
+
+    parser.addoption("--rundisplay", action="store_true",
+                     help="run display tests")
+
+
+def pytest_runtest_setup(item):
+    if 'slow' in item.keywords and not item.config.getvalue("runslow"):
+        pytest.skip("need --runslow option to run")
+
+    if 'display' in item.keywords and not item.config.getvalue("rundisplay"):
+        pytest.skip("need --rundisplay option to run")
 
 
 @pytest.fixture(scope='session')
-def titanic():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_titanic.pkl'
+def root_path():
+    return path.abspath(path.join(path.dirname(path.abspath(__file__)), '..'))
+
+
+@pytest.fixture(scope='session')
+def titanic(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_titanic.pkl')
     return joblib.load(file)
 
 
@@ -32,9 +52,8 @@ def titanic_model(titanic):
 
 
 @pytest.fixture(scope='session')
-def ross():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_ross.pkl'
+def ross(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_ross.pkl')
     return joblib.load(file)
 
 
@@ -59,9 +78,8 @@ def ross_model(ross):
 
 
 @pytest.fixture(scope='session')
-def otto():
-    root_path = Path(__file__).resolve().parents[1]
-    file = root_path / 'pdpbox' / 'datasets' / 'test_otto.pkl'
+def otto(root_path):
+    file = path.join(root_path, 'pdpbox', 'datasets', 'test_otto.pkl')
     return joblib.load(file)
 
 

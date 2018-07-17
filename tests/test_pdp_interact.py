@@ -9,7 +9,6 @@ import matplotlib
 from pdpbox.pdp import pdp_interact, pdp_interact_plot
 
 
-# @pytest.mark.skip(reason="slow")
 class TestPDPInteractBinary(object):
     def test_binary_numeric(self, titanic_model, titanic_data, titanic_features):
         pdp_interact_out = pdp_interact(model=titanic_model, dataset=titanic_data, model_features=titanic_features,
@@ -51,7 +50,7 @@ class TestPDPInteractBinary(object):
         assert_frame_equal(pdp_interact_out.pdp.iloc[[0, 3, 5]], expected, check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.slow
 class TestPDPInteractRegression(object):
     def test_binary_numeric(self, ross_model, ross_data, ross_features):
         pdp_interact_out = pdp_interact(model=ross_model, dataset=ross_data, model_features=ross_features,
@@ -94,11 +93,11 @@ class TestPDPInteractRegression(object):
         assert_frame_equal(pdp_interact_out.pdp.iloc[[0, 3, 5, 7]], expected, check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.slow
 class TestPDPInteractMulticlass(object):
     def test_numeric_numeric(self, otto_model, otto_data, otto_features):
         pdp_interact_out = pdp_interact(model=otto_model, dataset=otto_data, model_features=otto_features,
-                                        features=['feat_67', 'feat_24'], n_jobs=4)
+                                        features=['feat_67', 'feat_24'])
         assert len(pdp_interact_out) == 9
         assert pdp_interact_out[0]._type == 'PDPInteract_instance'
         assert pdp_interact_out[0].n_classes == 9
@@ -136,7 +135,6 @@ class TestPDPInteractMulticlass(object):
                            check_like=True, check_dtype=False)
 
 
-# @pytest.mark.skip(reason="slow")
 class TestPDPInteractSingle(object):
     @pytest.fixture
     def pdp_interact_out(self, titanic_data, titanic_model, titanic_features):
@@ -179,7 +177,7 @@ class TestPDPInteractSingle(object):
             assert type(axes['pdp_inter_ax'][k]) == matplotlib.axes._subplots.Subplot
 
 
-# @pytest.mark.skip(reason="slow")
+@pytest.mark.slow
 class TestPDPInteractMulti(object):
     @pytest.fixture
     def pdp_interact_out(self, otto_data, otto_model, otto_features):

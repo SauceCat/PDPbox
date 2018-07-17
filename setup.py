@@ -16,6 +16,7 @@ setup(name='PDPbox',
       install_requires=[
           'pandas',
           'numpy',
+          'scipy',
           'matplotlib>=2.1.2',
           'joblib',
           'psutil',

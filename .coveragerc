@@ -1,0 +1,11 @@
+[run]
+include =
+    ./*
+
+omit =
+    *tests*
+    */_version.py
+    docs/*
+    docs_history/*
+    notebooks/*
+    .tox/*
