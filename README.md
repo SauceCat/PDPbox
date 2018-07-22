@@ -60,9 +60,17 @@ https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
   $ python setup.py install
   ```
 
+
 ## Testing
 
-PDPbox can be tested using `tox`.
+PDPbox can be tested using `tox`. 
+
+- Before testing, you need to first install these requirements:
+    ```
+    xgboost=0.6
+    py2nb
+    yapf=0.22.0
+    ```
 
 - First install `tox` and `tox-venv`
 
