@@ -10,7 +10,6 @@ setup(name='PDPbox',
       author='SauceCat',
       author_email='jiangchun.lee@gmail.com',
       url='https://github.com/SauceCat/PDPbox',
-      download_url = 'https://github.com/SauceCat/PDPbox/archive/0.1.zip',
       license='MIT',
       classifiers = [],
       install_requires=[
