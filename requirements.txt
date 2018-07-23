@@ -6,5 +6,8 @@ joblib
 psutil
 scikit-learn
 numpydoc>=0.7.0
+xgboost=0.6
+py2nb
+yapf=0.22.0
 
 
