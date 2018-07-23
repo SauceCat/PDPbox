@@ -38,7 +38,7 @@ between predictors and model prediction.
 
 - Latest version: http://pdpbox.readthedocs.io/en/latest/
 - Historical versions:
-  - [v0.1](https://github.com/SauceCat/PDPbox/blob/master/docs_history/v0.1/docs.md)
+  - [v0.1.0](https://github.com/SauceCat/PDPbox/blob/master/docs_history/v0.1/docs.md)
   
 ## Tutorials
 https://github.com/SauceCat/PDPbox/tree/master/tutorials
@@ -48,7 +48,7 @@ https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
 
 ## Installation
 
-- through pip (stable version)
+- through pip (latest stable version： 0.2.0)
   ```
   $ pip install pdpbox
   ```
@@ -75,18 +75,7 @@ PDPbox can be tested using `tox`.
 - To test the documentation, call `tox -e docs`. 
   The documentation should open up in your browser if it is successfully build.
   Otherwise, the problem with the documentation will be reported in the output of the command.
-  
 
-## TODO
-- [ ] complete unit test
-
-- [ ] test compatibility with python3 
-
-- [x] change logs 
-
-- [ ] release new version 
-
-- [x] notebook tutorials 
 
 ## Gallery
 - **PDP:** PDP for a single feature
