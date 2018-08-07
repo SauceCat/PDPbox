@@ -106,3 +106,7 @@ venv.bak/
 # pycharm
 .idea
 
+# readthedocs
+_build
+_static
+_templates
