@@ -28,9 +28,6 @@ sys.path.insert(0, os.path.abspath(os.path.pardir))
 #
 # needs_sphinx = '1.0'
 
-# needed because readthedocs doesn't have python with tkinter (needed by matplotlib)
-autodoc_mock_imports = ['_tkinter']
-
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
@@ -163,4 +160,6 @@ texinfo_documents = [
 ]
 
 
-
+# needed because readthedocs doesn't have python with tkinter (needed by matplotlib)
+import matplotlib
+matplotlib.use('agg')
