@@ -67,7 +67,7 @@ class PDPIsolate(object):
 
 def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, grid_type='percentile',
                 percentile_range=None, grid_range=None, cust_grid_points=None,
-                memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None):
+                memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None):
     """Calculate PDP isolation plot
 
     Parameters
@@ -101,7 +101,7 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
         check:
         1. https://pythonhosted.org/joblib/parallel.html#bad-interaction-of-multiprocessing-and-third-party-libraries
         2. https://github.com/scikit-learn/scikit-learn/issues/6627
-    predict_kwds: dict or None, optional, default=None
+    predict_kwds: dict, optional, default={}
         keywords to be passed to the model's predict function
     data_transformer: function or None, optional, default=None
         function to transform the data set as some features changing values
@@ -125,9 +125,6 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
     _check_grid_type(grid_type=grid_type)
     _check_percentile_range(percentile_range=percentile_range)
     _check_memory_limit(memory_limit=memory_limit)
-
-    if predict_kwds is None:
-        predict_kwds = dict()
 
     # feature_grids: grid points to calculate on
     # display_columns: xticklabels for grid points
@@ -487,7 +484,7 @@ class PDPInteract:
 
 def pdp_interact(model, dataset, model_features, features, num_grid_points=None, grid_types=None,
                  percentile_ranges=None, grid_ranges=None, cust_grid_points=None, memory_limit=0.5,
-                 n_jobs=1, predict_kwds=None, data_transformer=None):
+                 n_jobs=1, predict_kwds={}, data_transformer=None):
     """Calculate PDP interaction plot
 
     Parameters
@@ -517,7 +514,7 @@ def pdp_interact(model, dataset, model_features, features, num_grid_points=None,
         check:
         1. https://pythonhosted.org/joblib/parallel.html#bad-interaction-of-multiprocessing-and-third-party-libraries
         2. https://github.com/scikit-learn/scikit-learn/issues/6627
-    predict_kwds: dict or None, optional, default=None
+    predict_kwds: dict, optional, default={}
         keywords to be passed to the model's predict function
     data_transformer: function or None, optional, default=None
         function to transform the data set as some features changing values
@@ -526,8 +523,6 @@ def pdp_interact(model, dataset, model_features, features, num_grid_points=None,
     -------
     pdp_interact_out: instance of PDPInteract
     """
-    if predict_kwds is None:
-        predict_kwds = dict()
 
     # check function inputs
     n_classes, predict = _check_model(model=model)

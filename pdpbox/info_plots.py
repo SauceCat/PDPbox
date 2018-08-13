@@ -166,7 +166,7 @@ def q3(x):
 
 def actual_plot(model, X, feature, feature_name, num_grid_points=10, grid_type='percentile', percentile_range=None,
                 grid_range=None, cust_grid_points=None, show_percentile=False, show_outliers=False, endpoint=True,
-                which_classes=None, predict_kwds=None, ncols=2, figsize=None, plot_params=None):
+                which_classes=None, predict_kwds={}, ncols=2, figsize=None, plot_params=None):
     """Plot prediction distribution across different feature values (feature grid)
 
     Parameters
