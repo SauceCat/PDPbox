@@ -15,7 +15,7 @@ class TestPDPIsolateBinary(object):
         pdp_isolate_out = pdp_isolate(
             model=titanic_model, dataset=titanic_data, model_features=titanic_features, feature='Sex',
             num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None,
-            memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None)
+            memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None)
 
         assert pdp_isolate_out._type == 'PDPIsolate_instance'
         assert pdp_isolate_out.n_classes == 2
@@ -49,7 +49,7 @@ class TestPDPIsolateBinary(object):
             model=titanic_model, dataset=titanic_data, model_features=titanic_features,
             feature=['Embarked_C', 'Embarked_S', 'Embarked_Q'], num_grid_points=10, grid_type='percentile',
             percentile_range=None, grid_range=None, cust_grid_points=None, memory_limit=0.5, n_jobs=1,
-            predict_kwds=None, data_transformer=None)
+            predict_kwds={}, data_transformer=None)
 
         assert pdp_isolate_out._type == 'PDPIsolate_instance'
         assert pdp_isolate_out.n_classes == 2
@@ -89,7 +89,7 @@ class TestPDPIsolateBinary(object):
             model=titanic_model, dataset=titanic_data, model_features=titanic_features, feature='Fare',
             num_grid_points=10,
             grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None, memory_limit=0.5,
-            n_jobs=1, predict_kwds=None, data_transformer=None)
+            n_jobs=1, predict_kwds={}, data_transformer=None)
 
         assert pdp_isolate_out._type == 'PDPIsolate_instance'
         assert pdp_isolate_out.n_classes == 2
@@ -133,7 +133,7 @@ class TestPDPIsolateBinary(object):
             model=titanic_model, dataset=titanic_data, model_features=titanic_features, feature='Fare',
             num_grid_points=10,
             grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=range(0, 100, 5),
-            memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None)
+            memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None)
 
         assert pdp_isolate_out._type == 'PDPIsolate_instance'
         assert pdp_isolate_out.n_classes == 2
@@ -174,7 +174,7 @@ class TestPDPIsolateRegression(object):
         pdp_isolate_out = pdp_isolate(
             model=ross_model, dataset=ross_data, model_features=ross_features, feature='SchoolHoliday',
             num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None,
-            memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None)
+            memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None)
 
         assert pdp_isolate_out._type == 'PDPIsolate_instance'
         assert pdp_isolate_out.n_classes == 0
@@ -207,14 +207,14 @@ class TestPDPIsolateRegression(object):
         _ = pdp_isolate(
             model=ross_model, dataset=ross_data, model_features=ross_features, feature='SchoolHoliday',
             num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None,
-            memory_limit=0.5, n_jobs=2, predict_kwds=None, data_transformer=None)
+            memory_limit=0.5, n_jobs=2, predict_kwds={}, data_transformer=None)
 
 
 def test_pdp_isolate_multiclass(otto_model, otto_data, otto_features):
     pdp_isolate_out = pdp_isolate(
         model=otto_model, dataset=otto_data, model_features=otto_features, feature='feat_67',
         num_grid_points=10, grid_type='percentile', percentile_range=None, grid_range=None, cust_grid_points=None,
-        memory_limit=0.5, n_jobs=1, predict_kwds=None, data_transformer=None)
+        memory_limit=0.5, n_jobs=1, predict_kwds={}, data_transformer=None)
 
     assert len(pdp_isolate_out) == 9
     assert pdp_isolate_out[0]._type == 'PDPIsolate_instance'
