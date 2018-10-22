@@ -248,7 +248,7 @@ def _pdp_contour_plot(X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, font
     level = np.min([X.shape[0], X.shape[1]])
     c1 = inter_ax.contourf(X, Y, pdp_mx, N=level, origin='lower', cmap=cmap, norm=norm, alpha=inter_fill_alpha)
     c2 = inter_ax.contour(c1, levels=c1.levels, colors=contour_color, origin='lower')
-    inter_ax.clabel(c2, contour_label_fontsize=fontsize, inline=1)
+    inter_ax.clabel(c2, fontsize=fontsize, inline=1)
     inter_ax.set_aspect('auto')
 
     # return the color mapping object for colorbar
