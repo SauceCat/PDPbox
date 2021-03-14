@@ -407,24 +407,23 @@ def _pdp_xy(pdp_values, vmean, pdp_ax, ticklabels, feature_name, cmap, norm, plo
             pdp_ax.text(x=idx, y=0, **text_params)
 
     pdp_ax.set_frame_on(False)
+    pdp_ax.axes.axis('tight')
 
     if y:
-        pdp_ax.set_yticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_yticks(range(len(ticklabels)))
         pdp_ax.set_yticklabels(ticklabels)
         pdp_ax.set_ylabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
         if plot_type == 'contour':
             pdp_ax.get_yaxis().set_label_position('right')
-        pdp_ax.set_xticks([])
+        pdp_ax.get_xaxis().set_visible(False)
     else:
-        pdp_ax.set_xticks(np.arange(len(pdp_values) - 1) + 0.5, minor=True)
         pdp_ax.set_xticks(range(len(ticklabels)))
         pdp_ax.get_xaxis().tick_top()
         pdp_ax.set_xticklabels(ticklabels)
         pdp_ax.set_xlabel(feature_name, fontdict={'family': font_family, 'fontsize': 12})
         if plot_type == 'grid':
             pdp_ax.get_xaxis().set_label_position('top')
-        pdp_ax.set_yticks([])
+        pdp_ax.get_yaxis().set_visible(False)
 
     pdp_ax.grid(which="minor", color="w", linestyle='-', linewidth=1)
     pdp_ax.tick_params(which="minor", top=False, left=False)
@@ -442,12 +441,9 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
     cmap = plot_params.get('cmap', 'viridis')
     font_family = plot_params.get('font_family', 'Arial')
 
-    inter_ax = plt.subplot(chart_grids[3])
-    fig.add_subplot(inter_ax)
-    pdp_x_ax = plt.subplot(chart_grids[1], sharex=inter_ax)
-    fig.add_subplot(pdp_x_ax)
-    pdp_y_ax = plt.subplot(chart_grids[2], sharey=inter_ax)
-    fig.add_subplot(pdp_y_ax)
+    pdp_x_ax = fig.add_subplot(chart_grids[1])
+    pdp_y_ax = fig.add_subplot(chart_grids[2])
+    inter_ax = fig.add_subplot(chart_grids[3], sharex=pdp_x_ax, sharey=pdp_y_ax)
 
     pdp_x = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[0].pdp)
     pdp_y = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[1].pdp)
@@ -493,8 +489,3 @@ def _pdp_inter_three(pdp_interact_out, feature_names, plot_type, chart_grids, x_
         '_pdp_y_ax': pdp_y_ax,
         '_pdp_inter_ax': inter_ax
     }
-
-
-
-
-

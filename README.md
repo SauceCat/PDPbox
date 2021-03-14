@@ -5,6 +5,18 @@
 
 python partial dependence plot toolbox
 
+
+## Update!
+<img src="images/3_years_codes.gif" />
+
+Update for versions:
+```
+xgboost==1.3.3
+matplotlib==3.1.1
+sklearn==0.23.1
+```
+
+
 ## Motivation
 
 This repository is inspired by ICEbox. The goal is to visualize the impact of certain features towards model
