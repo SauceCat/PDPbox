@@ -6,7 +6,7 @@
 python partial dependence plot toolbox
 
 
-## Update!
+## Update! 😹
 <img src="images/3_years_codes.gif" />
 
 Update for versions:
@@ -60,7 +60,7 @@ https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
 
 ## Installation
 
-- through pip (latest stable version： 0.2.0)
+- through pip (latest stable version： 0.2.1)
   ```
   $ pip install pdpbox
   ```
@@ -82,7 +82,7 @@ PDPbox can be tested using `tox`.
   $ pip install tox tox-venv
   ```
   
-- Call `tox` inside the pdpbox clone directory. This will run tests with python 2.7 and 3.6 (if available).
+- Call `tox` inside the pdpbox clone directory. This will run tests with python3.7.
 
 - To test the documentation, call `tox -e docs`. 
   The documentation should open up in your browser if it is successfully build.
