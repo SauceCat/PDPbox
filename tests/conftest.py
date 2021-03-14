@@ -1,7 +1,9 @@
 
 import pytest
 import joblib
-from os import path
+import os
+import json
+import pandas as pd
 
 
 def pytest_addoption(parser):
@@ -22,13 +24,23 @@ def pytest_runtest_setup(item):
 
 @pytest.fixture(scope='session')
 def root_path():
-    return path.abspath(path.join(path.dirname(path.abspath(__file__)), '..'))
+    return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 
 @pytest.fixture(scope='session')
 def titanic(root_path):
-    file = path.join(root_path, 'pdpbox', 'datasets', 'test_titanic.pkl')
-    return joblib.load(file)
+    DIR = os.path.join(root_path, 'pdpbox')
+    with open(os.path.join(DIR, 'datasets/titanic/titanic_info.json'), 'r') as fin:
+        info = json.load(fin)
+
+    dataset = {
+        'data': pd.read_csv(os.path.join(DIR, 'datasets/titanic/titanic_data.csv')),
+        'xgb_model': joblib.load(os.path.join(DIR, 'datasets/titanic/titanic_model.pkl')),
+        'features': info['features'],
+        'target': info['target']
+    }
+
+    return dataset
 
 
 @pytest.fixture(scope='module')
@@ -53,8 +65,18 @@ def titanic_model(titanic):
 
 @pytest.fixture(scope='session')
 def ross(root_path):
-    file = path.join(root_path, 'pdpbox', 'datasets', 'test_ross.pkl')
-    return joblib.load(file)
+    DIR = os.path.join(root_path, 'pdpbox')
+    with open(os.path.join(DIR, 'datasets/ross/ross_info.json'), 'r') as fin:
+        info = json.load(fin)
+
+    dataset = {
+        'data': pd.read_csv(os.path.join(DIR, 'datasets/ross/ross_data.csv')),
+        'rf_model': joblib.load(os.path.join(DIR, 'datasets/ross/ross_model.pkl')),
+        'features': info['features'],
+        'target': info['target']
+    }
+
+    return dataset
 
 
 @pytest.fixture(scope='module')
@@ -79,8 +101,18 @@ def ross_model(ross):
 
 @pytest.fixture(scope='session')
 def otto(root_path):
-    file = path.join(root_path, 'pdpbox', 'datasets', 'test_otto.pkl')
-    return joblib.load(file)
+    DIR = os.path.join(root_path, 'pdpbox')
+    with open(os.path.join(DIR, 'datasets/otto/otto_info.json'), 'r') as fin:
+        info = json.load(fin)
+
+    dataset = {
+        'data': pd.read_csv(os.path.join(DIR, 'datasets/otto/otto_data.csv')),
+        'rf_model': joblib.load(os.path.join(DIR, 'datasets/otto/otto_model.pkl')),
+        'features': info['features'],
+        'target': info['target']
+    }
+
+    return dataset
 
 
 @pytest.fixture(scope='module')
