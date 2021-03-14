@@ -1,5 +1,8 @@
 language: python
-cache: pip
+cache: 
+  pip: true
+  directories:
+    - .git/lfs
 branches:
   only:
     - master
@@ -20,6 +23,10 @@ before_install:
   - "export DISPLAY=:99.0"
   # - "sh -e /etc/init.d/xvfb start"
   - sleep 3
-install: pip install tox tox-venv
+git:
+  lfs_skip_smudge: true
+install: 
+  - git lfs pull
+  - pip install tox tox-venv
 script: 
   - tox -e $TOXENV
