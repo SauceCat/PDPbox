@@ -16,9 +16,10 @@ setup(name='PDPbox',
           'pandas',
           'numpy',
           'scipy',
-          'matplotlib>=2.1.2',
           'joblib',
           'psutil',
-          'scikit-learn'
+          'xgboost==1.3.3',
+          'matplotlib==3.1.1',
+          'sklearn==0.23.1'
       ],
       zip_safe=False)
