@@ -1,0 +1,19 @@
+{
+    "features": [
+        "DayOfWeek",
+        "SchoolHoliday",
+        "month",
+        "weekofyear",
+        "StateHoliday_a",
+        "StateHoliday_b",
+        "StateHoliday_c",
+        "StoreType_a",
+        "StoreType_b",
+        "StoreType_c",
+        "StoreType_d",
+        "Assortment_a",
+        "Assortment_b",
+        "Assortment_c"
+    ],
+    "target": "Sales"
+}

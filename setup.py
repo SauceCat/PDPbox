@@ -3,7 +3,7 @@ import versioneer
 
 setup(name='PDPbox',
       packages=['pdpbox'],
-      package_data={'pdpbox': ['datasets/*.pkl']},
+      package_data={'pdpbox': ['datasets/*/*']},
       version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
       description='python partial dependence plot toolbox',
@@ -18,8 +18,7 @@ setup(name='PDPbox',
           'scipy',
           'joblib',
           'psutil',
-          'xgboost==1.3.3',
           'matplotlib==3.1.1',
-          'sklearn==0.23.1'
+          'sklearn'
       ],
       zip_safe=False)
