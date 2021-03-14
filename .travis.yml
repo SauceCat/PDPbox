@@ -21,6 +21,6 @@ before_install:
   # - "sh -e /etc/init.d/xvfb start"
   - sleep 3
 install: 
-  - pip install tox tox-venv tox-cmake
+  - pip install tox tox-venv
 script: 
   - tox -e $TOXENV

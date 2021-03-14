@@ -12,5 +12,13 @@ setup(name='PDPbox',
       url='https://github.com/SauceCat/PDPbox',
       license='MIT',
       classifiers = [],
-      install_requires=[],
+      install_requires=[
+          'pandas',
+          'numpy',
+          'scipy',
+          'joblib',
+          'psutil',
+          'matplotlib==3.1.1',
+          'sklearn'
+      ],
       zip_safe=False)
