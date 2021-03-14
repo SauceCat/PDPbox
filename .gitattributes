@@ -1,1 +1,4 @@
 pdpbox/_version.py export-subst
+pdpbox/datasets/test_otto.pkl filter=lfs diff=lfs merge=lfs -text
+pdpbox/datasets/test_ross.pkl filter=lfs diff=lfs merge=lfs -text
+pdpbox/datasets/test_titanic.pkl filter=lfs diff=lfs merge=lfs -text
