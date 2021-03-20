@@ -135,6 +135,9 @@ def pdp_isolate(model, dataset, model_features, feature, num_grid_points=10, gri
     elif feature_type == 'onehot':
         feature_grids = np.array(feature)
         display_columns = feature
+    elif feature_type == 'categorical':
+        feature_grids = _dataset[feature].unique().tolist()
+        display_columns = feature_grids
     else:
         # calculate grid points for numeric features
         if cust_grid_points is None:

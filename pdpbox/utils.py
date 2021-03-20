@@ -25,6 +25,8 @@ def _check_feature(feature, df):
             raise ValueError('feature does not exist: %s' % feature)
         if sorted(list(np.unique(df[feature]))) == [0, 1]:
             feature_type = 'binary'
+        elif not pd.api.types.is_numeric_dtype(df[feature]):
+            feature_type = 'categorical'
         else:
             feature_type = 'numeric'
 
@@ -326,6 +328,8 @@ def _find_bucket(x, feature_grids, endpoint):
 
 
 def _get_string(x):
+    if isinstance(x, str):
+        return x
     if int(x) == x:
         x_str = str(int(x))
     elif round(x, 1) == x:
