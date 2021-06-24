@@ -19,6 +19,6 @@ setup(name='PDPbox',
           'joblib',
           'psutil',
           'matplotlib==3.1.1',
-          'sklearn'
+          'scikit-learn'
       ],
       zip_safe=False)

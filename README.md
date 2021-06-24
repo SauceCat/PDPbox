@@ -13,7 +13,7 @@ Update for versions:
 ```
 xgboost==1.3.3
 matplotlib==3.1.1
-sklearn==0.23.1
+scikit-learn==0.23.1
 ```
 
 
