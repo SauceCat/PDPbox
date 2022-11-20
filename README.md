@@ -14,10 +14,8 @@ Honestly, when I developed this package four years ago, I just treated it as a s
 would give me a quick taste of real-world python package development. 
 
 Also, I personally switched to deep learning related field since 2018 and thus ceased the development 
-as well as maintenance.
-
-Well, during these years, I started to see it appeared in some online courses and books. 
-I think I should take on some responsibility by reviewing my codes, adding new features if necessary and creating more tutorials.
+as well as maintenance. Well, during these years, I started to see it appeared in some online courses and books. 
+I think I should take on some responsibilities by reviewing my codes, adding new features if necessary and creating more tutorials.
 
 Update for versions:
 ```
