@@ -110,3 +110,8 @@ venv.bak/
 _build
 _static
 _templates
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*

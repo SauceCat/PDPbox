@@ -6,8 +6,18 @@
 python partial dependence plot toolbox
 
 
-## Update! 😹
-<img src="images/3_years_codes.gif" />
+## I am back! :smirk_cat:
+After four years... 
+
+It seems PDPbox has become quite popular, which is beyond my expectation. 
+Honestly, when I developed this package four years ago, I just treated it as a small side project that 
+would give me a quick taste of real-world python package development. 
+
+Also, I personally switched to deep learning related field since 2018 and thus ceased the development 
+as well as maintenance.
+
+Well, during these years, I started to see it appeared in some online courses and books. 
+I think I should take on some responsibility by reviewing my codes, adding new features if necessary and creating more tutorials.
 
 Update for versions:
 ```
@@ -113,3 +123,9 @@ PDPbox can be tested using `tox`.
 
 - **Information plot:** actual prediction plot for a single feature
     <img src='https://github.com/SauceCat/PDPbox/blob/master/images/actual_plot.png' width=90%>
+
+
+## Tools
+- documentation: 
+    - [Sphinx](https://www.sphinx-doc.org/en/master/)
+    - [Read the Docs](https://readthedocs.org/)
