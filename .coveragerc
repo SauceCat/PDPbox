@@ -7,5 +7,5 @@ omit =
     */_version.py
     docs/*
     docs_history/*
-    notebooks/*
+    tutorials/*
     .tox/*

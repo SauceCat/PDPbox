@@ -67,4 +67,5 @@ Installation
    :caption: Contents
 
    papers
+   tools
    api

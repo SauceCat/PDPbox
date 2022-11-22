@@ -121,9 +121,3 @@ PDPbox can be tested using `tox`.
 
 - **Information plot:** actual prediction plot for a single feature
     <img src='https://github.com/SauceCat/PDPbox/blob/master/images/actual_plot.png' width=90%>
-
-
-## Tools
-- documentation: 
-    - [Sphinx](https://www.sphinx-doc.org/en/master/)
-    - [Read the Docs](https://readthedocs.org/)

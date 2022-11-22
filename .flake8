@@ -6,7 +6,7 @@ exclude =
     tox.ini
     docs/*
     docs_history/*
-    notebooks/*
+    tutorials/*
     .*
     *.cfg
     *.in 
