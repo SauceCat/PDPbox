@@ -29,13 +29,13 @@ def root_path():
 @pytest.fixture(scope="session")
 def titanic(root_path):
     DIR = os.path.join(root_path, "pdpbox")
-    with open(os.path.join(DIR, "datasets/titanic/titanic_info.json"), "r") as fin:
+    with open(os.path.join(DIR, "examples/titanic/titanic_info.json"), "r") as fin:
         info = json.load(fin)
 
     dataset = {
-        "data": pd.read_csv(os.path.join(DIR, "datasets/titanic/titanic_data.csv")),
+        "data": pd.read_csv(os.path.join(DIR, "examples/titanic/titanic_data.csv")),
         "xgb_model": joblib.load(
-            os.path.join(DIR, "datasets/titanic/titanic_model.pkl")
+            os.path.join(DIR, "examples/titanic/titanic_model.pkl")
         ),
         "features": info["features"],
         "target": info["target"],
@@ -67,12 +67,12 @@ def titanic_model(titanic):
 @pytest.fixture(scope="session")
 def ross(root_path):
     DIR = os.path.join(root_path, "pdpbox")
-    with open(os.path.join(DIR, "datasets/ross/ross_info.json"), "r") as fin:
+    with open(os.path.join(DIR, "examples/ross/ross_info.json"), "r") as fin:
         info = json.load(fin)
 
     dataset = {
-        "data": pd.read_csv(os.path.join(DIR, "datasets/ross/ross_data.csv")),
-        "rf_model": joblib.load(os.path.join(DIR, "datasets/ross/ross_model.pkl")),
+        "data": pd.read_csv(os.path.join(DIR, "examples/ross/ross_data.csv")),
+        "rf_model": joblib.load(os.path.join(DIR, "examples/ross/ross_model.pkl")),
         "features": info["features"],
         "target": info["target"],
     }
@@ -103,12 +103,12 @@ def ross_model(ross):
 @pytest.fixture(scope="session")
 def otto(root_path):
     DIR = os.path.join(root_path, "pdpbox")
-    with open(os.path.join(DIR, "datasets/otto/otto_info.json"), "r") as fin:
+    with open(os.path.join(DIR, "examples/otto/otto_info.json"), "r") as fin:
         info = json.load(fin)
 
     dataset = {
-        "data": pd.read_csv(os.path.join(DIR, "datasets/otto/otto_data.csv")),
-        "rf_model": joblib.load(os.path.join(DIR, "datasets/otto/otto_model.pkl")),
+        "data": pd.read_csv(os.path.join(DIR, "examples/otto/otto_data.csv")),
+        "rf_model": joblib.load(os.path.join(DIR, "examples/otto/otto_model.pkl")),
         "features": info["features"],
         "target": info["target"],
     }

@@ -1,7 +1,47 @@
-
 import numpy as np
 import pandas as pd
 import psutil
+
+
+def _check_percentile_range(percentile_range):
+    """Make sure percentile range is valid"""
+    if percentile_range is not None:
+        name = "percentile_range"
+        assert isinstance(percentile_range, tuple), f"{name} should be a tuple"
+        assert len(percentile_range) == 2, f"{name} should contain 2 elements"
+        assert all(
+            0 <= v <= 100 for v in percentile_range
+        ), f"{name} should be between 0 and 100"
+        assert percentile_range[0] < percentile_range[1], f"{name} should be in order"
+
+
+def _check_col(col, df, is_target=True):
+    """Validate column and return type"""
+    cols = set(df.columns.values)
+    name = "target" if is_target else "feature"
+    if isinstance(col, list):
+        assert (
+            len(col) > 1
+        ), f"a list of {name} should contain more than 1 element, \
+        please provide the full list or just use the single element"
+        assert set(col) < cols, f"{name} does not exist: {set(col) - cols}"
+        assert set(np.unique(df[col].values)) == {
+            0,
+            1,
+        }, f"one-hot encoded {name} should only contain 0 or 1"
+        if not is_target:
+            assert set(df[col].sum(axis=1).unique()) == {
+                1
+            }, f"{name} should be one-hot encoded"
+        col_type = "multi-class" if is_target else "onehot"
+    else:
+        assert col in cols, f"{name} does not exist: {col}"
+        if set(np.unique(df[col].values)) == {0, 1}:
+            col_type = "binary"
+        else:
+            col_type = "regression" if is_target else "numeric"
+
+    return col_type
 
 
 def _check_feature(feature, df):
@@ -14,71 +54,30 @@ def _check_feature(feature, df):
     3. numeric
     """
 
-    if type(feature) == list:
-        if len(feature) < 2:
-            raise ValueError('one-hot encoding feature should contain more than 1 element')
-        if not set(feature) < set(df.columns.values):
-            raise ValueError('feature does not exist: %s' % str(feature))
-        feature_type = 'onehot'
-    else:
-        if feature not in df.columns.values:
-            raise ValueError('feature does not exist: %s' % feature)
-        if sorted(list(np.unique(df[feature]))) == [0, 1]:
-            feature_type = 'binary'
-        else:
-            feature_type = 'numeric'
-
-    return feature_type
-
-
-def _check_percentile_range(percentile_range):
-    """Make sure percentile range is valid"""
-    if percentile_range is not None:
-        if type(percentile_range) != tuple:
-            raise ValueError('percentile_range: should be a tuple')
-        if len(percentile_range) != 2:
-            raise ValueError('percentile_range: should contain 2 elements')
-        if np.max(percentile_range) > 100 or np.min(percentile_range) < 0:
-            raise ValueError('percentile_range: should be between 0 and 100')
+    return _check_col(feature, df, False)
 
 
 def _check_target(target, df):
     """Check and return target type
 
     target types
-    -------------
+    ------------
     1. binary
     2. multi-class
     3. regression
     """
 
-    if type(target) == list:
-        if not set(target) < set(df.columns.values):
-            raise ValueError('target does not exist: %s' % (str(target)))
-        for target_idx in range(len(target)):
-            if sorted(list(np.unique(df[target[target_idx]]))) != [0, 1]:
-                raise ValueError('multi-class targets should be one-hot encoded: %s' % (str(target[target_idx])))
-        target_type = 'multi-class'
-    else:
-        if target not in df.columns.values:
-            raise ValueError('target does not exist: %s' % target)
-        if sorted(list(np.unique(df[target]))) == [0, 1]:
-            target_type = 'binary'
-        else:
-            target_type = 'regression'
-
-    return target_type
+    return _check_col(target, df)
 
 
 def _check_dataset(df):
     """Make sure input dataset is pandas DataFrame"""
-    if type(df) != pd.core.frame.DataFrame:
-        raise ValueError('only accept pandas DataFrame')
+    assert isinstance(df, pd.DataFrame), "only accept pandas DataFrame"
 
 
 def _make_list(x):
     """Make list when it is necessary"""
-    if type(x) == list:
+    if isinstance(x, list):
         return x
     return [x]
 
@@ -104,8 +103,10 @@ def _check_model(model):
 
 def _check_grid_type(grid_type):
     """Make sure grid type is percentile or equal"""
-    if grid_type not in ['percentile', 'equal']:
-        raise ValueError('grid_type should be "percentile" or "equal".')
+    assert grid_type in {
+        "percentile",
+        "equal",
+    }, "grid_type should be either 'percentile' or 'equal'"
 
 
 def _check_classes(classes_list, n_classes):
@@ -118,40 +119,53 @@ def _check_classes(classes_list, n_classes):
     """
     if len(classes_list) > 0 and n_classes > 2:
         if np.min(classes_list) < 0:
-            raise ValueError('class index should be >= 0.')
+            raise ValueError("class index should be >= 0.")
         if np.max(classes_list) > n_classes - 1:
-            raise ValueError('class index should be < n_classes.')
+            raise ValueError("class index should be < n_classes.")
 
 
 def _check_memory_limit(memory_limit):
     """Make sure memory limit is between 0 and 1"""
     if memory_limit <= 0 or memory_limit >= 1:
-        raise ValueError('memory_limit: should be (0, 1)')
+        raise ValueError("memory_limit: should be (0, 1)")
 
 
 def _check_frac_to_plot(frac_to_plot):
     """Make sure frac_to_plot is between 0 and 1 if it is float"""
     if type(frac_to_plot) == float:
         if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
-            raise ValueError('frac_to_plot: should in range(0, 1) when it is a float')
+            raise ValueError("frac_to_plot: should in range(0, 1) when it is a float")
     elif type(frac_to_plot) == int:
         if frac_to_plot <= 0:
-            raise ValueError('frac_to_plot: should be larger than 0.')
+            raise ValueError("frac_to_plot: should be larger than 0.")
     else:
-        raise ValueError('frac_to_plot: should be float or integer')
+        raise ValueError("frac_to_plot: should be float or integer")
 
 
-def _plot_title(title, subtitle, title_ax, plot_params):
+def _plot_title(axes, plot_style):
     """Add plot title."""
-
-    title_params = {'fontname': plot_params.get('font_family', 'Arial'), 'x': 0, 'va': 'top', 'ha': 'left'}
-    title_fontsize = plot_params.get('title_fontsize', 15)
-    subtitle_fontsize = plot_params.get('subtitle_fontsize', 12)
-
-    title_ax.set_facecolor('white')
-    title_ax.text(y=0.7, s=title, fontsize=title_fontsize, **title_params)
-    title_ax.text(y=0.5, s=subtitle, fontsize=subtitle_fontsize, color='grey', **title_params)
-    title_ax.axis('off')
+    title_params = {
+        "fontname": plot_style.font_family,
+        "x": 0,
+        "va": "top",
+        "ha": "left",
+    }
+    axes.set_facecolor("white")
+    title_style, subtitle_style = (
+        plot_style.title["title"],
+        plot_style.title["subtitle"],
+    )
+    axes.text(
+        y=0.7, s=title_style["text"], fontsize=title_style["font_size"], **title_params
+    )
+    axes.text(
+        y=0.5,
+        s=subtitle_style["text"],
+        fontsize=subtitle_style["font_size"],
+        color=subtitle_style["color"],
+        **title_params,
+    )
+    axes.axis("off")
 
 
 def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
@@ -166,7 +180,7 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     return true_n_jobs
 
 
-def _axes_modify(font_family, ax, top=False, right=False, grid=False):
+def _axes_modify(axes, plot_style, top=False, right=False, grid=False):
     """Modify matplotlib Axes
 
     Parameters
@@ -178,26 +192,21 @@ def _axes_modify(font_family, ax, top=False, right=False, grid=False):
     grid: bool, default=False
         whether it is for grid plot
     """
-
-    ax.set_facecolor('white')
-    ax.tick_params(axis='both', which='major', labelsize=10, labelcolor='#424242', colors='#9E9E9E')
-
-    for tick in ax.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    ax.set_frame_on(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
+    axes.set_facecolor("white")
+    axes.tick_params(**plot_style.tick["tick_params"])
+    for ticks in [axes.get_xticklabels(), axes.get_yticklabels()]:
+        for tick in ticks:
+            tick.set_fontname(plot_style.font_family)
+    axes.set_frame_on(False)
+    axes.get_xaxis().tick_bottom()
+    axes.get_yaxis().tick_left()
 
     if top:
-        ax.get_xaxis().tick_top()
+        axes.get_xaxis().tick_top()
     if right:
-        ax.get_yaxis().tick_right()
+        axes.get_yaxis().tick_right()
     if not grid:
-        ax.grid(True, 'major', 'x', ls='--', lw=.5, c='k', alpha=.3)
-        ax.grid(True, 'major', 'y', ls='--', lw=.5, c='k', alpha=.3)
+        axes.grid(True, "major", "both", ls="--", lw=0.5, c="k", alpha=0.3)
 
 
 def _modify_legend_ax(ax, font_family):
@@ -209,48 +218,43 @@ def _modify_legend_ax(ax, font_family):
     for tick in ax.get_yticklabels():
         tick.set_fontname(font_family)
 
-    ax.set_facecolor('white')
+    ax.set_facecolor("white")
     ax.set_xticks([])
     ax.set_yticks([])
 
 
-def _get_grids(feature_values, num_grid_points, grid_type, percentile_range, grid_range):
-    """Calculate grid points for numeric feature
-
-    Returns
-    -------
-    feature_grids: 1d-array
-        calculated grid points
-    percentile_info: 1d-array or []
-        percentile information for feature_grids
-        exists when grid_type='percentile'
-    """
-
-    if grid_type == 'percentile':
+def _get_grids(values, num_grid_points, grid_type, percentile_range, grid_range):
+    """Calculate grid points for numeric feature"""
+    if grid_type == "percentile":
         # grid points are calculated based on percentile in unique level
         # thus the final number of grid points might be smaller than num_grid_points
         start, end = 0, 100
         if percentile_range is not None:
-            start, end = np.min(percentile_range), np.max(percentile_range)
+            start, end = percentile_range
 
-        percentile_grids = np.linspace(start=start, stop=end, num=num_grid_points)
-        value_grids = np.percentile(feature_values, percentile_grids)
-
-        grids_df = pd.DataFrame()
-        grids_df['percentile_grids'] = [round(v, 2) for v in percentile_grids]
-        grids_df['value_grids'] = value_grids
-        grids_df = grids_df.groupby(['value_grids'], as_index=False).agg(
-            {'percentile_grids': lambda v: str(tuple(v)).replace(',)', ')')}).sort_values('value_grids', ascending=True)
-
-        feature_grids, percentile_info = grids_df['value_grids'].values, grids_df['percentile_grids'].values
+        percentiles = np.linspace(start=start, stop=end, num=num_grid_points)
+        grids_df = pd.DataFrame(
+            {
+                "percentiles": [round(x, 2) for x in percentiles],
+                "grids": np.percentile(values, percentiles),
+            }
+        )
+        grids_df = (
+            grids_df.groupby(["grids"], as_index=False)
+            .agg({"percentiles": lambda x: tuple(x)})
+            .sort_values("grids", ascending=True)
+        )
+        grids, percentiles = (
+            grids_df["grids"].values,
+            grids_df["percentiles"].values,
+        )
     else:
         if grid_range is not None:
-            value_grids = np.linspace(np.min(grid_range), np.max(grid_range), num_grid_points)
-        else:
-            value_grids = np.linspace(np.min(feature_values), np.max(feature_values), num_grid_points)
-        feature_grids, percentile_info = value_grids, []
+            values = grid_range
+        grids = np.linspace(np.min(values), np.max(values), num_grid_points)
+        percentiles = None
 
-    return feature_grids, percentile_info
+    return grids, percentiles
 
 
 def _get_grid_combos(feature_grids, feature_types):
@@ -258,9 +262,9 @@ def _get_grid_combos(feature_grids, feature_types):
 
     # create grid combination
     grids1, grids2 = feature_grids
-    if feature_types[0] == 'onehot':
+    if feature_types[0] == "onehot":
         grids1 = np.eye(len(grids1)).astype(int).tolist()
-    if feature_types[1] == 'onehot':
+    if feature_types[1] == "onehot":
         grids2 = np.eye(len(grids2)).astype(int).tolist()
 
     grid_combos = []
@@ -280,7 +284,7 @@ def _sample_data(ice_lines, frac_to_plot):
 
     """
 
-    if frac_to_plot < 1.:
+    if frac_to_plot < 1.0:
         ice_plot_data = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
     elif frac_to_plot > 1:
         ice_plot_data = ice_lines.sample(frac_to_plot)
@@ -300,121 +304,99 @@ def _find_onehot_actual(x):
     return value
 
 
-def _find_bucket(x, feature_grids, endpoint):
+def _find_bucket(x, grids, endpoint):
     """Find bucket that x falls in"""
-    # map value into value bucket
-    if x < feature_grids[0]:
-        bucket = 0
-    else:
-        if endpoint:
-            if x > feature_grids[-1]:
-                bucket = len(feature_grids)
-            else:
-                bucket = len(feature_grids) - 1
-                for i in range(len(feature_grids) - 2):
-                    if feature_grids[i] <= x < feature_grids[i + 1]:
-                        bucket = i + 1
+
+    # grids: ...1...2...3...4...
+    # number of buckets: len(grids) + 1
+    # index of ranges: 0 ~ len(grids)
+
+    num_buckets = len(grids) + 1
+    if x < grids[0]:
+        bucket = 1
+    elif x >= grids[-1]:
+        if endpoint and x == grids[-1]:
+            bucket = num_buckets - 1
         else:
-            if x >= feature_grids[-1]:
-                bucket = len(feature_grids)
-            else:
-                bucket = len(feature_grids) - 1
-                for i in range(len(feature_grids) - 2):
-                    if feature_grids[i] <= x < feature_grids[i + 1]:
-                        bucket = i + 1
-    return bucket
+            bucket = num_buckets
+    else:
+        # 2 ~ (num_buckets - 1)
+        for i in range(2, num_buckets):
+            if grids[i - 2] <= x < grids[i - 1]:
+                bucket = i
+    # index from 0
+    return bucket - 1
 
 
 def _get_string(x):
     if int(x) == x:
-        x_str = str(int(x))
+        x = int(x)
     elif round(x, 1) == x:
-        x_str = str(round(x, 1))
+        x = round(x, 1)
     else:
-        x_str = str(round(x, 2))
-
-    return x_str
-
-
-def _make_bucket_column_names(feature_grids, endpoint):
-    """Create bucket names based on feature grids"""
-    # create bucket names
-    column_names = []
-    bound_lows = [np.nan]
-    bound_ups = [feature_grids[0]]
-
-    feature_grids_str = []
-    for g in feature_grids:
-        feature_grids_str.append(_get_string(x=g))
-
-    # number of buckets: len(feature_grids_str) - 1
-    for i in range(len(feature_grids_str) - 1):
-        column_name = '[%s, %s)' % (feature_grids_str[i], feature_grids_str[i + 1])
-        bound_lows.append(feature_grids[i])
-        bound_ups.append(feature_grids[i + 1])
-
-        if (i == len(feature_grids_str) - 2) and endpoint:
-            column_name = '[%s, %s]' % (feature_grids_str[i], feature_grids_str[i + 1])
-
-        column_names.append(column_name)
-
-    if endpoint:
-        column_names = ['< %s' % feature_grids_str[0]] + column_names + ['> %s' % feature_grids_str[-1]]
-    else:
-        column_names = ['< %s' % feature_grids_str[0]] + column_names + ['>= %s' % feature_grids_str[-1]]
-
-    bound_lows.append(feature_grids[-1])
-    bound_ups.append(np.nan)
-
-    return column_names, bound_lows, bound_ups
+        x = round(x, 2)
+    return str(x)
 
 
-def _make_bucket_column_names_percentile(percentile_info, endpoint):
+def _make_bucket_column_names(grids, endpoint, ranges):
+    """Create bucket names based on grids"""
+    names = []
+    lowers = [np.nan]
+    uppers = [grids[0]]
+
+    grids_str = []
+    for g in grids:
+        grids_str.append(_get_string(g))
+
+    # number of inner buckets: len(grids_str) - 1
+    for i in range(len(grids_str) - 1):
+        lower, upper = i, i + 1
+        name = f"[{grids_str[lower]}, {grids_str[upper]})"
+        lowers.append(grids[lower])
+        uppers.append(grids[upper])
+
+        if (i == len(grids_str) - 2) and endpoint:
+            name = name.replace(")", "]")
+        names.append(name)
+
+    end_sign = ">" if endpoint else ">="
+    names = [f"< {grids_str[0]}"] + names + [f"{end_sign} {grids_str[-1]}"]
+    lowers.append(grids[-1])
+    uppers.append(np.nan)
+    return [np.array(lst)[ranges] for lst in [names, lowers, uppers]]
+
+
+def _make_bucket_column_names_percentile(percentiles, endpoint, ranges):
     """Create bucket names based on percentile info"""
-    # create percentile bucket names
-    percentile_column_names = []
-    percentile_info_numeric = []
-    for p_idx, p in enumerate(percentile_info):
-        p_array = np.array(p.replace('(', '').replace(')', '').split(', ')).astype(np.float64)
-        if p_idx == 0 or p_idx == len(percentile_info) - 1:
-            p_numeric = np.min(p_array)
-        else:
-            p_numeric = np.max(p_array)
-        percentile_info_numeric.append(p_numeric)
+    total = len(percentiles)
+    names, p_numerics = [], []
+    for i, p in enumerate(percentiles):
+        p_array = np.array(p).astype(np.float64)
+        p_numerics.append(np.min(p_array))
 
-    percentile_bound_lows = [0]
-    percentile_bound_ups = [percentile_info_numeric[0]]
-
-    for i in range(len(percentile_info) - 1):
+    lowers = [0]
+    uppers = [p_numerics[0]]
+    for i in range(total - 1):
         # for each grid point, percentile information is in tuple format
         # (percentile1, percentile2, ...)
-        # some grid points would belong to multiple percentiles
-        low, high = percentile_info_numeric[i], percentile_info_numeric[i + 1]
-        low_str, high_str = _get_string(x=low), _get_string(x=high)
+        # some grid points belong to multiple percentiles
+        lower, upper = p_numerics[i], p_numerics[i + 1]
+        lower_str, upper_str = _get_string(lower), _get_string(upper)
+        name = f"[{lower_str}, {upper_str})"
+        lowers.append(lower)
+        uppers.append(upper)
 
-        percentile_column_name = '[%s, %s)' % (low_str, high_str)
-        percentile_bound_lows.append(low)
-        percentile_bound_ups.append(high)
+        if i == total - 2 and endpoint:
+            name = name.replace(")", "]")
+        names.append(name)
 
-        if i == len(percentile_info) - 2:
-            if endpoint:
-                percentile_column_name = '[%s, %s]' % (low_str, high_str)
-            else:
-                percentile_column_name = '[%s, %s)' % (low_str, high_str)
-
-        percentile_column_names.append(percentile_column_name)
-
-    low, high = percentile_info_numeric[0], percentile_info_numeric[-1]
-    low_str, high_str = _get_string(x=low), _get_string(x=high)
-
-    if endpoint:
-        percentile_column_names = ['< %s' % low_str] + percentile_column_names + ['> %s' % high_str]
-    else:
-        percentile_column_names = ['< %s' % low_str] + percentile_column_names + ['>= %s' % high_str]
-    percentile_bound_lows.append(high)
-    percentile_bound_ups.append(100)
-
-    return percentile_column_names, percentile_bound_lows, percentile_bound_ups
+    lower, upper = p_numerics[0], p_numerics[-1]
+    lower_str, upper_str = _get_string(lower), _get_string(upper)
+    end_sign = ">" if endpoint else ">="
+    names = [f"< {lower_str}"] + names + [f"{end_sign} {upper_str}"]
+    lowers.append(upper)
+    uppers.append(100)
+    return [np.array(lst)[ranges] for lst in [names, lowers, uppers]]
 
 
 def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
@@ -425,8 +407,11 @@ def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
         width = np.min([unit_figsize[0] * ncols, 15])
         height = np.min([width * 1.0 / ncols, unit_figsize[1]]) * nrows + title_height
     else:
-        width, height, nrows, ncols = unit_figsize[0], unit_figsize[1] + title_height, 1, 1
+        width, height, nrows, ncols = (
+            unit_figsize[0],
+            unit_figsize[1] + title_height,
+            1,
+            1,
+        )
 
     return width, height, nrows, ncols
-
-

@@ -3,6 +3,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [WIP]
+### Changed
+code style: https://github.com/psf/black
+
+`info_plots.target_plot`
+TODO: parallel, https://pbpython.com/pandas-qcut-cut.html
+- return `axes`: dict_keys are renamed as `[title_axes, bar_axes, line_axes]` (previously `[title_ax, bar_ax, line_ax]`)
+- `plot_params`: more organized, for all configurable params, check `styles.infoPlotStyle` 
+- `summary_df` columns rename
+
+`get_dataset` is renamed as `get_example`
+
+
+
+
 ## [0.2.0] 
 ### Added
 - Formal documentation hosted on readthedocs.org

@@ -1,8 +1,4 @@
 from pdpbox.info_plots import target_plot
-import pandas as pd
-import numpy as np
-from pandas.testing import assert_frame_equal
-from pandas.testing import assert_series_equal
 
 
 def test_binary(titanic_data, titanic_target):
