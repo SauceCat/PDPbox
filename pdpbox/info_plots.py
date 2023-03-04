@@ -1,5 +1,6 @@
 from .info_plot_utils import (
     _target_plot,
+    _target_plot_plotly,
     _info_plot_interact,
     _actual_plot,
     _prepare_info_plot_interact_data,
@@ -27,6 +28,8 @@ def target_plot(
     figsize=None,
     ncols=2,
     plot_params=None,
+    engine="plotly",
+    template="plotly_white",
 ):
     """
     Plot average target value by different feature values (feature grids)
@@ -74,6 +77,10 @@ def target_plot(
         number subplot columns, used when it is multi-class problem
     plot_params: dict or None, optional, default=None
         parameters for the plot, check styles.infoPlotStyle for more details
+    engine: str, optinal, default=plotly
+        visualization engine, can be plotly or matplotlib
+    template: str, optional, default='plotly_white'
+        plotly template
 
     Returns
     -------
@@ -190,14 +197,26 @@ def target_plot(
         plot_params = {}
     if figsize is not None:
         plot_params["figsize"] = figsize
+    if template is not None:
+        plot_params["template"] = template
+
     plot_params.update(
         {
             "ncols": ncols,
             "display_columns": display_columns,
             "percentile_columns": percentile_columns,
+            "engine": engine,
         }
     )
-    fig, axes = _target_plot(feature_name, target, bar_data, target_lines, plot_params)
+    if engine == "plotly":
+        fig = _target_plot_plotly(
+            feature_name, target, bar_data, target_lines, plot_params
+        )
+        axes = None
+    else:
+        fig, axes = _target_plot(
+            feature_name, target, bar_data, target_lines, plot_params
+        )
 
     return fig, axes, summary_df
 

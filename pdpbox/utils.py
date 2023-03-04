@@ -239,6 +239,8 @@ def _get_grids(values, num_grid_points, grid_type, percentile_range, grid_range)
                 "grids": np.percentile(values, percentiles),
             }
         )
+
+        # sometimes different percentiles correspond to the same value
         grids_df = (
             grids_df.groupby(["grids"], as_index=False)
             .agg({"percentiles": lambda x: tuple(x)})
@@ -307,7 +309,8 @@ def _find_onehot_actual(x):
 def _find_bucket(x, grids, endpoint):
     """Find bucket that x falls in"""
 
-    # grids: ...1...2...3...4...
+    # grids:   ...1...2...3...4...
+    # buckets:  1 . 2 . 3 . 4 . 5
     # number of buckets: len(grids) + 1
     # index of ranges: 0 ~ len(grids)
 
@@ -370,6 +373,8 @@ def _make_bucket_column_names_percentile(percentiles, endpoint, ranges):
     """Create bucket names based on percentile info"""
     total = len(percentiles)
     names, p_numerics = [], []
+
+    # p is a tuple
     for i, p in enumerate(percentiles):
         p_array = np.array(p).astype(np.float64)
         p_numerics.append(np.min(p_array))

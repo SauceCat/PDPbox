@@ -24,6 +24,10 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.patheffects as PathEffects
 
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+
 
 def _prepare_data_x(
     feature,
@@ -47,6 +51,7 @@ def _prepare_data_x(
         grids = np.array([0, 1])
         cols = [f"{feature}_{g}" for g in grids]
         data_x["x"] = data_x[feature]
+
     if feature_type == "numeric":
         if cust_grid_points is None:
             grids, percentiles = _get_grids(
@@ -60,17 +65,33 @@ def _prepare_data_x(
             grids = np.array(sorted(cust_grid_points))
             percentiles = None
 
+        grids_raw = grids.copy()
+
+        if endpoint:
+            grids[-1] *= 1.01
+
         if not show_outliers:
             data_x = data_x[
                 (data_x[feature] >= grids[0]) & (data_x[feature] <= grids[-1])
             ].reset_index(drop=True)
+        else:
+            grids = np.array(
+                [data_x[feature].min() * 0.99]
+                + list(grids)
+                + [data_x[feature].max() * 1.01]
+            )
 
         # map feature value into value buckets
-        data_x["x"] = data_x[feature].apply(lambda x: _find_bucket(x, grids, endpoint))
+        # data_x["x"] = data_x[feature].apply(lambda x: _find_bucket(x, grids_raw, endpoint))
+        data_x["x"] = pd.cut(data_x[feature].values, bins=grids, right=False).codes
+        if not show_outliers:
+            data_x["x"] += 1
         uni_xs = sorted(data_x["x"].unique())
 
         # create bucket names
         ranges = np.arange(uni_xs[0], uni_xs[-1] + 1)
+        if endpoint:
+            grids[-1] /= 1.01
         cols, lowers, uppers = _make_bucket_column_names(grids, endpoint, ranges)
 
         # create percentile bucket names
@@ -86,7 +107,7 @@ def _prepare_data_x(
 
     if feature_type == "onehot":
         grids = cols = np.array(feature)
-        data_x["x"] = data_x[feature].apply(lambda x: _find_onehot_actual(x), axis=1)
+        data_x["x"] = np.argmax(data_x[feature].values, axis=1)
         data_x = data_x[~data_x["x"].isnull()].reset_index(drop=True)
 
     data_x["x"] = data_x["x"].map(int)
@@ -197,8 +218,7 @@ def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
     axes.set_ylabel(target_ylabel, fontdict=plot_style.label["fontdict"])
 
 
-def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
-    """Internal call for target_plot"""
+def _prepare_for_target_plot(feat_name, target, target_lines, plot_params):
     plot_style = infoPlotStyle(feat_name, plot_params)
 
     # set up graph parameters
@@ -207,86 +227,199 @@ def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
     if len(target) > 1:
         nrows = int(np.ceil(len(target) * 1.0 / ncols))
         ncols = np.min([len(target), ncols])
-        height = width * 1.0 / ncols * nrows
+        height = width * 1.0 / ncols * nrows * 0.8
+    else:
+        ncols = 1
 
-    fig = plt.figure(figsize=(width, height))
+    plot_style.figsize = (width, height)
+    plot_style.nrows, plot_style.ncols = int(nrows), int(ncols)
+
+    # get max average target value
+    ys = []
+    for i, t in enumerate(target):
+        ys += list(target_lines[i][t].values)
+    y_max = np.max(ys)
+
+    return plot_style, y_max
+
+
+def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
+    """Internal call for target_plot, drawing with plotly"""
+    plot_style, y_max = _prepare_for_target_plot(
+        feat_name, target, target_lines, plot_params
+    )
+
+    fig = make_subplots(
+        rows=plot_style.nrows,
+        cols=plot_style.ncols,
+        specs=[
+            [{"secondary_y": True} for _ in range(plot_style.ncols)]
+            for _ in range(plot_style.nrows)
+        ],
+        shared_yaxes=True,
+        horizontal_spacing=0.1,
+        vertical_spacing=0.05,
+    )
+
+    fig.update_layout(
+        width=plot_style.figsize[0],
+        height=plot_style.figsize[1],
+        template=plot_style.template,
+        showlegend=False,
+        title=go.layout.Title(
+            text=f"{plot_style.title['title']['text']} <br><sup>{plot_style.title['subtitle']['text']}</sup>",
+            xref="paper",
+            x=0,
+        ),
+    )
+
+    line_colors = plot_style.line["colors"]
+    if line_colors is None:
+        line_colors = px.colors.qualitative.Plotly
+
+    for i, t in enumerate(target):
+        line_color = line_colors[i % len(line_colors)]
+        ic, ir = i % plot_style.ncols + 1, i // plot_style.ncols + 1
+
+        line_data = (
+            target_lines[i].rename(columns={t: "y"}).sort_values("x", ascending=True)
+        )
+
+        bx = bar_data["x"].values
+        by = bar_data["fake_count"].values
+
+        fig.add_trace(
+            go.Bar(
+                x=bx,
+                y=by,
+                text=by,
+                textposition="outside",
+                width=plot_style.bar["width"],
+                name="count",
+                marker=dict(
+                    color=plot_style.bar["color"],
+                    opacity=0.5,
+                ),
+            ),
+            row=ir,
+            col=ic,
+            secondary_y=False,
+        )
+
+        lx = line_data["x"].values
+        ly = line_data["y"].values
+
+        fig.add_trace(
+            go.Scatter(
+                x=lx,
+                y=ly,
+                text=[round(v, 3) for v in ly],
+                textposition="top center",
+                mode="lines+markers+text",
+                yaxis="y2",
+                name="Average " + t,
+                line=dict(color=line_color),
+                marker=dict(color=line_color),
+            ),
+            row=ir,
+            col=ic,
+            secondary_y=True,
+        )
+
+        # display percentile
+        ticktext = plot_style.display_columns.copy()
+        if len(plot_style.percentile_columns) > 0:
+            for j, p in enumerate(plot_style.percentile_columns):
+                ticktext[j] += f"<br><sup><b>{p}</b></sup>"
+            title_text = f"<b>{feat_name}</b> (value+percentile)"
+        else:
+            title_text = f"<b>{feat_name}</b> (value)"
+
+        fig.update_xaxes(
+            title_text=title_text, ticktext=ticktext, tickvals=bx, row=ir, col=ic
+        )
+
+        if ic == 1:
+            fig.update_yaxes(title_text="count", secondary_y=False, row=ir, col=ic)
+        fig.update_yaxes(
+            title_text="Average " + t,
+            secondary_y=True,
+            row=ir,
+            col=ic,
+            range=[0, y_max * 1.1],
+        )
+
+    return fig
+
+
+def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
+    """Internal call for target_plot"""
+    plot_style, y_max = _prepare_for_target_plot(
+        feat_name, target, target_lines, plot_params
+    )
+
+    fig = plt.figure(figsize=plot_style.figsize, dpi=300)
     title_ratio = 2
     outer_grid = GridSpec(
         nrows=2,
         ncols=1,
         wspace=0.0,
         hspace=0.0,
-        height_ratios=[title_ratio, height - title_ratio],
+        height_ratios=[title_ratio, plot_style.figsize[1] - title_ratio],
     )
     title_axes = plt.subplot(outer_grid[0])
     fig.add_subplot(title_axes)
     _plot_title(title_axes, plot_style)
 
-    if len(target) == 1:
-        bar_axes = plt.subplot(outer_grid[1])
-        fig.add_subplot(bar_axes)
-        line_axes = bar_axes.twinx()
+    inner_grid = GridSpecFromSubplotSpec(
+        plot_style.nrows,
+        plot_style.ncols,
+        subplot_spec=outer_grid[1],
+        wspace=0.2,
+        hspace=0.35,
+    )
+    plot_axes, bar_axes, line_axes = [], [], []
+    for inner_idx in range(len(target)):
+        axes = plt.subplot(inner_grid[inner_idx])
+        plot_axes.append(axes)
+        fig.add_subplot(axes)
+
+    line_colors = plot_style.line["colors"]
+    if line_colors is None:
+        line_colors = plt.get_cmap(plot_style.line["cmap"])(
+            np.arange(np.min([20, len(target)]))
+        )
+
+    for i, t in enumerate(target):
+        inner_line_color = line_colors[i % len(line_colors)]
+        inner_bar_axes = plot_axes[i]
+        inner_line_axes = inner_bar_axes.twinx()
+
         line_data = (
-            target_lines[0]
-            .rename(columns={target[0]: "y"})
-            .sort_values("x", ascending=True)
+            target_lines[i].rename(columns={t: "y"}).sort_values("x", ascending=True)
         )
-        _draw_barplot(feat_name, [bar_data, bar_axes], plot_style)
-        _draw_lineplot("Average " + target[0], [line_data, line_axes], plot_style)
-    else:
-        inner_grid = GridSpecFromSubplotSpec(
-            nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35
+        _draw_barplot(feat_name, [bar_data, inner_bar_axes], plot_style)
+        _draw_lineplot(
+            "Average " + t,
+            [line_data, inner_line_axes],
+            plot_style,
+            inner_line_color,
         )
-        plot_axes, bar_axes, line_axes = [], [], []
-        for inner_idx in range(len(target)):
-            axes = plt.subplot(inner_grid[inner_idx])
-            plot_axes.append(axes)
-            fig.add_subplot(axes)
+        inner_line_axes.set_ylim(0.0, y_max)
+        bar_axes.append(inner_bar_axes)
+        line_axes.append(inner_line_axes)
 
-        # get max average target value
-        ys = []
-        for i, t in enumerate(target):
-            ys += list(target_lines[i][t].values)
-        y_max = np.max(ys)
+        if i % plot_style.ncols != 0:
+            inner_bar_axes.set_yticklabels([])
+            inner_bar_axes.tick_params(which="major", left=False)
 
-        line_colors = plot_style.line["colors"]
-        if line_colors is None:
-            line_colors = plt.get_cmap(plot_style.line["cmap"])(
-                np.arange(np.min([20, len(target)]))
-            )
+        if (i % plot_style.ncols + 1 != plot_style.ncols) and i != len(plot_axes) - 1:
+            inner_line_axes.set_yticklabels([])
+            inner_line_axes.tick_params(which="major", right=False)
 
-        for i, t in enumerate(target):
-            inner_line_color = line_colors[i % len(line_colors)]
-            inner_bar_axes = plot_axes[i]
-            inner_line_axes = inner_bar_axes.twinx()
-
-            line_data = (
-                target_lines[i]
-                .rename(columns={t: "y"})
-                .sort_values("x", ascending=True)
-            )
-            _draw_barplot(feat_name, [bar_data, inner_bar_axes], plot_style)
-            _draw_lineplot(
-                "Average " + t,
-                [line_data, inner_line_axes],
-                plot_style,
-                inner_line_color,
-            )
-            inner_line_axes.set_ylim(0.0, y_max)
-            bar_axes.append(inner_bar_axes)
-            line_axes.append(inner_line_axes)
-
-            if i % ncols != 0:
-                inner_bar_axes.set_yticklabels([])
-                inner_bar_axes.tick_params(which="major", left=False)
-
-            if (i % ncols + 1 != ncols) and i != len(plot_axes) - 1:
-                inner_line_axes.set_yticklabels([])
-                inner_line_axes.tick_params(which="major", right=False)
-
-        if len(plot_axes) > len(target):
-            for i in range(len(target), len(plot_axes)):
-                plot_axes[i].axis("off")
+    if len(plot_axes) > len(target):
+        for i in range(len(target), len(plot_axes)):
+            plot_axes[i].axis("off")
 
     axes = {"title_axes": title_axes, "bar_axes": bar_axes, "line_axes": line_axes}
     return fig, axes
