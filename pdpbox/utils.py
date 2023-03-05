@@ -91,14 +91,17 @@ def _expand_default(x, default):
 
 def _check_model(model):
     """Check model input, return class information and predict function"""
-    try:
-        n_classes = len(model.classes_)
-        predict = model.predict_proba
-    except:
-        n_classes = 0
-        predict = model.predict
+    n_classes = None
+    if hasattr(model, "n_classes_"):
+        n_classes = model.n_classes_
 
-    return n_classes, predict
+    pred_func = None
+    if hasattr(model, "predict_proba"):
+        pred_func = model.predict_proba
+    elif hasattr(model, "predict"):
+        pred_func = model.predict
+
+    return n_classes, pred_func
 
 
 def _check_grid_type(grid_type):

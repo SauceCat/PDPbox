@@ -3,11 +3,13 @@ from .info_plot_utils import (
     _target_plot_plotly,
     _info_plot_interact,
     _actual_plot,
+    _actual_plot_plotly,
     _prepare_info_plot_interact_data,
     _prepare_info_plot_interact_summary,
     _prepare_info_plot_data,
     _check_info_plot_interact_params,
     _check_info_plot_params,
+    _prepare_plot_params,
 )
 from .utils import _make_list, _check_model, _check_target, _check_classes
 
@@ -143,7 +145,6 @@ def target_plot(
 
     """
 
-    # check inputs
     _ = _check_target(target, df)
     feature_type, show_outliers = _check_info_plot_params(
         df,
@@ -193,30 +194,25 @@ def target_plot(
         target_lines.append(target_line)
         summary_df = summary_df.merge(target_line, on="x", how="outer")
 
-    if plot_params is None:
-        plot_params = {}
-    if figsize is not None:
-        plot_params["figsize"] = figsize
-    if template is not None:
-        plot_params["template"] = template
-
-    plot_params.update(
-        {
-            "ncols": ncols,
-            "display_columns": display_columns,
-            "percentile_columns": percentile_columns,
-            "engine": engine,
-        }
+    plot_params = _prepare_plot_params(
+        plot_params,
+        ncols,
+        display_columns,
+        percentile_columns,
+        figsize,
+        template,
+        engine,
     )
-    if engine == "plotly":
+
+    if engine == "matplotlib":
+        fig, axes = _target_plot(
+            feature_name, target, bar_data, target_lines, plot_params
+        )
+    else:
         fig = _target_plot_plotly(
             feature_name, target, bar_data, target_lines, plot_params
         )
         axes = None
-    else:
-        fig, axes = _target_plot(
-            feature_name, target, bar_data, target_lines, plot_params
-        )
 
     return fig, axes, summary_df
 
@@ -238,6 +234,8 @@ def actual_plot(
     X,
     feature,
     feature_name,
+    pred_func=None,
+    n_classes=None,
     num_grid_points=10,
     grid_type="percentile",
     percentile_range=None,
@@ -251,13 +249,15 @@ def actual_plot(
     ncols=2,
     figsize=None,
     plot_params=None,
+    engine="plotly",
+    template="plotly_white",
 ):
     """Plot prediction distribution across different feature values (feature grid)
 
     Parameters
     ----------
 
-    model: a fitted sklearn model
+    model: a fitted model
     X: pandas DataFrame
         data set on which the model is trained
     feature: string or list
@@ -265,6 +265,17 @@ def actual_plot(
         for one-hot encoding features, feature list is required
     feature_name: string
         name of the feature, not necessary a column name
+    pred_func: callable, optional, default=None
+        function to get model prediction on X.
+        if it's not provided, we assume the model is a sklearn model.
+        we use `model.predict_proba` to get classification prediction,
+        and `model.predict` for regression prediction.
+        if the provided model doesn't follow the same pattern as a sklearn model,
+        you need to provide the predict function,
+        the function must be sth like: `func(model, X, predict_kwds)`.
+    n_classes: integer, optional, default=None
+        required when we can't infer number of classes from `model.classes_`,
+        `n_classes` should be set as 0 when it is a regression problem
     num_grid_points: integer, optional, default=10
         number of grid points for numeric feature
     grid_type: string, optional, default='percentile'
@@ -297,6 +308,10 @@ def actual_plot(
         number subplot columns, used when it is multi-class problem
     plot_params: dict or None, optional, default=None
         parameters for the plot
+    engine: str, optinal, default=plotly
+        visualization engine, can be plotly or matplotlib
+    template: str, optional, default='plotly_white'
+        plotly template
 
     Returns
     -------
@@ -365,91 +380,117 @@ def actual_plot(
 
     """
 
-    # check inputs
-    n_classes, predict = _check_model(model=model)
     feature_type, show_outliers = _check_info_plot_params(
-        df=X,
-        feature=feature,
-        grid_type=grid_type,
-        percentile_range=percentile_range,
-        grid_range=grid_range,
-        cust_grid_points=cust_grid_points,
-        show_outliers=show_outliers,
+        X,
+        feature,
+        grid_type,
+        percentile_range,
+        grid_range,
+        cust_grid_points,
+        show_outliers,
     )
 
-    # make predictions
-    # info_df only contains feature value and actual predictions
-    prediction = predict(X, **predict_kwds)
+    model_n_classes, model_pred_func = _check_model(model=model)
+    if model_n_classes is None:
+        assert (
+            n_classes is not None
+        ), "n_classes is required when it can't be accessed through model.n_classes_."
+    else:
+        n_classes = model_n_classes
+
+    if pred_func is None:
+        print("predict using model predict func...")
+        assert (
+            model_pred_func is not None
+        ), "pred_func is required when model.predict_proba or model.predict doesn't exist."
+        prediction = model_pred_func(X, **predict_kwds)
+    else:
+        print("predict using customized func...")
+        prediction = pred_func(model, X, **predict_kwds)
+
     info_df = X[_make_list(feature)]
-    actual_prediction_columns = ["actual_prediction"]
+    pred_cols = ["pred"]
     if n_classes == 0:
-        info_df["actual_prediction"] = prediction
+        info_df["pred"] = prediction
     elif n_classes == 2:
-        info_df["actual_prediction"] = prediction[:, 1]
+        info_df["pred"] = prediction[:, 1]
     else:
         plot_classes = range(n_classes)
         if which_classes is not None:
             _check_classes(classes_list=which_classes, n_classes=n_classes)
             plot_classes = sorted(which_classes)
 
-        actual_prediction_columns = []
+        pred_cols = []
         for class_idx in plot_classes:
-            info_df["actual_prediction_%d" % class_idx] = prediction[:, class_idx]
-            actual_prediction_columns.append("actual_prediction_%d" % class_idx)
+            info_df["pred_%d" % class_idx] = prediction[:, class_idx]
+            pred_cols.append("pred_%d" % class_idx)
 
     (
         info_df_x,
         bar_data,
         summary_df,
-        info_cols,
         display_columns,
         percentile_columns,
     ) = _prepare_info_plot_data(
-        feature=feature,
-        feature_type=feature_type,
-        data=info_df,
-        num_grid_points=num_grid_points,
-        grid_type=grid_type,
-        percentile_range=percentile_range,
-        grid_range=grid_range,
-        cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile,
-        show_outliers=show_outliers,
-        endpoint=endpoint,
+        feature,
+        feature_type,
+        info_df,
+        num_grid_points,
+        grid_type,
+        percentile_range,
+        grid_range,
+        cust_grid_points,
+        show_percentile,
+        show_outliers,
+        endpoint,
     )
 
     # prepare data for box lines
     # each box line contains 'x' and actual prediction q1, q2, q3
     box_lines = []
-    actual_prediction_columns_qs = []
-    for idx in range(len(actual_prediction_columns)):
+    pred_cols_qs = []
+    for p in pred_cols:
         box_line = (
             info_df_x.groupby("x", as_index=False)
-            .agg({actual_prediction_columns[idx]: [q1, q2, q3]})
+            .agg({p: [q1, q2, q3]})
             .sort_values("x", ascending=True)
         )
         box_line.columns = [
             "_".join(col) if col[1] != "" else col[0] for col in box_line.columns
         ]
         box_lines.append(box_line)
-        actual_prediction_columns_qs += [
-            actual_prediction_columns[idx] + "_%s" % q for q in ["q1", "q2", "q3"]
-        ]
+        pred_cols_qs += [p + "_%s" % q for q in ["q1", "q2", "q3"]]
         summary_df = summary_df.merge(box_line, on="x", how="outer").fillna(0)
-    summary_df = summary_df[info_cols + ["count"] + actual_prediction_columns_qs]
 
-    fig, axes = _actual_plot(
-        plot_data=info_df_x,
-        bar_data=bar_data,
-        box_lines=box_lines,
-        actual_prediction_columns=actual_prediction_columns,
-        feature_name=feature_name,
-        display_columns=display_columns,
-        percentile_columns=percentile_columns,
-        figsize=figsize,
-        ncols=ncols,
-        plot_params=plot_params,
+    plot_params = _prepare_plot_params(
+        plot_params,
+        ncols,
+        display_columns,
+        percentile_columns,
+        figsize,
+        template,
+        engine,
     )
+
+    if engine == "matplotlib":
+        fig, axes = _actual_plot(
+            feature_name,
+            pred_cols,
+            info_df_x,
+            bar_data,
+            box_lines,
+            plot_params,
+        )
+    else:
+        fig = _actual_plot_plotly(
+            feature_name,
+            pred_cols,
+            info_df_x,
+            bar_data,
+            box_lines,
+            plot_params,
+        )
+        axes = None
     return fig, axes, summary_df
 
 
@@ -771,7 +812,7 @@ def actual_plot_interact(
     prediction = predict(X, **predict_kwds)
 
     info_df = X[_make_list(features[0]) + _make_list(features[1])]
-    actual_prediction_columns = ["actual_prediction"]
+    pred_cols = ["actual_prediction"]
     if n_classes == 0:
         info_df["actual_prediction"] = prediction
     elif n_classes == 2:
@@ -781,18 +822,16 @@ def actual_plot_interact(
         if which_classes is not None:
             plot_classes = sorted(which_classes)
 
-        actual_prediction_columns = []
+        pred_cols = []
         for class_idx in plot_classes:
             info_df["actual_prediction_%d" % class_idx] = prediction[:, class_idx]
-            actual_prediction_columns.append("actual_prediction_%d" % class_idx)
+            pred_cols.append("actual_prediction_%d" % class_idx)
 
     agg_dict = {}
-    actual_prediction_columns_qs = []
-    for idx in range(len(actual_prediction_columns)):
-        agg_dict[actual_prediction_columns[idx]] = [q1, q2, q3]
-        actual_prediction_columns_qs += [
-            actual_prediction_columns[idx] + "_%s" % q for q in ["q1", "q2", "q3"]
-        ]
+    pred_cols_qs = []
+    for idx in range(len(pred_cols)):
+        agg_dict[pred_cols[idx]] = [q1, q2, q3]
+        pred_cols_qs += [pred_cols[idx] + "_%s" % q for q in ["q1", "q2", "q3"]]
     agg_dict["fake_count"] = "count"
 
     data_x, actual_plot_data, prepared_results = _prepare_info_plot_interact_data(
@@ -829,7 +868,7 @@ def actual_plot_interact(
         prepared_results=prepared_results,
         feature_types=feature_types,
     )
-    summary_df = summary_df[info_cols + ["count"] + actual_prediction_columns_qs]
+    summary_df = summary_df[info_cols + ["count"] + pred_cols_qs]
 
     title = plot_params.get(
         "title", "Actual predictions plot for %s" % " & ".join(feature_names)
@@ -843,7 +882,7 @@ def actual_plot_interact(
         feature_names=feature_names,
         display_columns=display_columns,
         percentile_columns=percentile_columns,
-        ys=[col + "_q2" for col in actual_prediction_columns],
+        ys=[col + "_q2" for col in pred_cols],
         plot_data=actual_plot_data,
         title=title,
         subtitle=subtitle,

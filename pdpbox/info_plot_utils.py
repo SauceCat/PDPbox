@@ -17,6 +17,7 @@ from .styles import infoPlotStyle
 
 import numpy as np
 import pandas as pd
+import copy
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -26,7 +27,6 @@ import matplotlib.patheffects as PathEffects
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
 
 
 def _prepare_data_x(
@@ -64,8 +64,6 @@ def _prepare_data_x(
         else:
             grids = np.array(sorted(cust_grid_points))
             percentiles = None
-
-        grids_raw = grids.copy()
 
         if endpoint:
             grids[-1] *= 1.01
@@ -120,6 +118,27 @@ def _prepare_data_x(
     return results
 
 
+def _prepare_plot_params(
+    plot_params, ncols, display_columns, percentile_columns, figsize, template, engine
+):
+    if plot_params is None:
+        plot_params = {}
+    if figsize is not None:
+        plot_params["figsize"] = figsize
+    if template is not None:
+        plot_params["template"] = template
+
+    plot_params.update(
+        {
+            "ncols": ncols,
+            "display_columns": display_columns,
+            "percentile_columns": percentile_columns,
+            "engine": engine,
+        }
+    )
+    return plot_params
+
+
 def _autolabel(rects, axes, color, fontdict):
     """Create label for bar plot"""
     for rect in rects:
@@ -141,36 +160,9 @@ def _autolabel(rects, axes, color, fontdict):
         )
 
 
-def _draw_barplot(feat_name, data_axes, plot_style):
-    """Draw bar plot"""
-    data, axes = data_axes
-    display_columns = plot_style.display_columns
-    bar_width = plot_style.bar["width"]
-    if bar_width is None:
-        bar_width = np.min([0.4, 0.4 / (10.0 / len(display_columns))])
-    bar_color = plot_style.bar["color"]
-
-    # add value label for bar plot
-    rects = axes.bar(
-        x=data["x"],
-        height=data["fake_count"],
-        width=bar_width,
-        color=bar_color,
-        alpha=0.5,
-    )
-    _autolabel(rects, axes, bar_color, plot_style.bar["fontdict"])
-    _axes_modify(axes, plot_style)
-
-    # bar plot
-    axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
-    axes.set_ylabel("count", fontdict=plot_style.label["fontdict"])
-    axes.set_xticks(range(len(display_columns)))
-    axes.set_xticklabels(display_columns, rotation=plot_style.tick["xticks_rotation"])
-    axes.set_xlim(-0.5, len(display_columns) - 0.5)
-
-    # display percentile
+def _display_percentile(axes, show_percentile, plot_style):
     percentile_columns = plot_style.percentile_columns
-    if len(percentile_columns) > 0:
+    if len(percentile_columns) > 0 and show_percentile:
         axes_per = axes.twiny()
         axes_per.set_xticks(axes.get_xticks())
         axes_per.set_xbound(axes.get_xbound())
@@ -179,6 +171,34 @@ def _draw_barplot(feat_name, data_axes, plot_style):
         )
         axes_per.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
         _axes_modify(axes_per, plot_style, top=True)
+
+
+def _draw_barplot(feat_name, data_axes, plot_style, show_percentile=True):
+    """Draw bar plot"""
+    data, axes = data_axes
+
+    # add value label for bar plot
+    rects = axes.bar(
+        x=data["x"],
+        height=data["fake_count"],
+        width=plot_style.bar["width"],
+        color=plot_style.bar["color"],
+        alpha=0.5,
+    )
+    _autolabel(rects, axes, plot_style.bar["color"], plot_style.bar["fontdict"])
+    _axes_modify(axes, plot_style)
+    num_xticks = len(plot_style.display_columns)
+
+    # bar plot
+    axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
+    axes.set_ylabel("count", fontdict=plot_style.label["fontdict"])
+    axes.set_xticks(range(num_xticks))
+    axes.set_xticklabels(
+        plot_style.display_columns, rotation=plot_style.tick["xticks_rotation"]
+    )
+    axes.set_xlim(-0.5, num_xticks - 0.5)
+
+    _display_percentile(axes, show_percentile, plot_style)
 
 
 def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
@@ -218,8 +238,10 @@ def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
     axes.set_ylabel(target_ylabel, fontdict=plot_style.label["fontdict"])
 
 
-def _prepare_for_target_plot(feat_name, target, target_lines, plot_params):
-    plot_style = infoPlotStyle(feat_name, plot_params)
+def _prepare_for_info_plot(
+    feat_name, target, target_lines, plot_params, plot_type="target"
+):
+    plot_style = infoPlotStyle(feat_name, plot_params, plot_type)
 
     # set up graph parameters
     width, height = plot_style.figsize
@@ -231,13 +253,19 @@ def _prepare_for_target_plot(feat_name, target, target_lines, plot_params):
     else:
         ncols = 1
 
+    plot_style.bar["width"] *= ncols
+    plot_style.box["width"] *= ncols
+
     plot_style.figsize = (width, height)
     plot_style.nrows, plot_style.ncols = int(nrows), int(ncols)
 
     # get max average target value
     ys = []
     for i, t in enumerate(target):
-        ys += list(target_lines[i][t].values)
+        if plot_type == "target":
+            ys += list(target_lines[i][t].values)
+        else:
+            ys += list(target_lines[i][t + "_q3"].values)
     y_max = np.max(ys)
 
     return plot_style, y_max
@@ -245,8 +273,8 @@ def _prepare_for_target_plot(feat_name, target, target_lines, plot_params):
 
 def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
     """Internal call for target_plot, drawing with plotly"""
-    plot_style, y_max = _prepare_for_target_plot(
-        feat_name, target, target_lines, plot_params
+    plot_style, y_max = _prepare_for_info_plot(
+        feat_name, target, target_lines, plot_params, "target"
     )
 
     fig = make_subplots(
@@ -273,12 +301,8 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
         ),
     )
 
-    line_colors = plot_style.line["colors"]
-    if line_colors is None:
-        line_colors = px.colors.qualitative.Plotly
-
     for i, t in enumerate(target):
-        line_color = line_colors[i % len(line_colors)]
+        line_color = plot_style.line["colors"][i % len(plot_style.line["colors"])]
         ic, ir = i % plot_style.ncols + 1, i // plot_style.ncols + 1
 
         line_data = (
@@ -354,8 +378,8 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
 
 def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
     """Internal call for target_plot"""
-    plot_style, y_max = _prepare_for_target_plot(
-        feat_name, target, target_lines, plot_params
+    plot_style, y_max = _prepare_for_info_plot(
+        feat_name, target, target_lines, plot_params, "target"
     )
 
     fig = plt.figure(figsize=plot_style.figsize, dpi=300)
@@ -384,14 +408,8 @@ def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
         plot_axes.append(axes)
         fig.add_subplot(axes)
 
-    line_colors = plot_style.line["colors"]
-    if line_colors is None:
-        line_colors = plt.get_cmap(plot_style.line["cmap"])(
-            np.arange(np.min([20, len(target)]))
-        )
-
     for i, t in enumerate(target):
-        inner_line_color = line_colors[i % len(line_colors)]
+        inner_line_color = plot_style.line["colors"][i % len(plot_style.line["colors"])]
         inner_bar_axes = plot_axes[i]
         inner_line_axes = inner_bar_axes.twinx()
 
@@ -425,40 +443,40 @@ def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
     return fig, axes
 
 
-def _draw_boxplot(
-    box_data, box_line_data, box_ax, display_columns, box_color, plot_params
-):
-    """Draw box plot"""
-    font_family = plot_params.get("font_family", "Arial")
-    box_line_width = plot_params.get("box_line_width", 1.5)
-    box_width = plot_params.get(
-        "box_width", np.min([0.4, 0.4 / (10.0 / len(display_columns))])
-    )
-
+def _prepare_box_data(box_data):
     xs = sorted(box_data["x"].unique())
     ys = []
     for x in xs:
         ys.append(box_data[box_data["x"] == x]["y"].values)
+    return xs, ys
 
-    boxprops = dict(linewidth=box_line_width, color=box_color)
+
+def _draw_boxplot(
+    box_data, box_line_data, box_axes, plot_style, box_color=None, show_percentile=True
+):
+    """Draw box plot"""
+    xs, ys = _prepare_box_data(box_data)
+    if box_color is None:
+        box_color = plot_style.box["color"]
+
+    boxprops = dict(linewidth=plot_style.box["line_width"], color=box_color)
     medianprops = dict(linewidth=0)
-    whiskerprops = dict(linewidth=box_line_width, color=box_color)
-    capprops = dict(linewidth=box_line_width, color=box_color)
+    whiskerprops = copy.deepcopy(boxprops)
+    capprops = copy.deepcopy(boxprops)
 
-    box_ax.boxplot(
+    box_axes.boxplot(
         ys,
         positions=xs,
         showfliers=False,
-        widths=box_width,
+        widths=plot_style.box["width"],
         whiskerprops=whiskerprops,
         capprops=capprops,
         boxprops=boxprops,
         medianprops=medianprops,
     )
+    _axes_modify(box_axes, plot_style)
 
-    _axes_modify(font_family=font_family, ax=box_ax)
-
-    box_ax.plot(
+    box_axes.plot(
         box_line_data["x"], box_line_data["y"], linewidth=1, c=box_color, linestyle="--"
     )
     for idx in box_line_data.index.values:
@@ -468,7 +486,7 @@ def _draw_boxplot(
             "boxstyle": "square,pad=0.5",
             "lw": 1,
         }
-        box_ax.text(
+        box_axes.text(
             box_line_data.loc[idx, "x"],
             box_line_data.loc[idx, "y"],
             "%.3f" % box_line_data.loc[idx, "y"],
@@ -478,208 +496,192 @@ def _draw_boxplot(
             bbox=bbox_props,
             color=box_color,
         )
+    box_axes.set_xticklabels([])
+
+    _display_percentile(box_axes, show_percentile, plot_style)
 
 
-def _draw_box_bar(
-    bar_data,
-    bar_ax,
-    box_data,
-    box_line_data,
-    box_color,
-    box_ax,
-    feature_name,
-    display_columns,
-    percentile_columns,
-    plot_params,
-    target_ylabel,
-):
-    """Draw box plot and bar plot"""
-
-    font_family = plot_params.get("font_family", "Arial")
-    xticks_rotation = plot_params.get("xticks_rotation", 0)
-
-    _draw_boxplot(
-        box_data=box_data,
-        box_line_data=box_line_data,
-        box_ax=box_ax,
-        display_columns=display_columns,
-        box_color=box_color,
-        plot_params=plot_params,
-    )
-    box_ax.set_ylabel("%sprediction dist" % target_ylabel)
-    box_ax.set_xticklabels([])
-
-    _draw_barplot(
-        bar_data=bar_data,
-        bar_ax=bar_ax,
-        display_columns=display_columns,
-        plot_params=plot_params,
-    )
-
-    # bar plot
-    bar_ax.set_xlabel(feature_name)
-    bar_ax.set_ylabel("count")
-
-    bar_ax.set_xticks(range(len(display_columns)))
-    bar_ax.set_xticklabels(display_columns, rotation=xticks_rotation)
-    bar_ax.set_xlim(-0.5, len(display_columns) - 0.5)
-
-    plt.setp(box_ax.get_xticklabels(), visible=False)
-
-    # display percentile
-    if len(percentile_columns) > 0:
-        percentile_ax = box_ax.twiny()
-        percentile_ax.set_xticks(box_ax.get_xticks())
-        percentile_ax.set_xbound(box_ax.get_xbound())
-        percentile_ax.set_xticklabels(percentile_columns, rotation=xticks_rotation)
-        percentile_ax.set_xlabel("percentile buckets")
-        _axes_modify(font_family=font_family, ax=percentile_ax, top=True)
-
-
-def _actual_plot(
+def _actual_plot_plotly(
+    feat_name,
+    pred_cols,
     plot_data,
     bar_data,
     box_lines,
-    actual_prediction_columns,
-    feature_name,
-    display_columns,
-    percentile_columns,
-    figsize,
-    ncols,
     plot_params,
 ):
     """Internal call for actual_plot"""
+    plot_style, y_max = _prepare_for_info_plot(
+        feat_name, pred_cols, box_lines, plot_params, "actual"
+    )
 
-    # set up graph parameters
-    width, height = 15, 9
-    nrows = 1
+    fig = make_subplots(
+        rows=plot_style.nrows * 2,
+        cols=plot_style.ncols,
+        shared_yaxes=True,
+        shared_xaxes=True,
+        horizontal_spacing=0.1,
+        vertical_spacing=0.1,
+    )
 
-    if plot_params is None:
-        plot_params = dict()
-
-    # font_family = plot_params.get('font_family', 'Arial')
-    box_color = plot_params.get("box_color", "#3288bd")
-    box_colors_cmap = plot_params.get("box_colors_cmap", "tab20")
-    box_colors = plot_params.get(
-        "box_colors",
-        plt.get_cmap(box_colors_cmap)(
-            range(np.min([20, len(actual_prediction_columns)]))
+    fig.update_layout(
+        width=plot_style.figsize[0],
+        height=plot_style.figsize[1],
+        template=plot_style.template,
+        showlegend=False,
+        title=go.layout.Title(
+            text=f"{plot_style.title['title']['text']} <br><sup>{plot_style.title['subtitle']['text']}</sup>",
+            xref="paper",
+            x=0,
         ),
     )
-    title = plot_params.get("title", "Actual predictions plot for %s" % feature_name)
-    subtitle = plot_params.get(
-        "subtitle",
-        "Distribution of actual prediction through different feature values.",
-    )
 
-    if len(actual_prediction_columns) > 1:
-        nrows = int(np.ceil(len(actual_prediction_columns) * 1.0 / ncols))
-        ncols = np.min([len(actual_prediction_columns), ncols])
-        width = np.min([7.5 * len(actual_prediction_columns), 15])
-        height = width * 1.0 / ncols * nrows
+    for i, p in enumerate(pred_cols):
+        box_color = plot_style.box["colors"][i % len(plot_style.box["colors"])]
+        ic, ir = i % plot_style.ncols + 1, i // plot_style.ncols + 1
 
-    if figsize is not None:
-        width, height = figsize
+        inner_box_data = plot_data[["x", p]].rename(columns={p: "y"})
+        inner_box_line_data = box_lines[i].rename(columns={p + "_q2": "y"})
 
-    if plot_params is None:
-        plot_params = dict()
+        xs, ys = _prepare_box_data(inner_box_data)
+        for iy, y in enumerate(ys):
+            fig.add_trace(
+                go.Box(
+                    x0=iy,
+                    y=y,
+                    width=plot_style.box["width"],
+                    marker=dict(
+                        color=box_color,
+                        opacity=0.5,
+                    ),
+                    name=f"{p} dist",
+                    boxpoints=False,
+                ),
+                row=ir * 2 - 1,
+                col=ic,
+            )
 
-    fig = plt.figure(figsize=(width, height))
-    outer_grid = GridSpec(2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, height - 2])
-    title_ax = plt.subplot(outer_grid[0])
-    fig.add_subplot(title_ax)
-    _plot_title(
-        title=title, subtitle=subtitle, title_ax=title_ax, plot_params=plot_params
-    )
+        lx = inner_box_line_data["x"].values
+        ly = inner_box_line_data["y"].values
 
-    box_bar_params = {
-        "bar_data": bar_data,
-        "feature_name": feature_name,
-        "display_columns": display_columns,
-        "percentile_columns": percentile_columns,
-        "plot_params": plot_params,
-    }
+        fig.add_trace(
+            go.Scatter(
+                x=lx,
+                y=ly,
+                text=[round(v, 3) for v in ly],
+                textposition="top center",
+                mode="lines+markers+text",
+                line=dict(color=box_color),
+                marker=dict(color=box_color),
+            ),
+            row=ir * 2 - 1,
+            col=ic,
+        )
 
-    if len(actual_prediction_columns) == 1:
-        inner_grid = GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_grid[1])
+        bx = bar_data["x"].values
+        by = bar_data["fake_count"].values
 
-        box_ax = plt.subplot(inner_grid[0])
-        bar_ax = plt.subplot(inner_grid[1], sharex=box_ax)
-        fig.add_subplot(box_ax)
-        fig.add_subplot(bar_ax)
+        fig.add_trace(
+            go.Bar(
+                x=bx,
+                y=by,
+                text=by,
+                textposition="outside",
+                width=plot_style.bar["width"],
+                name="count",
+                marker=dict(
+                    color=plot_style.bar["color"],
+                    opacity=0.5,
+                ),
+            ),
+            row=ir * 2,
+            col=ic,
+        )
 
-        if actual_prediction_columns[0] == "actual_prediction":
-            target_ylabel = ""
+        # display percentile
+        ticktext = plot_style.display_columns.copy()
+        if len(plot_style.percentile_columns) > 0:
+            for j, p in enumerate(plot_style.percentile_columns):
+                ticktext[j] += f"<br><sup><b>{p}</b></sup>"
+            title_text = f"<b>{feat_name}</b> (value+percentile)"
         else:
-            target_ylabel = "target_%s: " % actual_prediction_columns[0].split("_")[-1]
+            title_text = f"<b>{feat_name}</b> (value)"
 
-        box_data = plot_data[["x", actual_prediction_columns[0]]].rename(
-            columns={actual_prediction_columns[0]: "y"}
+        fig.update_xaxes(
+            title_text=title_text, ticktext=ticktext, tickvals=bx, row=ir * 2, col=ic
         )
-        box_line_data = box_lines[0].rename(
-            columns={actual_prediction_columns[0] + "_q2": "y"}
-        )
-        _draw_box_bar(
-            bar_ax=bar_ax,
-            box_data=box_data,
-            box_line_data=box_line_data,
-            box_color=box_color,
-            box_ax=box_ax,
-            target_ylabel=target_ylabel,
-            **box_bar_params,
-        )
-    else:
-        inner_grid = GridSpecFromSubplotSpec(
-            nrows, ncols, subplot_spec=outer_grid[1], wspace=0.2, hspace=0.35
+        fig.update_yaxes(
+            title_text="count", row=ir * 2, col=ic, range=[0, np.max(by) * 1.1]
         )
 
-        box_ax = []
-        bar_ax = []
+    return fig
 
-        # get max average target value
-        ys = []
-        for idx in range(len(box_lines)):
-            ys += list(box_lines[idx][actual_prediction_columns[idx] + "_q2"].values)
-        y_max = np.max(ys)
 
-        for idx in range(len(actual_prediction_columns)):
-            box_color = box_colors[idx % len(box_colors)]
+def _actual_plot(
+    feat_name,
+    pred_cols,
+    plot_data,
+    bar_data,
+    box_lines,
+    plot_params,
+):
+    """Internal call for actual_plot"""
+    plot_style, y_max = _prepare_for_info_plot(
+        feat_name, pred_cols, box_lines, plot_params, "actual"
+    )
 
-            inner = GridSpecFromSubplotSpec(
-                2, 1, subplot_spec=inner_grid[idx], wspace=0, hspace=0.2
-            )
-            inner_box_ax = plt.subplot(inner[0])
-            inner_bar_ax = plt.subplot(inner[1], sharex=inner_box_ax)
-            fig.add_subplot(inner_box_ax)
-            fig.add_subplot(inner_bar_ax)
+    fig = plt.figure(figsize=plot_style.figsize, dpi=300)
+    outer_grid = GridSpec(
+        2, 1, wspace=0.0, hspace=0.1, height_ratios=[2, plot_style.figsize[1] - 2]
+    )
+    title_axes = plt.subplot(outer_grid[0])
+    fig.add_subplot(title_axes)
+    _plot_title(title_axes, plot_style)
 
-            inner_box_data = plot_data[["x", actual_prediction_columns[idx]]].rename(
-                columns={actual_prediction_columns[idx]: "y"}
-            )
-            inner_box_line_data = box_lines[idx].rename(
-                columns={actual_prediction_columns[idx] + "_q2": "y"}
-            )
-            _draw_box_bar(
-                bar_ax=inner_bar_ax,
-                box_data=inner_box_data,
-                box_line_data=inner_box_line_data,
-                box_color=box_color,
-                box_ax=inner_box_ax,
-                target_ylabel="target_%s: "
-                % actual_prediction_columns[idx].split("_")[-1],
-                **box_bar_params,
-            )
+    inner_grid = GridSpecFromSubplotSpec(
+        plot_style.nrows,
+        plot_style.ncols,
+        subplot_spec=outer_grid[1],
+        wspace=0.2,
+        hspace=0.35,
+    )
 
-            inner_box_ax.set_ylim(0.0, y_max)
+    box_axes = []
+    bar_axes = []
+    for i, p in enumerate(pred_cols):
+        box_color = plot_style.box["colors"][i % len(plot_style.box["colors"])]
 
-            if idx % ncols != 0:
-                inner_bar_ax.set_yticklabels([])
-                inner_box_ax.set_yticklabels([])
+        inner = GridSpecFromSubplotSpec(
+            2, 1, subplot_spec=inner_grid[i], wspace=0, hspace=0.2
+        )
+        inner_box_axes = plt.subplot(inner[0])
+        inner_bar_axes = plt.subplot(inner[1], sharex=inner_box_axes)
+        fig.add_subplot(inner_box_axes)
+        fig.add_subplot(inner_bar_axes)
 
-            box_ax.append(inner_box_ax)
-            bar_ax.append(inner_bar_ax)
+        inner_box_data = plot_data[["x", p]].rename(columns={p: "y"})
+        inner_box_line_data = box_lines[i].rename(columns={p + "_q2": "y"})
 
-    axes = {"title_ax": title_ax, "box_ax": box_ax, "bar_ax": bar_ax}
+        _draw_boxplot(
+            inner_box_data,
+            inner_box_line_data,
+            inner_box_axes,
+            plot_style,
+            box_color,
+            show_percentile=True,
+        )
+        inner_box_axes.set_ylabel("%s dist" % p)
+        _draw_barplot(
+            feat_name, (bar_data, inner_bar_axes), plot_style, show_percentile=False
+        )
+
+        if i % plot_style.ncols != 0:
+            inner_bar_axes.set_yticklabels([])
+            inner_box_axes.set_yticklabels([])
+
+        box_axes.append(inner_box_axes)
+        bar_axes.append(inner_bar_axes)
+
+    axes = {"title_axes": title_axes, "box_axes": box_axes, "bar_axes": bar_axes}
     return fig, axes
 
 

@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import plotly.express as px
 
 
 class defaultColors:
@@ -8,6 +10,7 @@ class defaultColors:
     darkGray = "#424242"
     lightGray = "#9E9E9E"
     black = "#000000"
+    blue = "#3288bd"
 
 
 default_font_family = "Arial"
@@ -25,7 +28,7 @@ def update_style(curr, update):
 
 
 class infoPlotStyle:
-    def __init__(self, feat_name, plot_params):
+    def __init__(self, feat_name, plot_params, plot_type="target"):
         """
         Style configuration for info plots
 
@@ -71,6 +74,7 @@ class infoPlotStyle:
         if plot_params is None:
             plot_params = {}
 
+        self.plot_type = plot_type
         self.engine = plot_params.get("engine", "plotly")
         fontdict_keys = {
             "family": "family" if self.engine == "plotly" else "fontfamily",
@@ -98,6 +102,11 @@ class infoPlotStyle:
             },
         }
         update_style(self.line, plot_params.get("line", {}))
+        if self.line["colors"] is None:
+            if self.engine == "matplotlib":
+                self.line["colors"] = plt.get_cmap(self.line["cmap"])(np.arange(20))
+            else:
+                self.line["colors"] = px.colors.qualitative.Plotly
 
         self.bar = {
             "width": None,
@@ -109,7 +118,7 @@ class infoPlotStyle:
         }
         update_style(self.bar, plot_params.get("bar", {}))
         if self.bar["width"] is None:
-            self.bar["width"] = np.min([0.5, 0.5 / (10.0 / len(self.display_columns))])
+            self.bar["width"] = np.min([0.4, 0.4 / (10.0 / len(self.display_columns))])
 
         self.tick = {
             "xticks_rotation": 0,
@@ -131,11 +140,31 @@ class infoPlotStyle:
         }
         update_style(self.label, plot_params.get("label", {}))
 
+        self.box = {
+            "width": None,
+            "line_width": 2,
+            "color": defaultColors.blue,
+            "colors": None,
+            "cmap": defaultColors.cmap,
+        }
+        update_style(self.box, plot_params.get("box", {}))
+        if self.box["colors"] is None:
+            if self.engine == "matplotlib":
+                self.box["colors"] = plt.get_cmap(self.box["cmap"])(np.arange(20))
+            else:
+                self.box["colors"] = px.colors.qualitative.Plotly
+        if self.box["width"] is None:
+            self.box["width"] = self.bar["width"]
+
         self.title = {
             "title": {
                 "font_size": 15,
                 "color": defaultColors.black,
-                "text": "Target plot for feature "
+                "text": (
+                    "Target plot for feature "
+                    if self.plot_type == "target"
+                    else "Actual predictions plot for feature "
+                )
                 + (
                     f"<b>{feat_name}</b>" if self.engine == "plotly" else f"{feat_name}"
                 ),
@@ -143,7 +172,11 @@ class infoPlotStyle:
             "subtitle": {
                 "font_size": 12,
                 "color": defaultColors.lightGray,
-                "text": "Average target value by different feature values.",
+                "text": (
+                    "Average target value by different feature values."
+                    if self.plot_type == "target"
+                    else "Distribution of actual prediction through different feature values."
+                ),
             },
         }
         update_style(self.title, plot_params.get("title", {}))
