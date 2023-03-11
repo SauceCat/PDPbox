@@ -5,13 +5,14 @@ from .info_plot_utils import (
     _actual_plot,
     _actual_plot_plotly,
     _prepare_info_plot_interact_data,
-    _prepare_info_plot_interact_summary,
     _prepare_info_plot_data,
     _check_info_plot_interact_params,
     _check_info_plot_params,
     _prepare_plot_params,
+    _prepare_actual_plot_data,
+    _info_plot_interact_plotly,
 )
-from .utils import _make_list, _check_model, _check_target, _check_classes
+from .utils import _make_list, _check_target, _q1, _q2, _q3
 
 
 def target_plot(
@@ -28,6 +29,7 @@ def target_plot(
     show_outliers=False,
     endpoint=True,
     figsize=None,
+    dpi=300,
     ncols=2,
     plot_params=None,
     engine="plotly",
@@ -145,7 +147,7 @@ def target_plot(
 
     """
 
-    _ = _check_target(target, df)
+    _check_target(target, df)
     feature_type, show_outliers = _check_info_plot_params(
         df,
         feature,
@@ -156,7 +158,6 @@ def target_plot(
         show_outliers,
     )
 
-    # create feature grids and bar counts
     target = _make_list(target)
     useful_features = _make_list(feature) + target
 
@@ -200,6 +201,7 @@ def target_plot(
         display_columns,
         percentile_columns,
         figsize,
+        dpi,
         template,
         engine,
     )
@@ -215,18 +217,6 @@ def target_plot(
         axes = None
 
     return fig, axes, summary_df
-
-
-def q1(x):
-    return x.quantile(0.25)
-
-
-def q2(x):
-    return x.quantile(0.5)
-
-
-def q3(x):
-    return x.quantile(0.75)
 
 
 def actual_plot(
@@ -248,6 +238,7 @@ def actual_plot(
     predict_kwds={},
     ncols=2,
     figsize=None,
+    dpi=300,
     plot_params=None,
     engine="plotly",
     template="plotly_white",
@@ -390,40 +381,10 @@ def actual_plot(
         show_outliers,
     )
 
-    model_n_classes, model_pred_func = _check_model(model=model)
-    if model_n_classes is None:
-        assert (
-            n_classes is not None
-        ), "n_classes is required when it can't be accessed through model.n_classes_."
-    else:
-        n_classes = model_n_classes
-
-    if pred_func is None:
-        print("predict using model predict func...")
-        assert (
-            model_pred_func is not None
-        ), "pred_func is required when model.predict_proba or model.predict doesn't exist."
-        prediction = model_pred_func(X, **predict_kwds)
-    else:
-        print("predict using customized func...")
-        prediction = pred_func(model, X, **predict_kwds)
-
-    info_df = X[_make_list(feature)]
-    pred_cols = ["pred"]
-    if n_classes == 0:
-        info_df["pred"] = prediction
-    elif n_classes == 2:
-        info_df["pred"] = prediction[:, 1]
-    else:
-        plot_classes = range(n_classes)
-        if which_classes is not None:
-            _check_classes(classes_list=which_classes, n_classes=n_classes)
-            plot_classes = sorted(which_classes)
-
-        pred_cols = []
-        for class_idx in plot_classes:
-            info_df["pred_%d" % class_idx] = prediction[:, class_idx]
-            pred_cols.append("pred_%d" % class_idx)
+    info_features = _make_list(feature)
+    info_df, pred_cols = _prepare_actual_plot_data(
+        model, X, n_classes, pred_func, predict_kwds, info_features, which_classes
+    )
 
     (
         info_df_x,
@@ -452,11 +413,11 @@ def actual_plot(
     for p in pred_cols:
         box_line = (
             info_df_x.groupby("x", as_index=False)
-            .agg({p: [q1, q2, q3]})
+            .agg({p: [_q1, _q2, _q3]})
             .sort_values("x", ascending=True)
         )
         box_line.columns = [
-            "_".join(col) if col[1] != "" else col[0] for col in box_line.columns
+            "".join(col) if col[1] != "" else col[0] for col in box_line.columns
         ]
         box_lines.append(box_line)
         pred_cols_qs += [p + "_%s" % q for q in ["q1", "q2", "q3"]]
@@ -468,6 +429,7 @@ def actual_plot(
         display_columns,
         percentile_columns,
         figsize,
+        dpi,
         template,
         engine,
     )
@@ -508,9 +470,12 @@ def target_plot_interact(
     show_outliers=False,
     endpoint=True,
     figsize=None,
+    dpi=300,
     ncols=2,
     annotate=False,
     plot_params=None,
+    engine="plotly",
+    template="plotly_white",
 ):
     """Plot average target value across different feature value combinations (feature grid combinations)
 
@@ -552,6 +517,10 @@ def target_plot_interact(
         whether to annotate the points
     plot_params: dict or None, optional, default=None
         parameters for the plot
+    engine: str, optinal, default=plotly
+        visualization engine, can be plotly or matplotlib
+    template: str, optional, default='plotly_white'
+        plotly template
 
     Notes
     -----
@@ -591,94 +560,32 @@ def target_plot_interact(
 
     """
 
-    # check inputs
-    _ = _check_target(target=target, df=df)
-    check_results = _check_info_plot_interact_params(
-        num_grid_points=num_grid_points,
-        grid_types=grid_types,
-        percentile_ranges=percentile_ranges,
-        grid_ranges=grid_ranges,
-        cust_grid_points=cust_grid_points,
-        show_outliers=show_outliers,
-        plot_params=plot_params,
-        features=features,
-        df=df,
-    )
-
-    num_grid_points = check_results["num_grid_points"]
-    grid_types = check_results["grid_types"]
-    percentile_ranges = check_results["percentile_ranges"]
-    grid_ranges = check_results["grid_ranges"]
-    cust_grid_points = check_results["cust_grid_points"]
-    show_outliers = check_results["show_outliers"]
-    plot_params = check_results["plot_params"]
-    feature_types = check_results["feature_types"]
-
-    # create feature grids and bar counts
+    _check_target(target, df)
     target = _make_list(target)
     useful_features = _make_list(features[0]) + _make_list(features[1]) + target
 
-    # prepare data for bar plot
-    data = df[useful_features].copy()
-
-    # prepare data for target interact plot
-    agg_dict = {}
-    for t in target:
-        agg_dict[t] = "mean"
-    agg_dict["fake_count"] = "count"
-
-    data_x, target_plot_data, prepared_results = _prepare_info_plot_interact_data(
-        data_input=data,
-        features=features,
-        feature_types=feature_types,
-        num_grid_points=num_grid_points,
-        grid_types=grid_types,
-        percentile_ranges=percentile_ranges,
-        grid_ranges=grid_ranges,
-        cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile,
-        show_outliers=show_outliers,
-        endpoint=endpoint,
-        agg_dict=agg_dict,
+    return plot_interact(
+        df[useful_features],
+        features,
+        feature_names,
+        target,
+        num_grid_points,
+        grid_types,
+        percentile_ranges,
+        grid_ranges,
+        cust_grid_points,
+        show_percentile,
+        show_outliers,
+        endpoint,
+        figsize,
+        dpi,
+        ncols,
+        annotate,
+        plot_params,
+        engine,
+        template,
+        "target_interact",
     )
-
-    # prepare summary data frame
-    (
-        summary_df,
-        info_cols,
-        display_columns,
-        percentile_columns,
-    ) = _prepare_info_plot_interact_summary(
-        data_x=data_x,
-        plot_data=target_plot_data,
-        prepared_results=prepared_results,
-        feature_types=feature_types,
-    )
-    summary_df = summary_df[info_cols + ["count"] + target]
-
-    title = plot_params.get(
-        "title", 'Target plot for feature "%s"' % " & ".join(feature_names)
-    )
-    subtitle = plot_params.get(
-        "subtitle", "Average target value through different feature value combinations."
-    )
-
-    # inner call target plot interact
-    fig, axes = _info_plot_interact(
-        feature_names=feature_names,
-        display_columns=display_columns,
-        percentile_columns=percentile_columns,
-        ys=target,
-        plot_data=target_plot_data,
-        title=title,
-        subtitle=subtitle,
-        figsize=figsize,
-        ncols=ncols,
-        annotate=annotate,
-        plot_params=plot_params,
-    )
-
-    return fig, axes, summary_df
 
 
 def actual_plot_interact(
@@ -686,6 +593,8 @@ def actual_plot_interact(
     X,
     features,
     feature_names,
+    pred_func=None,
+    n_classes=None,
     num_grid_points=None,
     grid_types=None,
     percentile_ranges=None,
@@ -696,10 +605,13 @@ def actual_plot_interact(
     endpoint=True,
     which_classes=None,
     predict_kwds={},
-    ncols=2,
     figsize=None,
+    dpi=300,
+    ncols=2,
     annotate=False,
     plot_params=None,
+    engine="plotly",
+    template="plotly_white",
 ):
     """Plot prediction distribution across different feature value combinations (feature grid combinations)
 
@@ -786,111 +698,111 @@ def actual_plot_interact(
     """
 
     # check model
-    n_classes, predict = _check_model(model=model)
+    info_features = _make_list(features[0]) + _make_list(features[1])
+    info_df, pred_cols = _prepare_actual_plot_data(
+        model, X, n_classes, pred_func, predict_kwds, info_features, which_classes
+    )
+
+    return plot_interact(
+        info_df,
+        features,
+        feature_names,
+        pred_cols,
+        num_grid_points,
+        grid_types,
+        percentile_ranges,
+        grid_ranges,
+        cust_grid_points,
+        show_percentile,
+        show_outliers,
+        endpoint,
+        figsize,
+        dpi,
+        ncols,
+        annotate,
+        plot_params,
+        engine,
+        template,
+        "actual_interact",
+    )
+
+
+def plot_interact(
+    df,
+    features,
+    feature_names,
+    target,
+    num_grid_points,
+    grid_types,
+    percentile_ranges,
+    grid_ranges,
+    cust_grid_points,
+    show_percentile,
+    show_outliers,
+    endpoint,
+    figsize,
+    dpi,
+    ncols,
+    annotate,
+    plot_params,
+    engine,
+    template,
+    plot_type="target_interact",
+):
+
     check_results = _check_info_plot_interact_params(
-        num_grid_points=num_grid_points,
-        grid_types=grid_types,
-        percentile_ranges=percentile_ranges,
-        grid_ranges=grid_ranges,
-        cust_grid_points=cust_grid_points,
-        show_outliers=show_outliers,
-        plot_params=plot_params,
-        features=features,
-        df=X,
+        df,
+        features,
+        grid_types,
+        percentile_ranges,
+        grid_ranges,
+        num_grid_points,
+        cust_grid_points,
+        show_outliers,
     )
-
-    num_grid_points = check_results["num_grid_points"]
-    grid_types = check_results["grid_types"]
-    percentile_ranges = check_results["percentile_ranges"]
-    grid_ranges = check_results["grid_ranges"]
-    cust_grid_points = check_results["cust_grid_points"]
-    show_outliers = check_results["show_outliers"]
-    plot_params = check_results["plot_params"]
-    feature_types = check_results["feature_types"]
-
-    # prediction
-    prediction = predict(X, **predict_kwds)
-
-    info_df = X[_make_list(features[0]) + _make_list(features[1])]
-    pred_cols = ["actual_prediction"]
-    if n_classes == 0:
-        info_df["actual_prediction"] = prediction
-    elif n_classes == 2:
-        info_df["actual_prediction"] = prediction[:, 1]
-    else:
-        plot_classes = range(n_classes)
-        if which_classes is not None:
-            plot_classes = sorted(which_classes)
-
-        pred_cols = []
-        for class_idx in plot_classes:
-            info_df["actual_prediction_%d" % class_idx] = prediction[:, class_idx]
-            pred_cols.append("actual_prediction_%d" % class_idx)
-
-    agg_dict = {}
-    pred_cols_qs = []
-    for idx in range(len(pred_cols)):
-        agg_dict[pred_cols[idx]] = [q1, q2, q3]
-        pred_cols_qs += [pred_cols[idx] + "_%s" % q for q in ["q1", "q2", "q3"]]
-    agg_dict["fake_count"] = "count"
-
-    data_x, actual_plot_data, prepared_results = _prepare_info_plot_interact_data(
-        data_input=info_df,
-        features=features,
-        feature_types=feature_types,
-        num_grid_points=num_grid_points,
-        grid_types=grid_types,
-        percentile_ranges=percentile_ranges,
-        grid_ranges=grid_ranges,
-        cust_grid_points=cust_grid_points,
-        show_percentile=show_percentile,
-        show_outliers=show_outliers,
-        endpoint=endpoint,
-        agg_dict=agg_dict,
-    )
-
-    actual_plot_data.columns = [
-        "_".join(col) if col[1] != "" else col[0] for col in actual_plot_data.columns
-    ]
-    actual_plot_data = actual_plot_data.rename(
-        columns={"fake_count_count": "fake_count"}
-    )
-
-    # prepare summary data frame
     (
+        plot_data,
+        target_plot_data,
         summary_df,
-        info_cols,
         display_columns,
         percentile_columns,
-    ) = _prepare_info_plot_interact_summary(
-        data_x=data_x,
-        plot_data=actual_plot_data,
-        prepared_results=prepared_results,
-        feature_types=feature_types,
-    )
-    summary_df = summary_df[info_cols + ["count"] + pred_cols_qs]
-
-    title = plot_params.get(
-        "title", "Actual predictions plot for %s" % " & ".join(feature_names)
-    )
-    subtitle = plot_params.get(
-        "subtitle",
-        "Medium value of actual prediction through different feature value combinations.",
+    ) = _prepare_info_plot_interact_data(
+        features=features,
+        target=target,
+        data=df,
+        show_percentile=show_percentile,
+        endpoint=endpoint,
+        **check_results
     )
 
-    fig, axes = _info_plot_interact(
-        feature_names=feature_names,
-        display_columns=display_columns,
-        percentile_columns=percentile_columns,
-        ys=[col + "_q2" for col in pred_cols],
-        plot_data=actual_plot_data,
-        title=title,
-        subtitle=subtitle,
-        figsize=figsize,
-        ncols=ncols,
-        annotate=annotate,
-        plot_params=plot_params,
-        is_target_plot=False,
+    plot_params = _prepare_plot_params(
+        plot_params,
+        ncols,
+        display_columns,
+        percentile_columns,
+        figsize,
+        dpi,
+        template,
+        engine,
     )
+    plot_params["annotate"] = annotate
+
+    if engine == "matplotlib":
+        fig, axes = _info_plot_interact(
+            feature_names,
+            target,
+            plot_data,
+            plot_params,
+            plot_type,
+        )
+    else:
+        fig = _info_plot_interact_plotly(
+            feature_names,
+            target,
+            plot_data,
+            plot_params,
+            plot_type,
+        )
+        axes = None
 
     return fig, axes, summary_df

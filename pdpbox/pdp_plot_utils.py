@@ -1,4 +1,4 @@
-from .utils import _axes_modify, _sample_data, _modify_legend_ax, _get_string
+from .utils import _axes_modify, _sample_data, _modify_legend_axes, _get_string
 
 import pandas as pd
 import numpy as np

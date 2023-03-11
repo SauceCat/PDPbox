@@ -212,18 +212,18 @@ def _axes_modify(axes, plot_style, top=False, right=False, grid=False):
         axes.grid(True, "major", "both", ls="--", lw=0.5, c="k", alpha=0.3)
 
 
-def _modify_legend_ax(ax, font_family):
+def _modify_legend_axes(axes, font_family):
     """Modify legend like Axes"""
-    ax.set_frame_on(False)
+    axes.set_frame_on(False)
 
-    for tick in ax.get_xticklabels():
+    for tick in axes.get_xticklabels():
         tick.set_fontname(font_family)
-    for tick in ax.get_yticklabels():
+    for tick in axes.get_yticklabels():
         tick.set_fontname(font_family)
 
-    ax.set_facecolor("white")
-    ax.set_xticks([])
-    ax.set_yticks([])
+    axes.set_facecolor("white")
+    axes.set_xticks([])
+    axes.set_yticks([])
 
 
 def _get_grids(values, num_grid_points, grid_type, percentile_range, grid_range):
@@ -423,3 +423,15 @@ def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
         )
 
     return width, height, nrows, ncols
+
+
+def _q1(x):
+    return x.quantile(0.25)
+
+
+def _q2(x):
+    return x.quantile(0.5)
+
+
+def _q3(x):
+    return x.quantile(0.75)
