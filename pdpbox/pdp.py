@@ -121,8 +121,6 @@ class PDPIsolate:
         self.dist_data = prepared_results["dist"]
         self.display_columns = prepared_results["value_display"][0]
         self.percentile_columns = prepared_results["percentile_display"][0]
-        if len(self.percentile_columns) > 0:
-            self.percentile_columns = [str(v) for v in self.percentile_grids]
         self.n_jobs = _calc_n_jobs(
             self.dataset, self.feature_grids, self.memory_limit, self.n_jobs
         )

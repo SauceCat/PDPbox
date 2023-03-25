@@ -52,7 +52,7 @@ def _set_pdp_xticks(
 
 
 def _get_pdp_xticks(pdp_isolate_obj, plot_style):
-    dist_xticklabels = line_xticklabels = plot_style.display_columns
+    dist_xticklabels = line_xticklabels = copy.deepcopy(plot_style.display_columns)
     is_numeric = pdp_isolate_obj.feature_type == "numeric"
     if is_numeric:
         if plot_style.x_quantile:
@@ -60,6 +60,11 @@ def _get_pdp_xticks(pdp_isolate_obj, plot_style):
         else:
             dist_xticklabels = line_xticklabels = None
             plot_style.show_percentile = False
+
+    if plot_style.show_percentile and plot_style.engine == "plotly":
+        for j, p in enumerate(plot_style.percentile_columns):
+            dist_xticklabels[j] += f"<br><sup><b>{p}</b></sup>"
+
     return is_numeric, line_xticklabels, dist_xticklabels
 
 
@@ -137,6 +142,10 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
                 **tick_params,
             )
 
+        if len(plot_style.percentile_columns) > 0:
+            plot_style.percentile_columns = [
+                str(v) for v in pdp_isolate_obj.percentile_grids
+            ]
         _display_percentile(inner_line_axes, plot_style)
         line_axes.append(inner_line_axes)
 
@@ -187,7 +196,6 @@ def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
         is_numeric, line_xticklabels, dist_xticklabels = _get_pdp_xticks(
             pdp_isolate_obj, plot_style
         )
-
         if plot_style.plot_pts_dist:
             dist_trace = _pdp_dist_plot_plotly(pdp_isolate_obj, colors, plot_style)
             fig.add_trace(dist_trace, **dist_grids)
