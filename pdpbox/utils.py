@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 import psutil
 
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+
 
 def _check_percentile_range(percentile_range):
     """Make sure percentile range is valid"""
@@ -89,19 +92,38 @@ def _expand_default(x, default):
     return x
 
 
-def _check_model(model):
+def _check_model(model, n_classes, pred_func):
     """Check model input, return class information and predict function"""
-    n_classes = None
+
+    n_classes_ = None
     if hasattr(model, "n_classes_"):
-        n_classes = model.n_classes_
+        n_classes_ = model.n_classes_
 
-    pred_func = None
+    if n_classes_ is None:
+        assert (
+            n_classes is not None
+        ), "n_classes is required when it can't be accessed through model.n_classes_."
+    else:
+        n_classes = n_classes_
+
+    pred_func_ = None
+    from_model = True
     if hasattr(model, "predict_proba"):
-        pred_func = model.predict_proba
+        pred_func_ = model.predict_proba
     elif hasattr(model, "predict"):
-        pred_func = model.predict
+        pred_func_ = model.predict
 
-    return n_classes, pred_func
+    if pred_func is None:
+        assert (
+            pred_func_ is not None
+        ), "pred_func is required when model.predict_proba or model.predict doesn't exist."
+        pred_func = pred_func_
+        print("obtain pred_func from the provided model.")
+    else:
+        print("using provided pred_func.")
+        from_model = False
+
+    return n_classes, pred_func, from_model
 
 
 def _check_grid_type(grid_type):
@@ -180,6 +202,17 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     if true_n_jobs < 1:
         true_n_jobs = 1
 
+    return true_n_jobs
+
+
+def _calc_n_jobs(df, feature_grids, memory_limit, n_jobs):
+    _check_memory_limit(memory_limit)
+    true_n_jobs = _calc_memory_usage(
+        df,
+        len(feature_grids),
+        n_jobs,
+        memory_limit,
+    )
     return true_n_jobs
 
 
@@ -278,26 +311,6 @@ def _get_grid_combos(feature_grids, feature_types):
             grid_combos.append(_make_list(g1) + _make_list(g2))
 
     return np.array(grid_combos)
-
-
-def _sample_data(ice_lines, frac_to_plot):
-    """Get sample ice lines to plot
-
-    Notes
-    -----
-    If frac_to_plot==1, will plot all lines instead of sampling one line
-
-    """
-
-    if frac_to_plot < 1.0:
-        ice_plot_data = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
-    elif frac_to_plot > 1:
-        ice_plot_data = ice_lines.sample(frac_to_plot)
-    else:
-        ice_plot_data = ice_lines.copy()
-
-    ice_plot_data = ice_plot_data.reset_index(drop=True)
-    return ice_plot_data
 
 
 def _find_onehot_actual(x):
@@ -435,3 +448,173 @@ def _q2(x):
 
 def _q3(x):
     return x.quantile(0.75)
+
+
+def _check_plot_params(df, feature, grid_type, percentile_range):
+    _check_dataset(df)
+    feature_type = _check_feature(feature, df)
+    _check_grid_type(grid_type)
+    _check_percentile_range(percentile_range)
+
+    return feature_type
+
+
+def _check_interact_plot_params(
+    df,
+    features,
+    grid_types,
+    percentile_ranges,
+    grid_ranges,
+    num_grid_points,
+    cust_grid_points,
+):
+    _check_dataset(df)
+    num_grid_points = _expand_default(num_grid_points, 10)
+
+    grid_types = _expand_default(grid_types, "percentile")
+    [_check_grid_type(v) for v in grid_types]
+
+    percentile_ranges = _expand_default(percentile_ranges, None)
+    [_check_percentile_range(v) for v in percentile_ranges]
+
+    grid_ranges = _expand_default(grid_ranges, None)
+    cust_grid_points = _expand_default(cust_grid_points, None)
+    feature_types = [_check_feature(f, df) for f in features]
+
+    return {
+        "num_grid_points": num_grid_points,
+        "grid_types": grid_types,
+        "percentile_ranges": percentile_ranges,
+        "grid_ranges": grid_ranges,
+        "cust_grid_points": cust_grid_points,
+        "feature_types": feature_types,
+    }
+
+
+def _get_grids_and_cols(
+    feature,
+    feature_type,
+    data,
+    num_grid_points,
+    grid_type,
+    percentile_range,
+    grid_range,
+    cust_grid_points,
+):
+    percentiles = None
+
+    if feature_type == "binary":
+        grids = np.array([0, 1])
+        cols = [f"{feature}_{g}" for g in grids]
+    elif feature_type == "onehot":
+        grids = np.array(feature)
+        cols = grids[:]
+    else:
+        if cust_grid_points is None:
+            grids, percentiles = _get_grids(
+                data[feature].values,
+                num_grid_points,
+                grid_type,
+                percentile_range,
+                grid_range,
+            )
+        else:
+            grids = np.array(sorted(np.unique(cust_grid_points)))
+        cols = [_get_string(v) for v in grids]
+
+    return grids, cols, percentiles
+
+
+def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
+    if from_model:
+        preds = pred_func(X, **predict_kwds)
+    else:
+        preds = pred_func(model, X, **predict_kwds)
+    return preds
+
+
+def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
+    total = len(X)
+    if chunk_size > 0 and chunk_size >= total:
+        chunk_size = -1
+
+    if chunk_size == -1:
+        preds = _calc_preds_each(model, X, pred_func, from_model, predict_kwds)
+    else:
+        preds = []
+        for i in range(0, total, chunk_size):
+            preds.append(
+                _calc_preds_each(
+                    model, X[i : i + chunk_size], pred_func, from_model, predict_kwds
+                )
+            )
+        preds = np.concatenate(preds)
+
+    return preds
+
+
+def _prepare_plot_params(
+    plot_params,
+    ncols,
+    display_columns,
+    percentile_columns,
+    figsize,
+    dpi,
+    template,
+    engine,
+):
+    if plot_params is None:
+        plot_params = {}
+    if figsize is not None:
+        plot_params["figsize"] = figsize
+    if template is not None:
+        plot_params["template"] = template
+
+    plot_params.update(
+        {
+            "ncols": ncols,
+            "display_columns": display_columns,
+            "percentile_columns": percentile_columns,
+            "dpi": dpi,
+            "engine": engine,
+        }
+    )
+    return plot_params
+
+
+def _make_subplots(plot_style):
+    fig = plt.figure(figsize=plot_style.figsize, dpi=plot_style.dpi)
+    title_ratio = 2
+    outer_grid = GridSpec(
+        nrows=2,
+        ncols=1,
+        wspace=0.0,
+        hspace=0.0,
+        height_ratios=[title_ratio, plot_style.figsize[1] - title_ratio],
+    )
+    title_axes = plt.subplot(outer_grid[0])
+    fig.add_subplot(title_axes)
+    _plot_title(title_axes, plot_style)
+
+    inner_grid = GridSpecFromSubplotSpec(
+        plot_style.nrows,
+        plot_style.ncols,
+        subplot_spec=outer_grid[1],
+        wspace=0.3,
+        hspace=0.2,
+    )
+
+    return fig, inner_grid, title_axes
+
+
+def _display_percentile(axes, plot_style):
+    percentile_columns = plot_style.percentile_columns
+    if len(percentile_columns) > 0 and plot_style.show_percentile:
+        per_axes = axes.twiny()
+        per_axes.set_xticks(axes.get_xticks())
+        per_axes.set_xbound(axes.get_xbound())
+        per_axes.set_xticklabels(
+            percentile_columns, rotation=plot_style.tick["xticks_rotation"]
+        )
+        per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
+        _axes_modify(per_axes, plot_style, top=True)

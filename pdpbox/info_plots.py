@@ -8,7 +8,6 @@ from .info_plot_utils import (
     _prepare_info_plot_data,
     _check_info_plot_interact_params,
     _check_info_plot_params,
-    _prepare_plot_params,
     _prepare_actual_plot_data,
     _info_plot_interact_plotly,
 )
@@ -195,15 +194,20 @@ def target_plot(
         target_lines.append(target_line)
         summary_df = summary_df.merge(target_line, on="x", how="outer")
 
-    plot_params = _prepare_plot_params(
-        plot_params,
-        ncols,
-        display_columns,
-        percentile_columns,
-        figsize,
-        dpi,
-        template,
-        engine,
+    if plot_params is None:
+        plot_params = {}
+
+    plot_params.update(
+        {
+            "ncols": ncols,
+            "figsize": figsize,
+            "dpi": dpi,
+            "template": template,
+            "engine": engine,
+            "display_columns": display_columns,
+            "percentile_columns": percentile_columns,
+            "show_percentile": show_percentile,
+        }
     )
 
     if engine == "matplotlib":
@@ -236,6 +240,7 @@ def actual_plot(
     endpoint=True,
     which_classes=None,
     predict_kwds={},
+    chunk_size=-1,
     ncols=2,
     figsize=None,
     dpi=300,
@@ -383,7 +388,14 @@ def actual_plot(
 
     info_features = _make_list(feature)
     info_df, pred_cols = _prepare_actual_plot_data(
-        model, X, n_classes, pred_func, predict_kwds, info_features, which_classes
+        model,
+        X,
+        n_classes,
+        pred_func,
+        predict_kwds,
+        info_features,
+        which_classes,
+        chunk_size,
     )
 
     (
@@ -423,15 +435,20 @@ def actual_plot(
         pred_cols_qs += [p + "_%s" % q for q in ["q1", "q2", "q3"]]
         summary_df = summary_df.merge(box_line, on="x", how="outer").fillna(0)
 
-    plot_params = _prepare_plot_params(
-        plot_params,
-        ncols,
-        display_columns,
-        percentile_columns,
-        figsize,
-        dpi,
-        template,
-        engine,
+    if plot_params is None:
+        plot_params = {}
+
+    plot_params.update(
+        {
+            "ncols": ncols,
+            "figsize": figsize,
+            "dpi": dpi,
+            "template": template,
+            "engine": engine,
+            "display_columns": display_columns,
+            "percentile_columns": percentile_columns,
+            "show_percentile": show_percentile,
+        }
     )
 
     if engine == "matplotlib":
@@ -605,6 +622,7 @@ def actual_plot_interact(
     endpoint=True,
     which_classes=None,
     predict_kwds={},
+    chunk_size=-1,
     figsize=None,
     dpi=300,
     ncols=2,
@@ -700,7 +718,14 @@ def actual_plot_interact(
     # check model
     info_features = _make_list(features[0]) + _make_list(features[1])
     info_df, pred_cols = _prepare_actual_plot_data(
-        model, X, n_classes, pred_func, predict_kwds, info_features, which_classes
+        model,
+        X,
+        n_classes,
+        pred_func,
+        predict_kwds,
+        info_features,
+        which_classes,
+        chunk_size,
     )
 
     return plot_interact(
@@ -775,17 +800,22 @@ def plot_interact(
         **check_results
     )
 
-    plot_params = _prepare_plot_params(
-        plot_params,
-        ncols,
-        display_columns,
-        percentile_columns,
-        figsize,
-        dpi,
-        template,
-        engine,
+    if plot_params is None:
+        plot_params = {}
+
+    plot_params.update(
+        {
+            "ncols": ncols,
+            "figsize": figsize,
+            "dpi": dpi,
+            "template": template,
+            "engine": engine,
+            "annotate": annotate,
+            "display_columns": display_columns,
+            "percentile_columns": percentile_columns,
+            "show_percentile": show_percentile,
+        }
     )
-    plot_params["annotate"] = annotate
 
     if engine == "matplotlib":
         fig, axes = _info_plot_interact(

@@ -1,9 +1,7 @@
 from .utils import (
     _axes_modify,
     _modify_legend_axes,
-    _find_bucket,
     _make_bucket_column_names,
-    _find_onehot_actual,
     _make_bucket_column_names_percentile,
     _check_dataset,
     _check_percentile_range,
@@ -15,8 +13,14 @@ from .utils import (
     _check_model,
     _check_classes,
     _q2,
+    _check_plot_params,
+    _check_interact_plot_params,
+    _get_grids_and_cols,
+    _calc_preds,
+    _make_subplots,
+    _display_percentile,
 )
-from .styles import infoPlotStyle, infoPlotInterStyle
+from .styles import infoPlotStyle, infoPlotInterStyle, _prepare_plot_style
 
 import numpy as np
 import pandas as pd
@@ -32,31 +36,6 @@ import matplotlib.patheffects as PathEffects
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-
-def _make_subplots(plot_style):
-    fig = plt.figure(figsize=plot_style.figsize, dpi=plot_style.dpi)
-    title_ratio = 2
-    outer_grid = GridSpec(
-        nrows=2,
-        ncols=1,
-        wspace=0.0,
-        hspace=0.0,
-        height_ratios=[title_ratio, plot_style.figsize[1] - title_ratio],
-    )
-    title_axes = plt.subplot(outer_grid[0])
-    fig.add_subplot(title_axes)
-    _plot_title(title_axes, plot_style)
-
-    inner_grid = GridSpecFromSubplotSpec(
-        plot_style.nrows,
-        plot_style.ncols,
-        subplot_spec=outer_grid[1],
-        wspace=0.3,
-        hspace=0.2,
-    )
-
-    return fig, inner_grid, title_axes
 
 
 def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
@@ -122,12 +101,9 @@ def _actual_plot(
             inner_box_axes,
             plot_style,
             box_color,
-            show_percentile=True,
         )
         inner_box_axes.set_ylabel("%s dist" % p)
-        _draw_barplot(
-            feat_name, (bar_data, inner_bar_axes), plot_style, show_percentile=False
-        )
+        _draw_barplot(feat_name, (bar_data, inner_bar_axes), plot_style, single=False)
 
         if i % plot_style.ncols != 0:
             inner_bar_axes.set_yticklabels([])
@@ -574,37 +550,38 @@ def _prepare_data_x(
     per_cols, per_uppers, per_lowers = [], [], []
     data_x = data.copy()
 
+    grids, cols, percentiles = _get_grids_and_cols(
+        feature,
+        feature_type,
+        data,
+        num_grid_points,
+        grid_type,
+        percentile_range,
+        grid_range,
+        cust_grid_points,
+    )
+    results = {"feature_grids": grids, "percentile_grids": percentiles}
+
     if feature_type == "binary":
-        grids = np.array([0, 1])
-        cols = [f"{feature}_{g}" for g in grids]
         data_x["x"] = data_x[feature]
-
-    if feature_type == "numeric":
-        if cust_grid_points is None:
-            grids, percentiles = _get_grids(
-                data_x[feature].values,
-                num_grid_points,
-                grid_type,
-                percentile_range,
-                grid_range,
-            )
-        else:
-            grids = np.array(sorted(cust_grid_points))
-            percentiles = None
-
+    elif feature_type == "onehot":
+        data_x["x"] = np.argmax(data_x[feature].values, axis=1)
+        data_x = data_x[~data_x["x"].isnull()].reset_index(drop=True)
+    else:
         if endpoint:
             grids[-1] *= 1.01
 
-        if not show_outliers:
-            data_x = data_x[
-                (data_x[feature] >= grids[0]) & (data_x[feature] <= grids[-1])
-            ].reset_index(drop=True)
-        else:
+        if show_outliers:
             grids = np.array(
                 [data_x[feature].min() * 0.99]
                 + list(grids)
                 + [data_x[feature].max() * 1.01]
             )
+            grids = sorted(list(np.unique(grids)))
+        else:
+            data_x = data_x[
+                (data_x[feature] >= grids[0]) & (data_x[feature] <= grids[-1])
+            ].reset_index(drop=True)
 
         # map feature value into value buckets
         # data_x["x"] = data_x[feature].apply(lambda x: _find_bucket(x, grids_raw, endpoint))
@@ -630,48 +607,18 @@ def _prepare_data_x(
         # offset results
         data_x["x"] = data_x["x"] - data_x["x"].min()
 
-    if feature_type == "onehot":
-        grids = cols = np.array(feature)
-        data_x["x"] = np.argmax(data_x[feature].values, axis=1)
-        data_x = data_x[~data_x["x"].isnull()].reset_index(drop=True)
-
     data_x["x"] = data_x["x"].map(int)
-    results = {
-        "data": data_x,
-        "value_display": [list(lst) for lst in [cols, lowers, uppers]],
-        "percentile_display": [list(lst) for lst in [per_cols, per_lowers, per_uppers]],
-    }
-
-    return results
-
-
-def _prepare_plot_params(
-    plot_params,
-    ncols,
-    display_columns,
-    percentile_columns,
-    figsize,
-    dpi,
-    template,
-    engine,
-):
-    if plot_params is None:
-        plot_params = {}
-    if figsize is not None:
-        plot_params["figsize"] = figsize
-    if template is not None:
-        plot_params["template"] = template
-
-    plot_params.update(
+    results.update(
         {
-            "ncols": ncols,
-            "display_columns": display_columns,
-            "percentile_columns": percentile_columns,
-            "dpi": dpi,
-            "engine": engine,
+            "data": data_x,
+            "value_display": [list(lst) for lst in [cols, lowers, uppers]],
+            "percentile_display": [
+                list(lst) for lst in [per_cols, per_lowers, per_uppers]
+            ],
         }
     )
-    return plot_params
+
+    return results
 
 
 def _autolabel(rects, axes, color, fontdict):
@@ -695,20 +642,7 @@ def _autolabel(rects, axes, color, fontdict):
         )
 
 
-def _display_percentile(axes, show_percentile, plot_style):
-    percentile_columns = plot_style.percentile_columns
-    if len(percentile_columns) > 0 and show_percentile:
-        per_axes = axes.twiny()
-        per_axes.set_xticks(axes.get_xticks())
-        per_axes.set_xbound(axes.get_xbound())
-        per_axes.set_xticklabels(
-            percentile_columns, rotation=plot_style.tick["xticks_rotation"]
-        )
-        per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
-        _axes_modify(per_axes, plot_style, top=True)
-
-
-def _draw_barplot(feat_name, data_axes, plot_style, show_percentile=True):
+def _draw_barplot(feat_name, data_axes, plot_style, single=True):
     """Draw bar plot"""
     data, axes = data_axes
 
@@ -733,7 +667,8 @@ def _draw_barplot(feat_name, data_axes, plot_style, show_percentile=True):
     )
     axes.set_xlim(-0.5, num_xticks - 0.5)
 
-    _display_percentile(axes, show_percentile, plot_style)
+    if single:
+        _display_percentile(axes, plot_style)
 
 
 def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
@@ -773,14 +708,6 @@ def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
     axes.set_ylabel(target_ylabel, fontdict=plot_style.label["fontdict"])
 
 
-def _prepare_plot_style(feat_name, target, plot_params, plot_type):
-    if plot_type in ["target", "actual"]:
-        plot_style = infoPlotStyle(feat_name, target, plot_params, plot_type)
-    elif plot_type in ["target_interact", "actual_interact"]:
-        plot_style = infoPlotInterStyle(feat_name, target, plot_params, plot_type)
-    return plot_style
-
-
 def _prepare_info_interact_plot(
     feat_names, target, plot_data, plot_params, plot_type="target_interact"
 ):
@@ -808,9 +735,7 @@ def _prepare_box_data(box_data):
     return xs, ys
 
 
-def _draw_boxplot(
-    box_data, box_line_data, box_axes, plot_style, box_color=None, show_percentile=True
-):
+def _draw_boxplot(box_data, box_line_data, box_axes, plot_style, box_color=None):
     """Draw box plot"""
     xs, ys = _prepare_box_data(box_data)
     if box_color is None:
@@ -855,7 +780,7 @@ def _draw_boxplot(
         )
     box_axes.set_xticklabels([])
 
-    _display_percentile(box_axes, show_percentile, plot_style)
+    _display_percentile(box_axes, plot_style)
 
 
 def _plot_interact(
@@ -1152,10 +1077,7 @@ def _check_info_plot_params(
     show_outliers,
 ):
     """Check information plot parameters"""
-    _check_dataset(df)
-    feature_type = _check_feature(feature, df)
-    _check_grid_type(grid_type)
-    _check_percentile_range(percentile_range)
+    feature_type = _check_plot_params(df, feature, grid_type, percentile_range)
 
     # show_outliers should be only turned on when necessary
     if all(v is None for v in [percentile_range, grid_range, cust_grid_points]):
@@ -1175,66 +1097,42 @@ def _check_info_plot_interact_params(
     show_outliers,
 ):
     """Check interact information plot parameters"""
-    _check_dataset(df)
-    num_grid_points = _expand_default(num_grid_points, 10)
-
-    grid_types = _expand_default(grid_types, "percentile")
-    [_check_grid_type(v) for v in grid_types]
-
-    percentile_ranges = _expand_default(percentile_ranges, None)
-    [_check_percentile_range(v) for v in percentile_ranges]
-
-    grid_ranges = _expand_default(grid_ranges, None)
-    cust_grid_points = _expand_default(cust_grid_points, None)
+    res = _check_interact_plot_params(
+        df,
+        features,
+        grid_types,
+        percentile_ranges,
+        grid_ranges,
+        num_grid_points,
+        cust_grid_points,
+    )
 
     if not show_outliers:
         show_outliers = [False, False]
     else:
         show_outliers = [True, True]
-        for i, vs in enumerate(zip(percentile_ranges, grid_ranges, cust_grid_points)):
+        for i, vs in enumerate(
+            zip(res["percentile_ranges"], res["grid_ranges"], res["cust_grid_points"])
+        ):
             if all(v is None for v in vs):
                 show_outliers[i] = False
+    res["show_outliers"] = show_outliers
 
-    feature_types = [_check_feature(f, df) for f in features]
-
-    return {
-        "num_grid_points": num_grid_points,
-        "grid_types": grid_types,
-        "percentile_ranges": percentile_ranges,
-        "grid_ranges": grid_ranges,
-        "cust_grid_points": cust_grid_points,
-        "show_outliers": show_outliers,
-        "feature_types": feature_types,
-    }
+    return res
 
 
 def _prepare_actual_plot_data(
-    model, X, n_classes, pred_func, predict_kwds, features, which_classes
+    model, X, n_classes, pred_func, predict_kwds, features, which_classes, chunk_size
 ):
-    model_n_classes, model_pred_func = _check_model(model)
-    if model_n_classes is None:
-        assert (
-            n_classes is not None
-        ), "n_classes is required when it can't be accessed through model.n_classes_."
-    else:
-        n_classes = model_n_classes
-
-    if pred_func is None:
-        print("predict using model predict func...")
-        assert (
-            model_pred_func is not None
-        ), "pred_func is required when model.predict_proba or model.predict doesn't exist."
-        prediction = model_pred_func(X, **predict_kwds)
-    else:
-        print("predict using customized func...")
-        prediction = pred_func(model, X, **predict_kwds)
+    n_classes, pred_func, from_model = _check_model(model, n_classes, pred_func)
+    preds = _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size)
 
     info_df = X[features]
     pred_cols = ["pred"]
     if n_classes == 0:
-        info_df["pred"] = prediction
+        info_df["pred"] = preds
     elif n_classes == 2:
-        info_df["pred"] = prediction[:, 1]
+        info_df["pred"] = preds[:, 1]
     else:
         plot_classes = range(n_classes)
         if which_classes is not None:
@@ -1243,7 +1141,7 @@ def _prepare_actual_plot_data(
 
         pred_cols = []
         for class_idx in plot_classes:
-            info_df[f"pred_{class_idx}"] = prediction[:, class_idx]
+            info_df[f"pred_{class_idx}"] = preds[:, class_idx]
             pred_cols.append(f"pred_{class_idx}")
 
     return info_df, pred_cols

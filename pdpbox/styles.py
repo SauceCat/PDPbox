@@ -14,6 +14,10 @@ class defaultColors:
     lightGray = "#9E9E9E"
     black = "#000000"
     blue = "#3288bd"
+    darkBlue = "#1A4E5D"
+    lightBlue = "#66C2D7"
+    yellow = "#FEDC00"
+    red = "#E75438"
 
 
 default_font_family = "Arial"
@@ -42,27 +46,48 @@ def _get_colors(colors, cmap, engine, is_seq=False):
     return colors
 
 
+def _get_bold_text(text, engine):
+    if engine == "matplotlib":
+        bold_text = r"$\bf{" + text.replace("_", "\\_") + "}$"
+    else:
+        bold_text = f"<b>{text}</b>"
+    return bold_text
+
+
+def _prepare_plot_style(feat_name, target, plot_params, plot_type):
+    if plot_type in ["target", "actual"]:
+        plot_style = infoPlotStyle(feat_name, target, plot_params, plot_type)
+    elif plot_type in ["target_interact", "actual_interact"]:
+        plot_style = infoPlotInterStyle(feat_name, target, plot_params, plot_type)
+    elif plot_type in ["pdp_isolate"]:
+        plot_style = PDPIsolatePlotStyle(feat_name, target, plot_params, plot_type)
+    return plot_style
+
+
 class plotStyle:
     def __init__(self, target, plot_params):
         if plot_params is None:
             plot_params = {}
 
         self.dpi = plot_params["dpi"]
-        self.engine = plot_params.get("engine", "plotly")
+        self.engine = plot_params["engine"]
         self.fontdict_keys = {
             "family": "family" if self.engine == "plotly" else "fontfamily",
             "size": "size" if self.engine == "plotly" else "fontsize",
         }
-        self.template = plot_params.get("template", "plotly_white")
+        self.template = plot_params["template"]
         self.font_family = plot_params.get("font_family", default_font_family)
-        figsize = plot_params.get(
-            "figsize",
-            default_figsize_plotly if self.engine == "plotly" else default_figsize,
-        )
+        if plot_params["figsize"] is None:
+            figsize = (
+                default_figsize_plotly if self.engine == "plotly" else default_figsize
+            )
+        else:
+            figsize = plot_params["figsize"]
         self.display_columns = plot_params["display_columns"]
         self.percentile_columns = plot_params["percentile_columns"]
         self.horizontal_spacing = plot_params.get("horizontal_spacing", 0.1)
         self.vertical_spacing = plot_params.get("vertical_spacing", 0.05)
+        self.show_percentile = plot_params["show_percentile"]
 
         nrows = plot_params.get("nrows", 1)
         ncols = plot_params.get("ncols", 1)
@@ -70,7 +95,7 @@ class plotStyle:
         if len(target) > 1:
             nrows = int(np.ceil(len(target) * 1.0 / ncols))
             ncols = np.min([len(target), ncols])
-            height = width * 1.0 / ncols * nrows * 0.8
+            height = height * nrows
         else:
             ncols = 1
         self.figsize = (width, height)
@@ -168,11 +193,7 @@ class infoPlotStyle(plotStyle):
 
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-
-        if self.engine == "matplotlib":
-            feat_name_bold = r"$\bf{" + feat_name.replace("_", "\\_") + "}$"
-        else:
-            feat_name_bold = f"<b>{feat_name}</b>"
+        feat_name_bold = _get_bold_text(feat_name, self.engine)
 
         self.plot_type_to_title = {
             "title": {
@@ -276,7 +297,7 @@ class infoPlotInterStyle(plotStyle):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
         self.vertical_spacing = 0.1
-        self.annotate = plot_params.get("annotate", False)
+        self.annotate = plot_params["annotate"]
 
         if self.engine == "matplotlib":
             feat_name_bold = " & ".join(
@@ -322,4 +343,58 @@ class infoPlotInterStyle(plotStyle):
                 "fontsize": 10,
                 "fontfamily": self.font_family,
             },
+        }
+
+
+class PDPIsolatePlotStyle(plotStyle):
+    def __init__(self, feat_name, target, plot_params, plot_type):
+        super().__init__(target, plot_params)
+        self.plot_type = plot_type
+        feat_name_bold = _get_bold_text(feat_name, self.engine)
+
+        n_grids = plot_params["n_grids"]
+        self.plot_type_to_title = {
+            "title": {
+                "pdp_isolate": "PDP for feature " + feat_name_bold,
+                "pdp_interact": "",
+            },
+            "subtitle": {
+                "pdp_isolate": f"Number of unique grid points: {n_grids}",
+                "pdp_interact": "",
+            },
+        }
+
+        for key in ["title", "subtitle"]:
+            self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
+        update_style(self.title, plot_params.get("title", {}))
+
+        self.plot_lines = plot_params["plot_lines"]
+        self.frac_to_plot = plot_params["frac_to_plot"]
+        self.center = plot_params["center"]
+        self.clustering = plot_params["clustering"]
+        self.std_fill = plot_params.get("std_fill", True)
+        if self.plot_lines:
+            self.std_fill = False
+        self.pdp_hl = plot_params.get("pdp_hl", False)
+
+        self.line = {
+            "hl_color": defaultColors.yellow,
+            "zero_color": defaultColors.red,
+            "cmaps": defaultColors.cmaps_seq,
+            "width": 1,
+            "fontdict": {
+                self.fontdict_keys["family"]: self.font_family,
+                self.fontdict_keys["size"]: 9,
+            },
+            "fill_alpha": 0.8,
+            "hl_alpha": 0.8,
+            "markersize": 3,
+        }
+        update_style(self.line, plot_params.get("line", {}))
+        self.plot_pts_dist = plot_params["plot_pts_dist"]
+        self.x_quantile = plot_params["x_quantile"]
+        self.dist = {
+            "markersize": 20,
+            "fill_alpha": 0.8,
+            "font_size": 10,
         }

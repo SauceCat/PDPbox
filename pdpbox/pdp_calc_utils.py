@@ -1,18 +1,23 @@
 import pandas as pd
 import numpy as np
-from pdpbox.utils import _get_string, _find_bucket
+from sklearn.cluster import MiniBatchKMeans, KMeans
+from .utils import _get_string, _find_bucket, _calc_preds
+from .info_plot_utils import _prepare_data_x
 
 
 def _calc_ice_lines(
-    feature_grid,
-    data,
     model,
-    model_features,
+    data,
+    features,
+    feat,
+    feat_grid,
+    feat_type,
     n_classes,
-    feature,
-    feature_type,
+    pred_func,
+    from_model,
     predict_kwds,
-    data_transformer,
+    data_trans,
+    chunk_size,
     unit_test=False,
 ):
     """Apply predict function on a feature_grid
@@ -21,16 +26,12 @@ def _calc_ice_lines(
     -------
     Predicted result on this feature_grid
     """
-
-    _data = data.copy()
-    if feature_type == "onehot":
+    if feat_type == "onehot":
         # for onehot encoding feature, need to change all levels together
-        other_grids = [grid for grid in feature if grid != feature_grid]
-        _data[feature_grid] = 1
-        for grid in other_grids:
-            _data[grid] = 0
+        data[feat] = 0
+        data[feat_grid] = 1
     else:
-        _data[feature] = feature_grid
+        data[feat] = feat_grid
 
     # if there are other features highly depend on the investigating feature
     # other features should also adjust based on the changed feature value
@@ -41,32 +42,60 @@ def _calc_ice_lines(
     # def data_transformer(df):
     #   df["a_b_ratio"] = df["a"] / df["b"]
     #   return df
-    if data_transformer is not None:
-        _data = data_transformer(_data)
+    if data_trans is not None:
+        data = data_trans(data)
+
+    preds = _calc_preds(
+        model, data[features], pred_func, from_model, predict_kwds, chunk_size
+    )
 
     if n_classes == 0:
-        predict = model.predict
-    else:
-        predict = model.predict_proba
-
-    # get predictions for this chunk
-    preds = predict(_data[model_features], **predict_kwds)
-
-    if n_classes == 0:
-        grid_results = pd.DataFrame(preds, columns=[feature_grid])
+        grid_results = pd.DataFrame(preds, columns=[feat_grid])
     elif n_classes == 2:
-        grid_results = pd.DataFrame(preds[:, 1], columns=[feature_grid])
+        grid_results = pd.DataFrame(preds[:, 1], columns=[feat_grid])
     else:
         grid_results = []
         for n_class in range(n_classes):
-            grid_result = pd.DataFrame(preds[:, n_class], columns=[feature_grid])
+            grid_result = pd.DataFrame(preds[:, n_class], columns=[feat_grid])
             grid_results.append(grid_result)
 
     # _data is returned for unit test
     if unit_test:
-        return grid_results, _data
+        return grid_results, data
     else:
         return grid_results
+
+
+def _cluster_ice_lines(ice_lines, feature_grids, plot_style):
+    method = plot_style.clustering["method"]
+    if method not in ["approx", "accurate"]:
+        raise ValueError('cluster method: should be "approx" or "accurate".')
+
+    n_centers = plot_style.clustering["n_centers"]
+    if method == "approx":
+        kmeans = MiniBatchKMeans(n_clusters=n_centers, random_state=0, verbose=0)
+    else:
+        kmeans = KMeans(n_clusters=n_centers, random_state=0)
+
+    kmeans.fit(ice_lines[feature_grids])
+    return pd.DataFrame(kmeans.cluster_centers_, columns=feature_grids)
+
+
+def _sample_ice_lines(ice_lines, frac_to_plot):
+    """Get sample ice lines to plot
+
+    Notes
+    -----
+    If frac_to_plot==1, will plot all lines instead of sampling one line
+
+    """
+
+    if frac_to_plot < 1.0:
+        ice_lines = ice_lines.sample(int(ice_lines.shape[0] * frac_to_plot))
+    elif frac_to_plot > 1:
+        ice_lines = ice_lines.sample(frac_to_plot)
+
+    return ice_lines.reset_index(drop=True)
 
 
 def _calc_ice_lines_inter(
@@ -133,7 +162,16 @@ def _pdp_count_dist_xticklabels(feature_grids):
     return column_names
 
 
-def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
+def _prepare_pdp_count_data(
+    feature,
+    feature_type,
+    data,
+    num_grid_points,
+    grid_type,
+    percentile_range,
+    grid_range,
+    cust_grid_points,
+):
     """Calculate data point distribution
 
     Returns
@@ -144,59 +182,29 @@ def _prepare_pdp_count_data(feature, feature_type, data, feature_grids):
         column count_norm: normalized count number, notice that it is normalized
         by data.shape[0], just incase for onehot feature, not every data point has value
     """
-    if feature_type == "onehot":
-        count_data = (
-            pd.DataFrame(data[feature_grids].sum(axis=0))
-            .reset_index(drop=False)
-            .rename(columns={0: "count"})
-        )
-        count_data["x"] = range(count_data.shape[0])
-    elif feature_type == "binary":
-        count_data = pd.DataFrame(
-            data={
-                "x": [0, 1],
-                "count": [
-                    data[data[feature] == 0].shape[0],
-                    data[data[feature] == 1].shape[0],
-                ],
-            }
-        )
-    else:
-        data_x = data.copy()
-        vmin, vmax = data[feature].min(), data[feature].max()
-        feature_grids = list(feature_grids)
-        count_x = list(np.arange(len(feature_grids) - 1))
 
-        # append lower and upper bound to the grids
-        # make sure all data points are included
-        if feature_grids[0] > vmin:
-            feature_grids = [vmin] + feature_grids
-            count_x = [-1] + count_x
-        if feature_grids[-1] < vmax:
-            feature_grids = feature_grids + [vmax]
-            count_x = count_x + [count_x[-1] + 1]
-
-        data_x["x"] = data_x[feature].apply(
-            lambda x: _find_bucket(x=x, feature_grids=feature_grids, endpoint=True)
-        )
-        data_x = data_x[~data_x["x"].isnull()]
-        data_x["count"] = 1
-        count_data_temp = (
-            data_x.groupby("x", as_index=False)
-            .agg({"count": "count"})
-            .sort_values("x", ascending=True)
-            .reset_index(drop=True)
-        )
-        count_data_temp["x"] = count_data_temp["x"] - count_data_temp["x"].min()
-        count_data = pd.DataFrame(
-            data={
-                "x": range(len(feature_grids) - 1),
-                "xticklabels": _pdp_count_dist_xticklabels(feature_grids=feature_grids),
-            }
-        )
-        count_data = count_data.merge(count_data_temp, on="x", how="left").fillna(0)
-        count_data["x"] = count_x
-
+    prepared_results = _prepare_data_x(
+        feature,
+        feature_type,
+        data,
+        num_grid_points,
+        grid_type,
+        percentile_range,
+        grid_range,
+        cust_grid_points,
+        show_percentile=True,
+        show_outliers=False,
+        endpoint=True,
+    )
+    data_x = prepared_results["data"]
+    data_x["count"] = 1
+    count_data = (
+        data_x.groupby("x", as_index=False)
+        .agg({"count": "count"})
+        .sort_values("x", ascending=True)
+    )
     count_data["count_norm"] = count_data["count"] * 1.0 / data.shape[0]
+    prepared_results["count"] = count_data
+    prepared_results["dist"] = data[feature].values
 
-    return count_data
+    return prepared_results
