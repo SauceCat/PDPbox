@@ -4,6 +4,13 @@ import psutil
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+
+def _to_rgba(color, opacity=1.0):
+    color = [str(int(v * 255)) for v in color[:3]] + [str(opacity)]
+    return "rgba({})".format(",".join(color))
 
 
 def _check_percentile_range(percentile_range):
@@ -607,6 +614,23 @@ def _make_subplots(plot_style):
     return fig, inner_grid, title_axes
 
 
+def _make_subplots_plotly(plot_args, plot_style):
+    fig = make_subplots(**plot_args)
+    fig.update_layout(
+        width=plot_style.figsize[0],
+        height=plot_style.figsize[1],
+        template=plot_style.template,
+        showlegend=False,
+        title=go.layout.Title(
+            text=f"{plot_style.title['title']['text']} <br><sup>{plot_style.title['subtitle']['text']}</sup>",
+            xref="paper",
+            x=0,
+        ),
+    )
+
+    return fig
+
+
 def _display_percentile(axes, plot_style):
     percentile_columns = plot_style.percentile_columns
     if len(percentile_columns) > 0 and plot_style.show_percentile:
@@ -618,3 +642,15 @@ def _display_percentile(axes, plot_style):
         )
         per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
         _axes_modify(per_axes, plot_style, top=True)
+
+
+def _get_ticks_plotly(feat_name, plot_style):
+    ticktext = plot_style.display_columns.copy()
+    if len(plot_style.percentile_columns) > 0:
+        for j, p in enumerate(plot_style.percentile_columns):
+            ticktext[j] += f"<br><sup><b>{p}</b></sup>"
+        title_text = f"<b>{feat_name}</b> (value+percentile)"
+    else:
+        title_text = f"<b>{feat_name}</b> (value)"
+
+    return title_text, ticktext

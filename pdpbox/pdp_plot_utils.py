@@ -3,10 +3,17 @@ from .utils import (
     _modify_legend_axes,
     _get_string,
     _make_subplots,
+    _make_subplots_plotly,
     _display_percentile,
+    _to_rgba,
+    _get_ticks_plotly,
 )
 from .styles import _prepare_plot_style
-from .pdp_calc_utils import _cluster_ice_lines, _sample_ice_lines
+from .pdp_calc_utils import (
+    _cluster_ice_lines,
+    _sample_ice_lines,
+    _prepare_pdp_line_data,
+)
 
 import pandas as pd
 import numpy as np
@@ -18,10 +25,350 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import copy
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import plotly.graph_objects as go
+
+
+def _set_pdp_xticks(
+    xlabel, xticklabels, plot_style, axes, is_numeric_line=False, show_xlabels=True
+):
+    if xticklabels is not None:
+        xticks = np.arange(len(xticklabels))
+        if is_numeric_line:
+            axes.set_xlim(xticks[0], xticks[-1])
+        else:
+            axes.set_xlim(xticks[0] - 0.5, xticks[-1] + 0.5)
+
+        axes.set_xticks(xticks)
+        axes.set_xticklabels(xticklabels, rotation=plot_style.tick["xticks_rotation"])
+
+    if show_xlabels:
+        axes.set_xlabel(
+            xlabel,
+            fontsize=plot_style.title["subplot_title"]["font_size"],
+            fontdict={"family": plot_style.font_family},
+        )
+    else:
+        axes.set_xlabel("")
+
+
+def _get_pdp_xticks(pdp_isolate_obj, plot_style):
+    dist_xticklabels = line_xticklabels = plot_style.display_columns
+    is_numeric = pdp_isolate_obj.feature_type == "numeric"
+    if is_numeric:
+        if plot_style.x_quantile:
+            line_xticklabels = [_get_string(v) for v in pdp_isolate_obj.feature_grids]
+        else:
+            dist_xticklabels = line_xticklabels = None
+            plot_style.show_percentile = False
+    return is_numeric, line_xticklabels, dist_xticklabels
+
+
+def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
+    plot_style = _prepare_plot_style(feat_name, target, plot_params, "pdp_isolate")
+    fig, inner_grid, title_axes = _make_subplots(plot_style)
+
+    line_axes, dist_axes = [], []
+    cmaps = plot_style.line["cmaps"]
+    for i, t in enumerate(target):
+        cmap = cmaps[i % len(cmaps)]
+        colors = [cmap, plt.get_cmap(cmap)(0.1), plt.get_cmap(cmap)(1.0)]
+
+        if plot_style.plot_pts_dist:
+            inner = GridSpecFromSubplotSpec(
+                2,
+                1,
+                subplot_spec=inner_grid[i],
+                wspace=0,
+                hspace=0.2,
+                height_ratios=[7, 0.5],
+            )
+            inner_line_axes = plt.subplot(inner[0])
+            inner_dist_axes = plt.subplot(inner[1])
+        else:
+            inner_line_axes = plt.subplot(inner_grid[i])
+            inner_dist_axes = None
+
+        fig.add_subplot(inner_line_axes)
+        _pdp_line_plot(
+            t,
+            pdp_isolate_obj,
+            colors,
+            plot_style,
+            inner_line_axes,
+        )
+
+        is_numeric, line_xticklabels, dist_xticklabels = _get_pdp_xticks(
+            pdp_isolate_obj, plot_style
+        )
+        tick_params = {"xlabel": f"class_{t}", "plot_style": plot_style}
+        if inner_dist_axes is not None:
+            fig.add_subplot(inner_dist_axes)
+
+            if line_xticklabels is not None and not is_numeric:
+                line_xticklabels = [""] * len(line_xticklabels)
+
+            _set_pdp_xticks(
+                xticklabels=line_xticklabels,
+                axes=inner_line_axes,
+                is_numeric_line=is_numeric,
+                show_xlabels=False,
+                **tick_params,
+            )
+            _set_pdp_xticks(
+                xticklabels=dist_xticklabels,
+                axes=inner_dist_axes,
+                show_xlabels=True,
+                **tick_params,
+            )
+            _pdp_dist_plot(
+                pdp_isolate_obj,
+                colors,
+                plot_style,
+                inner_dist_axes,
+                inner_line_axes,
+            )
+            dist_axes.append(inner_dist_axes)
+        else:
+            _set_pdp_xticks(
+                xticklabels=line_xticklabels,
+                axes=inner_line_axes,
+                is_numeric_line=is_numeric,
+                show_xlabels=True,
+                **tick_params,
+            )
+
+        _display_percentile(inner_line_axes, plot_style)
+        line_axes.append(inner_line_axes)
+
+    axes = {"title_axes": title_axes, "line_axes": line_axes, "dist_axes": dist_axes}
+    return fig, axes
+
+
+def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
+    plot_style = _prepare_plot_style(feat_name, target, plot_params, "pdp_isolate")
+    nrows, ncols = plot_style.nrows, plot_style.ncols
+
+    row_heights = []
+    if plot_style.plot_pts_dist:
+        for i in range(nrows):
+            row_heights += [7, 0.5]
+    else:
+        row_heights = [7] * nrows
+    row_heights = [v / sum(row_heights) for v in row_heights]
+
+    plot_args = {
+        "rows": len(row_heights),
+        "cols": ncols,
+        "horizontal_spacing": plot_style.horizontal_spacing,
+        "vertical_spacing": plot_style.vertical_spacing,
+        "row_heights": row_heights,
+    }
+    fig = _make_subplots_plotly(plot_args, plot_style)
+
+    cmaps = plot_style.line["cmaps"]
+    for i, t in enumerate(target):
+        cmap = cmaps[i % len(cmaps)]
+        colors = [cmap, plt.get_cmap(cmap)(0.1), plt.get_cmap(cmap)(1.0)]
+        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
+        line_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
+        dist_grids = {"col": grids["col"], "row": grids["row"] * 2}
+
+        line_traces = _pdp_line_plot(
+            t,
+            pdp_isolate_obj,
+            colors,
+            plot_style,
+            axes=None,
+        )
+        for trace in line_traces:
+            if trace is not None:
+                fig.add_trace(trace, **line_grids)
+
+        is_numeric, line_xticklabels, dist_xticklabels = _get_pdp_xticks(
+            pdp_isolate_obj, plot_style
+        )
+
+        if plot_style.plot_pts_dist:
+            dist_trace = _pdp_dist_plot_plotly(pdp_isolate_obj, colors, plot_style)
+            fig.add_trace(dist_trace, **dist_grids)
+
+            if line_xticklabels is not None and not is_numeric:
+                line_xticklabels = [""] * len(line_xticklabels)
+            _set_pdp_xticks_plotly(
+                fig, "", line_xticklabels, line_grids, is_numeric_line=is_numeric
+            )
+            _set_pdp_xticks_plotly(fig, f"class_{t}", dist_xticklabels, dist_grids)
+            fig.update_yaxes(
+                showticklabels=False,
+                **dist_grids,
+            )
+
+            if is_numeric and not plot_style.x_quantile:
+                fig.update_xaxes(showgrid=False, showticklabels=False, **dist_grids)
+                fig.update_yaxes(showgrid=False, **dist_grids)
+        else:
+            _set_pdp_xticks_plotly(fig, f"class_{t}", line_xticklabels, line_grids)
+
+    return fig
+
+
+def _set_pdp_xticks_plotly(fig, xlabel, xticklabels, grids, is_numeric_line=False):
+    if xticklabels is not None:
+        xticks = np.arange(len(xticklabels))
+        if is_numeric_line:
+            x_range = [xticks[0], xticks[-1]]
+        else:
+            x_range = [xticks[0] - 0.5, xticks[-1] + 0.5]
+        fig.update_xaxes(
+            title_text=xlabel,
+            ticktext=xticklabels,
+            tickvals=np.arange(len(xticklabels)),
+            range=x_range,
+            **grids,
+        )
+    else:
+        fig.update_xaxes(
+            title_text=xlabel,
+            **grids,
+        )
+
+
+def _pdp_line_plot(
+    class_id,
+    pdp_isolate_obj,
+    colors,
+    plot_style,
+    axes,
+):
+    cmap, light_color, dark_color = colors
+    x, pdp, line_data, line_std = _prepare_pdp_line_data(
+        class_id,
+        pdp_isolate_obj,
+        plot_style,
+    )
+    ice_line_traces = []
+    if plot_style.plot_lines:
+        ice_line_traces = _ice_line_plot(x, line_data, cmap, axes, plot_style.engine)
+
+    std_params = {
+        "x": x,
+        "pdp": pdp,
+        "std": line_std,
+        "colors": (light_color, dark_color),
+        "plot_style": plot_style,
+    }
+    if plot_style.engine == "matplotlib":
+        _pdp_std_plot(axes=axes, **std_params)
+        _axes_modify(axes, plot_style)
+    else:
+        std_traces = _pdp_std_plot_plotly(axes=None, **std_params)
+        return ice_line_traces + std_traces
+
+
+def _pdp_std_plot(x, pdp, std, colors, plot_style, axes):
+    upper = pdp + std
+    lower = pdp - std
+    light_color, dark_color = colors
+    line_style = plot_style.line
+
+    if plot_style.std_fill:
+        axes.fill_between(
+            x, upper, lower, alpha=line_style["fill_alpha"], color=light_color
+        )
+
+    if plot_style.pdp_hl:
+        axes.plot(
+            x,
+            pdp,
+            color=line_style["hl_color"],
+            linewidth=line_style["width"] * 3,
+            alpha=line_style["hl_alpha"],
+        )
+
+    axes.plot(
+        x,
+        [0] * len(pdp),
+        linestyle="--",
+        linewidth=line_style["width"],
+        color=line_style["zero_color"],
+    )
+    axes.plot(
+        x,
+        pdp,
+        color=dark_color,
+        linewidth=line_style["width"],
+        marker="o",
+        markersize=line_style["markersize"],
+    )
+
+    ymin, ymax = np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0])
+    axes.set_ylim(ymin, ymax)
+
+
+def _pdp_std_plot_plotly(x, pdp, std, colors, plot_style, axes):
+    upper = pdp + std
+    lower = pdp - std
+    light_color, dark_color = colors
+    line_style = plot_style.line
+    light_color = _to_rgba(light_color, line_style["fill_alpha"])
+    dark_color = _to_rgba(dark_color)
+    trace_params = {"x": x, "mode": "lines", "hoverinfo": "none"}
+
+    fill_traces = [None, None]
+    if plot_style.std_fill:
+        trace_upper = go.Scatter(
+            y=upper,
+            line=dict(color=light_color),
+            **trace_params,
+        )
+        trace_lower = go.Scatter(
+            y=lower,
+            line=dict(color=light_color),
+            fill="tonexty",
+            fillcolor=light_color,
+            **trace_params,
+        )
+        fill_traces = [trace_upper, trace_lower]
+
+    pdp_hl_trace = None
+    if plot_style.pdp_hl:
+        pdp_hl_trace = go.Scatter(
+            y=pdp,
+            line=dict(color=line_style["hl_color"], width=line_style["width"] * 3),
+            **trace_params,
+        )
+
+    zero_trace = go.Scatter(
+        y=[0] * len(pdp),
+        line=dict(
+            color=line_style["zero_color"], width=line_style["width"], dash="dash"
+        ),
+        **trace_params,
+    )
+    pdp_trace = go.Scatter(
+        x=x,
+        y=pdp,
+        mode="lines+markers",
+        line=dict(color=dark_color, width=line_style["width"]),
+        marker=dict(color=dark_color, size=line_style["markersize"]),
+        name="pdp",
+    )
+
+    return fill_traces + [pdp_hl_trace, zero_trace, pdp_trace]
+
+
+def _draw_pdp_distplot(data, color, axes, plot_style):
+    axes.plot(
+        data,
+        [1] * len(data),
+        "|",
+        color=color,
+        markersize=plot_style.dist["markersize"],
+    )
+    _modify_legend_axes(axes, plot_style.font_family)
 
 
 def _draw_pdp_countplot(data, cmap, plot_style, axes):
-
     count_norm = data["count_norm"].values
     norm = mpl.colors.Normalize(vmin=0, vmax=np.max(count_norm))
     _modify_legend_axes(axes, plot_style.font_family)
@@ -60,198 +407,25 @@ def _draw_pdp_countplot(data, cmap, plot_style, axes):
     axes.tick_params(which="minor", bottom=False, left=False)
 
 
-def _draw_pdp_distplot(data, color, axes, plot_style):
-    axes.plot(
-        data,
-        [1] * len(data),
-        "|",
-        color=color,
-        markersize=plot_style.dist["markersize"],
+def _draw_pdp_countplot_plotly(data, cmap, plot_style):
+    count_norm = data["count_norm"].values
+    xticks = data["x"].values
+
+    heatmap_trace = go.Heatmap(
+        x=xticks,
+        y=[0],
+        z=[count_norm],
+        text=[[round(v, 3) for v in count_norm]],
+        texttemplate="%{text}",
+        colorscale=cmap,
+        zmin=0,
+        zmax=np.max(count_norm),
+        opacity=plot_style.dist["fill_alpha"],
+        showscale=False,
+        xgap=2,
+        name="dist",
     )
-    _modify_legend_axes(axes, plot_style.font_family)
-
-
-def _set_pdp_xticks(
-    xlabel, xticklabels, plot_style, axes, is_numeric_line=False, show_xlabels=True
-):
-    if xticklabels is not None:
-        xticks = np.arange(len(xticklabels))
-        if is_numeric_line:
-            axes.set_xlim(xticks[0], xticks[-1])
-        else:
-            axes.set_xlim(xticks[0] - 0.5, xticks[-1] + 0.5)
-
-        axes.set_xticks(xticks)
-        axes.set_xticklabels(xticklabels, rotation=plot_style.tick["xticks_rotation"])
-
-    if show_xlabels:
-        axes.set_xlabel(
-            xlabel,
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
-        )
-    else:
-        axes.set_xlabel("")
-
-
-def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
-    plot_style = _prepare_plot_style(feat_name, target, plot_params, "pdp_isolate")
-    fig, inner_grid, title_axes = _make_subplots(plot_style)
-
-    line_axes, dist_axes = [], []
-    cmaps = plot_style.line["cmaps"]
-    for i, t in enumerate(target):
-        cmap = cmaps[i % len(cmaps)]
-        colors = [cmap, plt.get_cmap(cmap)(0.1), plt.get_cmap(cmap)(1.0)]
-
-        if plot_style.plot_pts_dist:
-            inner = GridSpecFromSubplotSpec(
-                2,
-                1,
-                subplot_spec=inner_grid[i],
-                wspace=0,
-                hspace=0.2,
-                height_ratios=[7, 0.5],
-            )
-            inner_line_axes = plt.subplot(inner[0])
-            inner_dist_axes = plt.subplot(inner[1])
-        else:
-            inner_line_axes = plt.subplot(inner_grid[i])
-            inner_dist_axes = None
-
-        fig.add_subplot(inner_line_axes)
-        _pdp_line_plot(
-            t,
-            pdp_isolate_obj,
-            colors,
-            plot_style,
-            inner_line_axes,
-        )
-
-        dist_xticklabels = line_xticklabels = plot_style.display_columns
-        is_numeric = pdp_isolate_obj.feature_type == "numeric"
-        if is_numeric:
-            if plot_style.x_quantile:
-                line_xticklabels = [
-                    _get_string(v) for v in pdp_isolate_obj.feature_grids
-                ]
-            else:
-                dist_xticklabels = line_xticklabels = None
-                plot_style.show_percentile = False
-
-        tick_params = {"xlabel": f"class_{t}", "plot_style": plot_style}
-        if inner_dist_axes is not None:
-            fig.add_subplot(inner_dist_axes)
-            _set_pdp_xticks(
-                xticklabels=line_xticklabels,
-                axes=inner_line_axes,
-                is_numeric_line=is_numeric,
-                show_xlabels=False,
-                **tick_params,
-            )
-            _set_pdp_xticks(
-                xticklabels=dist_xticklabels,
-                axes=inner_dist_axes,
-                show_xlabels=True,
-                **tick_params,
-            )
-            _pdp_dist_plot(
-                pdp_isolate_obj,
-                colors,
-                plot_style,
-                inner_dist_axes,
-                inner_line_axes,
-            )
-            dist_axes.append(inner_dist_axes)
-        else:
-            _set_pdp_xticks(
-                xticklabels=line_xticklabels,
-                axes=inner_line_axes,
-                is_numeric_line=is_numeric,
-                show_xlabels=True,
-                **tick_params,
-            )
-
-        _display_percentile(inner_line_axes, plot_style)
-        line_axes.append(inner_line_axes)
-
-    axes = {"title_axes": title_axes, "line_axes": line_axes, "dist_axes": dist_axes}
-    return fig, axes
-
-
-def _pdp_line_plot(
-    class_id,
-    pdp_isolate_obj,
-    colors,
-    plot_style,
-    axes,
-):
-    pdp_result = pdp_isolate_obj.results[class_id]
-    pdp = copy.deepcopy(pdp_result.pdp)
-    ice_lines = copy.deepcopy(pdp_result.ice_lines)
-    feature_grids = pdp_isolate_obj.feature_grids
-    cmap, light_color, dark_color = colors
-
-    x = np.arange(len(feature_grids))
-    if pdp_isolate_obj.feature_type == "numeric" and not plot_style.x_quantile:
-        x = feature_grids
-
-    if plot_style.center:
-        pdp -= pdp[0]
-        for feat in feature_grids[1:]:
-            ice_lines[feat] -= ice_lines[feature_grids[0]]
-        ice_lines[feature_grids[0]] = 0
-
-    if plot_style.plot_lines:
-        if plot_style.clustering["on"]:
-            line_data = _cluster_ice_lines(ice_lines, feature_grids, plot_style)
-        else:
-            line_data = _sample_ice_lines(ice_lines, plot_style.frac_to_plot)
-        _ice_line_plot(x, line_data, axes, cmap)
-
-    std = ice_lines[feature_grids].std().values
-    _pdp_std_plot(x, pdp, std, (light_color, dark_color), plot_style, axes)
-    _axes_modify(axes, plot_style)
-
-
-def _pdp_std_plot(x, pdp, std, colors, plot_style, axes):
-    upper = pdp + std
-    lower = pdp - std
-
-    line_style = plot_style.line
-    if plot_style.pdp_hl:
-        axes.plot(
-            x,
-            pdp,
-            color=line_style["hl_color"],
-            linewidth=line_style["width"] * 3,
-            alpha=line_style["hl_alpha"],
-        )
-
-    light_color, dark_color = colors
-    axes.plot(
-        x,
-        pdp,
-        color=dark_color,
-        linewidth=line_style["width"],
-        marker="o",
-        markersize=line_style["markersize"],
-    )
-    axes.plot(
-        x,
-        [0] * len(pdp),
-        linestyle="--",
-        linewidth=line_style["width"],
-        color=line_style["zero_color"],
-    )
-
-    if plot_style.std_fill:
-        axes.fill_between(
-            x, upper, lower, alpha=line_style["fill_alpha"], color=light_color
-        )
-
-    ymin, ymax = np.min([np.min(lower) * 2, 0]), np.max([np.max(upper) * 2, 0])
-    axes.set_ylim(ymin, ymax)
+    return heatmap_trace
 
 
 def _pdp_dist_plot(pdp_isolate_obj, colors, plot_style, axes, line_axes):
@@ -277,14 +451,54 @@ def _pdp_dist_plot(pdp_isolate_obj, colors, plot_style, axes, line_axes):
     axes.tick_params(**plot_style.tick["tick_params"])
 
 
-def _ice_line_plot(x, lines, axes, cmap):
+def _pdp_dist_plot_plotly(pdp_isolate_obj, colors, plot_style):
+    cmap, light_color, dark_color = colors
+
+    if pdp_isolate_obj.feature_type == "numeric" and not plot_style.x_quantile:
+        data = pdp_isolate_obj.dist_data
+        dist_trace = go.Scatter(
+            x=data,
+            y=[1] * len(data),
+            mode="text",
+            text=["|"] * len(data),
+            textposition="middle center",
+            textfont=dict(
+                size=plot_style.dist["markersize"], color=_to_rgba(dark_color)
+            ),
+            showlegend=False,
+            name="dist",
+        )
+    else:
+        dist_trace = _draw_pdp_countplot_plotly(
+            pdp_isolate_obj.count_data, cmap, plot_style
+        )
+    return dist_trace
+
+
+def _ice_line_plot(x, lines, cmap, axes, engine):
     total = len(lines)
     linewidth = np.max([1.0 / np.log10(total), 0.3])
     linealpha = np.min([np.max([1.0 / np.log10(total), 0.3]), 0.8])
     colors = plt.get_cmap(cmap)(np.linspace(0, 1, 20))[5:15]
 
-    for i, line in enumerate(lines.values):
-        axes.plot(x, line, linewidth=linewidth, c=colors[i % 10], alpha=linealpha)
+    if engine == "matplotlib":
+        for i, line in enumerate(lines.values):
+            axes.plot(x, line, linewidth=linewidth, c=colors[i % 10], alpha=linealpha)
+    else:
+        colors = [_to_rgba(v, linealpha) for v in colors]
+        traces = []
+        for i, line in enumerate(lines.values):
+            traces.append(
+                go.Scatter(
+                    x=x,
+                    y=line,
+                    mode="lines",
+                    line=dict(color=colors[i % 10], width=linewidth),
+                    hoverinfo="none",
+                )
+            )
+
+        return traces
 
 
 def _pdp_contour_plot(

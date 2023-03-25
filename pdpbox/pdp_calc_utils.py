@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans, KMeans
+import copy
 from .utils import _get_string, _find_bucket, _calc_preds
 from .info_plot_utils import _prepare_data_x
 
@@ -96,6 +97,38 @@ def _sample_ice_lines(ice_lines, frac_to_plot):
         ice_lines = ice_lines.sample(frac_to_plot)
 
     return ice_lines.reset_index(drop=True)
+
+
+def _prepare_pdp_line_data(
+    class_id,
+    pdp_isolate_obj,
+    plot_style,
+):
+    pdp_result = pdp_isolate_obj.results[class_id]
+    pdp = copy.deepcopy(pdp_result.pdp)
+    ice_lines = copy.deepcopy(pdp_result.ice_lines)
+    feature_grids = pdp_isolate_obj.feature_grids
+
+    x = np.arange(len(feature_grids))
+    if pdp_isolate_obj.feature_type == "numeric" and not plot_style.x_quantile:
+        x = feature_grids
+
+    if plot_style.center:
+        pdp -= pdp[0]
+        for feat in feature_grids[1:]:
+            ice_lines[feat] -= ice_lines[feature_grids[0]]
+        ice_lines[feature_grids[0]] = 0
+
+    line_data = None
+    if plot_style.plot_lines:
+        if plot_style.clustering["on"]:
+            line_data = _cluster_ice_lines(ice_lines, feature_grids, plot_style)
+        else:
+            line_data = _sample_ice_lines(ice_lines, plot_style.frac_to_plot)
+
+    line_std = ice_lines[feature_grids].std().values
+
+    return x, pdp, line_data, line_std
 
 
 def _calc_ice_lines_inter(
@@ -205,6 +238,10 @@ def _prepare_pdp_count_data(
     )
     count_data["count_norm"] = count_data["count"] * 1.0 / data.shape[0]
     prepared_results["count"] = count_data
-    prepared_results["dist"] = data[feature].values
+    dist_data = data[feature]
+    num_samples = 1000
+    if len(dist_data) > num_samples:
+        dist_data = dist_data.sample(num_samples, replace=False)
+    prepared_results["dist"] = dist_data.values
 
     return prepared_results

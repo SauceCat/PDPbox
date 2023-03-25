@@ -3,7 +3,12 @@ from .pdp_calc_utils import (
     _calc_ice_lines_inter,
     _prepare_pdp_count_data,
 )
-from .pdp_plot_utils import _pdp_plot, _pdp_inter_three, _pdp_inter_one
+from .pdp_plot_utils import (
+    _pdp_plot,
+    _pdp_plot_plotly,
+    _pdp_inter_three,
+    _pdp_inter_one,
+)
 from .utils import (
     _check_model,
     _check_dataset,
@@ -293,7 +298,8 @@ class PDPIsolate:
         if engine == "matplotlib":
             fig, axes = _pdp_plot(self, feature_name, which_classes, plot_params)
         else:
-            pass
+            fig = _pdp_plot_plotly(self, feature_name, which_classes, plot_params)
+            axes = None
 
         return fig, axes
 

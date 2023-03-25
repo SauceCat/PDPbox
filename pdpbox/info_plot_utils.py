@@ -19,6 +19,8 @@ from .utils import (
     _calc_preds,
     _make_subplots,
     _display_percentile,
+    _make_subplots_plotly,
+    _get_ticks_plotly,
 )
 from .styles import infoPlotStyle, infoPlotInterStyle, _prepare_plot_style
 
@@ -35,7 +37,6 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.patheffects as PathEffects
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 
 def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
@@ -201,23 +202,6 @@ def _info_plot_interact(
     return fig, axes
 
 
-def _make_subplots_plotly(plot_args, plot_style):
-    fig = make_subplots(**plot_args)
-    fig.update_layout(
-        width=plot_style.figsize[0],
-        height=plot_style.figsize[1],
-        template=plot_style.template,
-        showlegend=False,
-        title=go.layout.Title(
-            text=f"{plot_style.title['title']['text']} <br><sup>{plot_style.title['subtitle']['text']}</sup>",
-            xref="paper",
-            x=0,
-        ),
-    )
-
-    return fig
-
-
 def _draw_barplot_plotly(fig, bar_data, plot_style, row, col):
     bx = bar_data["x"].values
     by = bar_data["fake_count"].values
@@ -239,18 +223,6 @@ def _draw_barplot_plotly(fig, bar_data, plot_style, row, col):
         col=col,
         secondary_y=False,
     )
-
-
-def _get_ticks_plotly(feat_name, plot_style):
-    ticktext = plot_style.display_columns.copy()
-    if len(plot_style.percentile_columns) > 0:
-        for j, p in enumerate(plot_style.percentile_columns):
-            ticktext[j] += f"<br><sup><b>{p}</b></sup>"
-        title_text = f"<b>{feat_name}</b> (value+percentile)"
-    else:
-        title_text = f"<b>{feat_name}</b> (value)"
-
-    return title_text, ticktext
 
 
 def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
@@ -330,7 +302,6 @@ def _actual_plot_plotly(
         "rows": nrows * 2,
         "cols": ncols,
         "shared_xaxes": True,
-        "shared_yaxes": True,
         "horizontal_spacing": plot_style.horizontal_spacing,
         "vertical_spacing": plot_style.vertical_spacing,
     }
@@ -340,10 +311,11 @@ def _actual_plot_plotly(
     for i, p in enumerate(pred_cols):
         box_color = box_colors[i % len(box_colors)]
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
+        box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
+        bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
 
         box_data = plot_data[["x", p]].rename(columns={p: "y"})
         xs, ys = _prepare_box_data(box_data)
-        box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
         for iy, y in enumerate(ys):
             fig.add_trace(
                 go.Box(
@@ -377,9 +349,7 @@ def _actual_plot_plotly(
         )
         fig.update_yaxes(title_text=f"{p} dist", **box_grids)
 
-        bar_grids = {"row": grids["row"] * 2, "col": grids["col"]}
         _draw_barplot_plotly(fig, bar_data, plot_style, **bar_grids)
-
         title_text, ticktext = _get_ticks_plotly(feat_name, plot_style)
         fig.update_xaxes(
             title_text=title_text,
