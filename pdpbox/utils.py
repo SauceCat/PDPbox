@@ -212,11 +212,11 @@ def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     return true_n_jobs
 
 
-def _calc_n_jobs(df, feature_grids, memory_limit, n_jobs):
+def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
     _check_memory_limit(memory_limit)
     true_n_jobs = _calc_memory_usage(
         df,
-        len(feature_grids),
+        n_grids,
         n_jobs,
         memory_limit,
     )
@@ -307,9 +307,10 @@ def _get_grid_combos(feature_grids, feature_types):
 
     # create grid combination
     grids1, grids2 = feature_grids
-    if feature_types[0] == "onehot":
+    feat_type1, feat_type2 = feature_types
+    if feat_type1 == "onehot":
         grids1 = np.eye(len(grids1)).astype(int).tolist()
-    if feature_types[1] == "onehot":
+    if feat_type2 == "onehot":
         grids2 = np.eye(len(grids2)).astype(int).tolist()
 
     grid_combos = []

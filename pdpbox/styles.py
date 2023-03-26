@@ -6,7 +6,8 @@ import plotly.express as px
 class defaultColors:
     cmap = "tab20"
     cmap_seq = "Blues"
-    cmaps_seq = ["Blues", "Greens", "Oranges", "Reds", "Purples", "Greys"]
+    cmap_inter = "viridis"
+    cmaps = ["Blues", "Greens", "Oranges", "Reds", "Purples", "Greys"]
     colors = px.colors.qualitative.Plotly
     darkGreen = "#1A4E5D"
     lightGreen = "#5BB573"
@@ -61,6 +62,8 @@ def _prepare_plot_style(feat_name, target, plot_params, plot_type):
         plot_style = infoPlotInterStyle(feat_name, target, plot_params, plot_type)
     elif plot_type in ["pdp_isolate"]:
         plot_style = PDPIsolatePlotStyle(feat_name, target, plot_params, plot_type)
+    elif plot_type in ["pdp_interact"]:
+        plot_style = PDPInteractPlotStyle(feat_name, target, plot_params, plot_type)
     return plot_style
 
 
@@ -325,7 +328,7 @@ class infoPlotInterStyle(plotStyle):
         self.marker = {
             "line_width": 1,
             "cmap": defaultColors.cmap_seq,
-            "cmaps": defaultColors.cmaps_seq,
+            "cmaps": defaultColors.cmaps,
             "min_size": 50 if self.engine == "matplotlib" else 10,
             "max_size": 1500 if self.engine == "matplotlib" else 50,
             "fontsize": 10,
@@ -356,11 +359,9 @@ class PDPIsolatePlotStyle(plotStyle):
         self.plot_type_to_title = {
             "title": {
                 "pdp_isolate": "PDP for feature " + feat_name_bold,
-                "pdp_interact": "",
             },
             "subtitle": {
                 "pdp_isolate": f"Number of unique grid points: {n_grids}",
-                "pdp_interact": "",
             },
         }
 
@@ -380,7 +381,7 @@ class PDPIsolatePlotStyle(plotStyle):
         self.line = {
             "hl_color": defaultColors.yellow,
             "zero_color": defaultColors.red,
-            "cmaps": defaultColors.cmaps_seq,
+            "cmaps": defaultColors.cmaps,
             "width": 1,
             "fontdict": {
                 self.fontdict_keys["family"]: self.font_family,
@@ -398,3 +399,40 @@ class PDPIsolatePlotStyle(plotStyle):
             "fill_alpha": 0.8,
             "font_size": 10,
         }
+
+
+class PDPInteractPlotStyle(plotStyle):
+    def __init__(self, feat_names, target, plot_params, plot_type):
+        super().__init__(target, plot_params)
+        self.plot_type = plot_type
+        feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
+        grids1, grids2 = plot_params["n_grids"]
+
+        self.plot_type_to_title = {
+            "title": {
+                "pdp_interact": f"PDP interact for features {feat1} and {feat2}",
+            },
+            "subtitle": {
+                "pdp_interact": f"Number of unique grid points: ({feat1}: {grids1}, {feat2}: {grids2})",
+            },
+        }
+
+        for key in ["title", "subtitle"]:
+            self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
+        update_style(self.title, plot_params.get("title", {}))
+
+        self.interact = {
+            "cmap": defaultColors.cmap_inter,
+            "fill_alpha": 0.8,
+            "type": plot_params["plot_type"],
+            "font_size": 10,
+        }
+        update_style(self.interact, plot_params.get("interact", {}))
+
+        self.isolate = {
+            "fill_alpha": 0.8,
+            "font_size": 10,
+        }
+        update_style(self.isolate, plot_params.get("isolate", {}))
+        self.plot_pdp = plot_params["plot_pdp"]
+        self.x_quantile = plot_params["x_quantile"]

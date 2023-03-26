@@ -475,6 +475,7 @@ def _pdp_dist_plot_plotly(pdp_isolate_obj, colors, plot_style):
             ),
             showlegend=False,
             name="dist",
+            hoverinfo="none",
         )
     else:
         dist_trace = _draw_pdp_countplot_plotly(
@@ -509,15 +510,146 @@ def _ice_line_plot(x, lines, cmap, axes, engine):
         return traces
 
 
-def _pdp_contour_plot(
-    X, Y, pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params
-):
+def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
+    plot_style = _prepare_plot_style(feat_names, target, plot_params, "pdp_interact")
+    fig, inner_grid, title_axes = _make_subplots(plot_style)
+    pdp_iso_obj_x, pdp_iso_obj_y = pdp_inter_obj.pdp_isolate_objs
+    grids_x, grids_y = pdp_inter_obj.feature_grids
+    share_xy = plot_style.interact["type"] == "grid" or plot_style.x_quantile
+
+    interact_axes, isolate_axes = [], []
+    cmap = plot_style.interact["cmap"]
+    for i, t in enumerate(target):
+        pdp_x = copy.deepcopy(pdp_iso_obj_x.results[t].pdp)
+        pdp_y = copy.deepcopy(pdp_iso_obj_y.results[t].pdp)
+        pdp_inter = copy.deepcopy(pdp_inter_obj.results[t].pdp)
+
+        if plot_style.plot_pdp:
+            inner = GridSpecFromSubplotSpec(
+                2,
+                2,
+                subplot_spec=inner_grid[i],
+                wspace=0.1,
+                hspace=0.2,
+                height_ratios=[0.5, 7],
+                width_ratios=[0.5, 7],
+            )
+            inner_iso_x_axes = plt.subplot(inner[1])
+            inner_iso_y_axes = plt.subplot(inner[2])
+            if share_xy:
+                inner_inter_axes = plt.subplot(
+                    inner[3], sharex=inner_iso_x_axes, sharey=inner_iso_y_axes
+                )
+            else:
+                inner_inter_axes = plt.subplot(inner[3])
+            pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
+        else:
+            inner_inter_axes = plt.subplot(inner_grid[i])
+            inner_iso_x_axes = None
+            inner_iso_y_axes = None
+            pdp_values = pdp_inter
+
+        interact_axes.append(inner_inter_axes)
+        isolate_axes.append([inner_iso_x_axes, inner_iso_y_axes])
+
+        pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
+        norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
+        vmean = norm.vmin + (norm.vmax - norm.vmin) * 0.5
+
+        fig.add_subplot(inner_inter_axes)
+        im = _pdp_inter_xy_plot(
+            pdp_inter,
+            pdp_inter_obj.feature_grids,
+            norm,
+            cmap,
+            plot_style,
+            inner_inter_axes,
+        )
+
+        iso_plot_params = {
+            "vmean": vmean,
+            "norm": norm,
+            "cmap": cmap,
+            "plot_style": plot_style,
+        }
+        cb_num_grids = np.max([np.min([len(grids_x), len(grids_y), 8]), 8])
+        boundaries = [
+            round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
+        ]
+
+        if inner_iso_x_axes is None and inner_iso_y_axes is None:
+            _set_xy_ticks(
+                feat_names[0],
+                plot_style.display_columns[0],
+                plot_style,
+                inner_inter_axes,
+                xy=True,
+                y=False,
+            )
+            _set_xy_ticks(
+                feat_names[1],
+                plot_style.display_columns[1],
+                plot_style,
+                inner_inter_axes,
+                xy=True,
+                y=True,
+            )
+            axes_divider = make_axes_locatable(inner_inter_axes)
+            cax = axes_divider.append_axes("right", size="3%", pad="2%")
+        else:
+            _pdp_iso_xy_plot(pdp_x, axes=inner_iso_x_axes, y=False, **iso_plot_params)
+            fig.add_subplot(inner_iso_x_axes)
+            _set_xy_ticks(
+                feat_names[0],
+                plot_style.display_columns[0],
+                plot_style,
+                inner_iso_x_axes,
+                xy=False,
+                y=False,
+            )
+
+            _pdp_iso_xy_plot(pdp_y, axes=inner_iso_y_axes, y=True, **iso_plot_params)
+            fig.add_subplot(inner_iso_y_axes)
+            _set_xy_ticks(
+                feat_names[1],
+                plot_style.display_columns[1],
+                plot_style,
+                inner_iso_y_axes,
+                xy=False,
+                y=True,
+            )
+            inner_inter_axes.grid(False)
+
+            if share_xy:
+                inner_inter_axes.get_xaxis().set_visible(False)
+                inner_inter_axes.get_yaxis().set_visible(False)
+
+            cax = inset_axes(
+                inner_inter_axes,
+                width="100%",
+                height="100%",
+                loc="right",
+                bbox_to_anchor=(1.05, 0.0, 0.05, 1),
+                bbox_transform=inner_inter_axes.transAxes,
+                borderpad=0,
+            )
+
+        cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
+        cb.ax.tick_params(**plot_style.tick["tick_params"])
+        cb.outline.set_visible(False)
+
+    axes = {
+        "title_axes": title_axes,
+        "interact_axes": interact_axes,
+        "isolate_axes": isolate_axes,
+    }
+    return fig, axes
+
+
+def _pdp_contour_plot(X, Y, pdp_mx, norm, cmap, plot_style, axes):
     """Interact contour plot"""
-
-    contour_color = plot_params.get("contour_color", "white")
-
     level = np.min([X.shape[0], X.shape[1]])
-    c1 = inter_ax.contourf(
+    c1 = axes.contourf(
         X,
         Y,
         pdp_mx,
@@ -525,66 +657,57 @@ def _pdp_contour_plot(
         origin="lower",
         cmap=cmap,
         norm=norm,
-        alpha=inter_fill_alpha,
+        alpha=plot_style.interact["fill_alpha"],
     )
-    c2 = inter_ax.contour(c1, levels=c1.levels, colors=contour_color, origin="lower")
-    inter_ax.clabel(c2, fontsize=fontsize, inline=1)
-    inter_ax.set_aspect("auto")
+    c2 = axes.contour(c1, levels=c1.levels, colors="white", origin="lower")
+    axes.clabel(c2, fontsize=plot_style.interact["font_size"], inline=1)
+    axes.set_aspect("auto")
 
     # return the color mapping object for colorbar
     return c1
 
 
-def _pdp_inter_grid(
-    pdp_mx, inter_ax, cmap, norm, inter_fill_alpha, fontsize, plot_params
-):
+def _pdp_inter_grid(pdp_mx, norm, cmap, plot_style, axes):
     """Interact grid plot (heatmap)"""
-
-    font_family = plot_params.get("font_family", "Arial")
-    im = inter_ax.imshow(
+    im = axes.imshow(
         pdp_mx,
         cmap=cmap,
         norm=norm,
         origin="lower",
         aspect="auto",
-        alpha=inter_fill_alpha,
+        alpha=plot_style.interact["fill_alpha"],
     )
+    R, C = pdp_mx.shape
 
-    for r in range(pdp_mx.shape[0]):
-        for c in range(pdp_mx.shape[1]):
+    for r in range(R):
+        for c in range(C):
             text_color = "w"
             if pdp_mx[r, c] >= norm.vmin + (norm.vmax - norm.vmin) * 0.5:
                 text_color = "black"
             # column -> x, row -> y
-            inter_ax.text(
+            axes.text(
                 c,
                 r,
                 round(pdp_mx[r, c], 3),
                 ha="center",
                 va="center",
                 color=text_color,
-                size=fontsize,
-                fontdict={"family": font_family},
+                size=plot_style.interact["font_size"],
             )
 
-    # draw the white gaps
-    inter_ax.set_xticks(np.arange(pdp_mx.shape[1] - 1) + 0.5, minor=True)
-    inter_ax.set_yticks(np.arange(pdp_mx.shape[0] - 1) + 0.5, minor=True)
-    inter_ax.grid(which="minor", color="w", linestyle="-", linewidth=1)
+    axes.set_xticks(np.arange(C - 1) + 0.5, minor=True)
+    axes.set_yticks(np.arange(R - 1) + 0.5, minor=True)
 
-    # return the color mapping object for colorbar
     return im
 
 
-def _pdp_inter_one(
-    pdp_interact_out,
-    feature_names,
-    plot_type,
-    inter_ax,
-    x_quantile,
-    plot_params,
+def _pdp_inter_xy_plot(
+    pdp_inter,
+    feature_grids,
     norm,
-    ticks=True,
+    cmap,
+    plot_style,
+    axes,
 ):
     """Plot single PDP interact
 
@@ -597,299 +720,91 @@ def _pdp_inter_one(
         False when it is called by _pdp_inter_three
 
     """
-    cmap = plot_params.get("cmap", "viridis")
-    inter_fill_alpha = plot_params.get("inter_fill_alpha", 0.8)
-    fontsize = plot_params.get("inter_fontsize", 9)
-    font_family = plot_params.get("font_family", "Arial")
+    grids_x, grids_y = feature_grids
+    pdp_mx = pdp_inter.reshape((len(grids_x), len(grids_y))).T
 
-    # prepare pdp_mx
-    pdp_mx_temp = copy.deepcopy(pdp_interact_out.pdp)
-    for feature, feature_type, mark in zip(
-        pdp_interact_out.features, pdp_interact_out.feature_types, ["x", "y"]
-    ):
-        if feature_type in ["numeric", "binary"]:
-            pdp_mx_temp[mark] = pdp_mx_temp[feature]
-        else:
-            # for onehot encoding feature, need to map to numeric representation
-            pdp_mx_temp[mark] = pdp_mx_temp[feature].apply(
-                lambda x: list(x).index(1), axis=1
-            )
-    pdp_mx_temp = pdp_mx_temp[["x", "y", "preds"]].sort_values(
-        by=["x", "y"], ascending=True
-    )
-
-    pdp_inter = copy.deepcopy(pdp_mx_temp["preds"].values)
-    n_grids_x, n_grids_y = len(pdp_interact_out.feature_grids[0]), len(
-        pdp_interact_out.feature_grids[1]
-    )
-    # pdp_inter.reshape((n_grids_x, n_grids_y)): each row represents grids_x
-    # pdp_inter.reshape((n_grids_x, n_grids_y)).T: each row represents grids_y
-    pdp_mx = pdp_inter.reshape((n_grids_x, n_grids_y)).T
-
-    # if it is called by _pdp_inter_three, norm is not None
-    if norm is None:
-        pdp_min, pdp_max = np.min(pdp_inter), np.max(pdp_inter)
-        norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
-
-    inter_params = {
-        "pdp_mx": pdp_mx,
-        "inter_ax": inter_ax,
-        "cmap": cmap,
-        "norm": norm,
-        "inter_fill_alpha": inter_fill_alpha,
-        "fontsize": fontsize,
-        "plot_params": plot_params,
-    }
-    if plot_type == "contour":
-        if x_quantile:
-            # because we have transpose the matrix
-            # pdp_max.shape[1]: x, pdp_max.shape[0]: y
+    if plot_style.interact["type"] == "grid":
+        im = _pdp_inter_grid(pdp_mx, norm, cmap, plot_style, axes)
+    else:
+        if plot_style.x_quantile:
             X, Y = np.meshgrid(range(pdp_mx.shape[1]), range(pdp_mx.shape[0]))
         else:
-            # for numeric not quantile
-            X, Y = np.meshgrid(
-                pdp_interact_out.feature_grids[0], pdp_interact_out.feature_grids[1]
-            )
-        im = _pdp_contour_plot(X=X, Y=Y, **inter_params)
-    elif plot_type == "grid":
-        im = _pdp_inter_grid(**inter_params)
-    else:
-        raise ValueError("plot_type: should be 'contour' or 'grid'")
+            X, Y = np.meshgrid(grids_x, grids_y)
+        im = _pdp_contour_plot(X, Y, pdp_mx, norm, cmap, plot_style, axes)
 
-    if ticks:
-        # if it is call by _pdp_inter_three, no need to set ticks
-        _axes_modify(font_family=font_family, ax=inter_ax, grid=True)
+    # axes.grid(which="minor", color="w", linestyle="-", linewidth=1)
+    plt.setp(axes.get_xticklabels(), visible=False)
+    plt.setp(axes.get_yticklabels(), visible=False)
+    axes.tick_params(which="minor", bottom=False, left=False)
+    axes.tick_params(which="major", bottom=False, left=False)
+    axes.set_frame_on(False)
+    _axes_modify(axes, plot_style)
 
-        if pdp_interact_out.feature_types[0] != "numeric" or x_quantile:
-            inter_ax.set_xticks(
-                range(len(pdp_interact_out.pdp_isolate_outs[0].display_columns))
-            )
-            inter_ax.set_xticklabels(
-                pdp_interact_out.pdp_isolate_outs[0].display_columns
-            )
-
-        if pdp_interact_out.feature_types[1] != "numeric" or x_quantile:
-            inter_ax.set_yticks(
-                range(len(pdp_interact_out.pdp_isolate_outs[1].display_columns))
-            )
-            inter_ax.set_yticklabels(
-                pdp_interact_out.pdp_isolate_outs[1].display_columns
-            )
-
-        inter_ax.set_xlabel(
-            feature_names[0], fontsize=12, fontdict={"family": font_family}
-        )
-        inter_ax.set_ylabel(
-            feature_names[1], fontsize=12, fontdict={"family": font_family}
-        )
-
-        # insert colorbar
-        inter_ax_divider = make_axes_locatable(inter_ax)
-        cax = inter_ax_divider.append_axes("right", size="5%", pad="2%")
-        if plot_type == "grid":
-            cb_num_grids = np.max([np.min([n_grids_x, n_grids_y, 8]), 8])
-            boundaries = [
-                round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
-            ]
-            cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
-        else:
-            cb = plt.colorbar(im, cax=cax, format="%.3f")
-        _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
-        cb.outline.set_visible(False)
-
-    inter_ax.tick_params(which="minor", bottom=False, left=False)
     return im
 
 
-def _pdp_xy(
+def _pdp_iso_xy_plot(
     pdp_values,
     vmean,
-    pdp_ax,
-    ticklabels,
-    feature_name,
-    cmap,
     norm,
-    plot_type,
-    plot_params,
+    cmap,
+    plot_style,
+    axes,
     y=False,
 ):
-    """PDP isolate on x, y axis
-
-    Parameters
-    ----------
-
-    pdp_values: 1-d array
-        pdp values
-    vmean: float
-        threshold to determine the text color
-    pdp_ax: matplotlib Axes
-        PDP interact axes
-    ticklabels: list
-        list of tick labels
-    feature_name: str
-        name of the feature
-    cmap: matplotlib color map
-    norm: matplotlib color normalize
-    y: bool, default=False
-        whether it is on y axis
-    """
-
-    font_family = plot_params.get("font_family", "Arial")
-    fontsize = plot_params.get("inter_fontsize", 9)
-    inter_fill_alpha = plot_params.get("inter_fill_alpha", 0.8)
-
-    pdp_ax.imshow(
+    axes.imshow(
         np.expand_dims(pdp_values, int(y)),
         cmap=cmap,
         norm=norm,
         origin="lower",
-        alpha=inter_fill_alpha,
+        alpha=plot_style.isolate["fill_alpha"],
     )
 
-    for idx in range(len(pdp_values)):
+    for i in range(len(pdp_values)):
         text_color = "w"
-        if pdp_values[idx] >= vmean:
+        if pdp_values[i] >= vmean:
             text_color = "black"
 
         text_params = {
-            "s": round(pdp_values[idx], 3),
+            "s": round(pdp_values[i], 3),
             "ha": "center",
             "va": "center",
             "color": text_color,
-            "size": fontsize,
-            "fontdict": {"family": font_family},
+            "size": plot_style.isolate["font_size"],
+            "fontdict": {"family": plot_style.font_family},
         }
         if y:
-            pdp_ax.text(x=0, y=idx, rotation="vertical", **text_params)
+            axes.text(x=0, y=i, rotation="vertical", **text_params)
         else:
-            pdp_ax.text(x=idx, y=0, **text_params)
+            axes.text(x=i, y=0, **text_params)
 
-    pdp_ax.set_frame_on(False)
-    pdp_ax.axes.axis("tight")
+    axes.set_frame_on(False)
+    axes.axes.axis("tight")
+
+
+def _set_xy_ticks(feat_name, ticklabels, plot_style, axes, xy=False, y=False):
+    fontdict = {
+        "family": plot_style.font_family,
+        "fontsize": plot_style.title["subplot_title"]["font_size"],
+    }
 
     if y:
-        pdp_ax.set_yticks(range(len(ticklabels)))
-        pdp_ax.set_yticklabels(ticklabels)
-        pdp_ax.set_ylabel(
-            feature_name, fontdict={"family": font_family, "fontsize": 12}
-        )
-        if plot_type == "contour":
-            pdp_ax.get_yaxis().set_label_position("right")
-        pdp_ax.get_xaxis().set_visible(False)
+        axes.set_ylabel(feat_name, fontdict=fontdict)
     else:
-        pdp_ax.set_xticks(range(len(ticklabels)))
-        pdp_ax.get_xaxis().tick_top()
-        pdp_ax.set_xticklabels(ticklabels)
-        pdp_ax.set_xlabel(
-            feature_name, fontdict={"family": font_family, "fontsize": 12}
-        )
-        if plot_type == "grid":
-            pdp_ax.get_xaxis().set_label_position("top")
-        pdp_ax.get_yaxis().set_visible(False)
+        axes.set_xlabel(feat_name, fontdict=fontdict)
+    _axes_modify(axes, plot_style)
+    axes.grid(False)
 
-    pdp_ax.grid(which="minor", color="w", linestyle="-", linewidth=1)
-    pdp_ax.tick_params(which="minor", top=False, left=False)
-    pdp_ax.tick_params(
-        axis="both", which="major", labelsize=10, labelcolor="#424242", colors="#9E9E9E"
-    )
+    if xy and plot_style.interact["type"] == "contour" and not plot_style.x_quantile:
+        return
 
-
-def _pdp_inter_three(
-    pdp_interact_out,
-    feature_names,
-    plot_type,
-    chart_grids,
-    x_quantile,
-    fig,
-    plot_params,
-):
-    """Plot PDP interact with pdp isolate color bar
-
-    Parameters
-    ----------
-    chart_grids: matplotlib subplot gridspec
-
-    """
-    cmap = plot_params.get("cmap", "viridis")
-    font_family = plot_params.get("font_family", "Arial")
-
-    pdp_x_ax = fig.add_subplot(chart_grids[1])
-    pdp_y_ax = fig.add_subplot(chart_grids[2])
-    inter_ax = fig.add_subplot(chart_grids[3], sharex=pdp_x_ax, sharey=pdp_y_ax)
-
-    pdp_x = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[0].pdp)
-    pdp_y = copy.deepcopy(pdp_interact_out.pdp_isolate_outs[1].pdp)
-    pdp_inter = copy.deepcopy(pdp_interact_out.pdp["preds"].values)
-    pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
-    pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
-
-    norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
-    vmean = norm.vmin + (norm.vmax - norm.vmin) * 0.5
-    feature_grids = pdp_interact_out.feature_grids
-
-    pdp_xy_params = {
-        "cmap": cmap,
-        "norm": norm,
-        "vmean": vmean,
-        "plot_params": plot_params,
-        "plot_type": plot_type,
-    }
-    _pdp_xy(
-        pdp_values=pdp_x,
-        pdp_ax=pdp_x_ax,
-        ticklabels=pdp_interact_out.pdp_isolate_outs[0].display_columns,
-        feature_name=feature_names[0],
-        y=False,
-        **pdp_xy_params,
-    )
-    _pdp_xy(
-        pdp_values=pdp_y,
-        pdp_ax=pdp_y_ax,
-        ticklabels=pdp_interact_out.pdp_isolate_outs[1].display_columns,
-        feature_name=feature_names[1],
-        y=True,
-        **pdp_xy_params,
-    )
-
-    im = _pdp_inter_one(
-        pdp_interact_out=pdp_interact_out,
-        feature_names=feature_names,
-        plot_type=plot_type,
-        inter_ax=inter_ax,
-        x_quantile=x_quantile,
-        plot_params=plot_params,
-        norm=norm,
-        ticks=False,
-    )
-
-    inter_ax.set_frame_on(False)
-    plt.setp(inter_ax.get_xticklabels(), visible=False)
-    plt.setp(inter_ax.get_yticklabels(), visible=False)
-    inter_ax.tick_params(which="minor", bottom=False, left=False)
-    inter_ax.tick_params(which="major", bottom=False, left=False)
-
-    # insert colorbar
-    if plot_type == "grid":
-        cax = inset_axes(
-            inter_ax,
-            width="100%",
-            height="100%",
-            loc="right",
-            bbox_to_anchor=(1.05, 0.0, 0.05, 1),
-            bbox_transform=inter_ax.transAxes,
-            borderpad=0,
-        )
-        cb_num_grids = np.max(
-            [np.min([len(feature_grids[0]), len(feature_grids[1]), 8]), 8]
-        )
-        boundaries = [
-            round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
-        ]
-        cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
+    if y:
+        # axes.yaxis.set_label_position('right')
+        axes.set_yticks(range(len(ticklabels)), ticklabels)
+        if not xy:
+            axes.get_xaxis().set_visible(False)
     else:
-        cax = inset_axes(inter_ax, width="5%", height="80%", loc="right")
-        cb = plt.colorbar(im, cax=cax, format="%.3f")
-    _axes_modify(font_family=font_family, ax=cax, right=True, grid=True)
-    cb.outline.set_visible(False)
-
-    return {"_pdp_x_ax": pdp_x_ax, "_pdp_y_ax": pdp_y_ax, "_pdp_inter_ax": inter_ax}
+        axes.xaxis.set_label_position("top")
+        axes.set_xticks(range(len(ticklabels)), ticklabels)
+        if not xy:
+            axes.get_yaxis().set_visible(False)
