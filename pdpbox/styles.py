@@ -408,6 +408,8 @@ class PDPInteractPlotStyle(plotStyle):
         feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
         grids1, grids2 = plot_params["n_grids"]
 
+        self.horizontal_spacing = plot_params.get("horizontal_spacing", 0.02)
+
         self.plot_type_to_title = {
             "title": {
                 "pdp_interact": f"PDP interact for features {feat1} and {feat2}",

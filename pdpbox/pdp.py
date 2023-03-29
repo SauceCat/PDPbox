@@ -7,6 +7,7 @@ from .pdp_plot_utils import (
     _pdp_plot,
     _pdp_plot_plotly,
     _pdp_inter_plot,
+    _pdp_inter_plot_plotly,
 )
 from .utils import (
     _check_model,
@@ -486,8 +487,15 @@ class PDPInteract:
         if plot_params is None:
             plot_params = {}
 
-        if any(v == "onehot" for v in self.feature_types):
+        if (
+            not all(v == "numeric" for v in self.feature_types)
+            or plot_pdp
+            or plot_type == "grid"
+        ):
             x_quantile = True
+
+        if any(v == "numeric" for v in self.feature_types) and not x_quantile:
+            show_percentile = False
 
         plot_params.update(
             {
@@ -513,7 +521,9 @@ class PDPInteract:
         if engine == "matplotlib":
             fig, axes = _pdp_inter_plot(self, feature_names, which_classes, plot_params)
         else:
-            # fig = _pdp_inter_plot_plotly(self, feature_names, which_classes, plot_params)
+            fig = _pdp_inter_plot_plotly(
+                self, feature_names, which_classes, plot_params
+            )
             axes = None
 
         return fig, axes

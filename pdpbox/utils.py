@@ -645,10 +645,41 @@ def _display_percentile(axes, plot_style):
         _axes_modify(per_axes, plot_style, top=True)
 
 
-def _get_ticks_plotly(feat_name, plot_style):
-    ticktext = plot_style.display_columns.copy()
-    if len(plot_style.percentile_columns) > 0:
-        for j, p in enumerate(plot_style.percentile_columns):
+def _display_percentile_inter(plot_style, axes, x=True, y=True):
+    per_xaxes, per_yaxes = None, None
+    if plot_style.show_percentile:
+        xs, ys = plot_style.percentile_columns
+        if x and len(xs) > 0:
+            per_xaxes = axes.twiny()
+            per_xaxes.set_xticks(axes.get_xticks())
+            per_xaxes.set_xbound(axes.get_xbound())
+            per_xaxes.set_xticklabels(xs, rotation=plot_style.tick["xticks_rotation"])
+            per_xaxes.set_xlabel("percentile buckets")
+            _axes_modify(per_xaxes, plot_style, top=True)
+            per_xaxes.grid(False)
+
+        if y and len(ys) > 0:
+            per_yaxes = axes.twinx()
+            per_yaxes.set_yticks(axes.get_yticks())
+            per_yaxes.set_ybound(axes.get_ybound())
+            per_yaxes.set_yticklabels(ys)
+            per_yaxes.set_ylabel("percentile buckets")
+            _axes_modify(per_yaxes, plot_style, right=True)
+            per_yaxes.grid(False)
+
+    return per_xaxes, per_yaxes
+
+
+def _get_ticks_plotly(feat_name, plot_style, idx=None):
+    if idx is None:
+        ticktext = plot_style.display_columns.copy()
+        percentiles = plot_style.percentile_columns
+    else:
+        ticktext = plot_style.display_columns[idx].copy()
+        percentiles = plot_style.percentile_columns[idx]
+
+    if len(percentiles) > 0 and plot_style.show_percentile:
+        for j, p in enumerate(percentiles):
             ticktext[j] += f"<br><sup><b>{p}</b></sup>"
         title_text = f"<b>{feat_name}</b> (value+percentile)"
     else:

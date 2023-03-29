@@ -21,6 +21,7 @@ from .utils import (
     _display_percentile,
     _make_subplots_plotly,
     _get_ticks_plotly,
+    _display_percentile_inter,
 )
 from .styles import infoPlotStyle, infoPlotInterStyle, _prepare_plot_style
 
@@ -177,22 +178,6 @@ def _info_plot_interact(
             plot_style.legend["circles"],
         )
         legend_axes.append(inner_legend_axes)
-
-        if plot_type == "target_interact":
-            subplot_title = f"Average {t}"
-        else:
-            subplot_title = f"{t}: median prediction"
-
-        if len(plot_style.percentile_columns[0]) > 0:
-            subplot_title += "\n\n\n"
-
-        inner_value_axes.set_title(
-            subplot_title,
-            fontdict={
-                "fontsize": plot_style.title["subplot_title"]["font_size"],
-                "fontname": plot_style.font_family,
-            },
-        )
 
     axes = {
         "title_axes": title_axes,
@@ -767,33 +752,16 @@ def _plot_interact(
         cmap = plot_style.marker["cmap"]
 
     xs, ys = plot_style.display_columns
-    plot_axes.set_xticks(range(len(xs)))
-    plot_axes.set_xticklabels(xs, rotation=plot_style.tick["xticks_rotation"])
+    plot_axes.set_xticks(
+        range(len(xs)), xs, rotation=plot_style.tick["xticks_rotation"]
+    )
     plot_axes.set_xlim(-0.5, len(xs) - 0.5)
-    plot_axes.set_yticks(range(len(ys)))
-    plot_axes.set_yticklabels(ys)
+    plot_axes.set_yticks(range(len(ys)), ys)
     plot_axes.set_ylim(-0.5, len(ys) - 0.5)
 
-    per_xaxes, per_yaxes = None, None
-    xs, ys = plot_style.percentile_columns
-    if len(xs) > 0:
-        per_xaxes = plot_axes.twiny()
-        per_xaxes.set_xticks(plot_axes.get_xticks())
-        per_xaxes.set_xbound(plot_axes.get_xbound())
-        per_xaxes.set_xticklabels(xs, rotation=plot_style.tick["xticks_rotation"])
-        per_xaxes.set_xlabel("percentile buckets")
-        _axes_modify(per_xaxes, plot_style, top=True)
-        per_xaxes.grid(False)
-
-    if len(ys) > 0:
-        per_yaxes = plot_axes.twinx()
-        per_yaxes.set_yticks(plot_axes.get_yticks())
-        per_yaxes.set_ybound(plot_axes.get_ybound())
-        per_yaxes.set_yticklabels(ys)
-        per_yaxes.set_ylabel("percentile buckets")
-        _axes_modify(per_yaxes, plot_style, right=True)
-        per_yaxes.grid(False)
-
+    per_xaxes, per_yaxes = _display_percentile_inter(
+        plot_style, plot_axes, x=True, y=True
+    )
     value_min, value_max = plot_data[target].min(), plot_data[target].max()
     colors = [
         plt.get_cmap(cmap)(float(v - value_min) / (value_max - value_min))
