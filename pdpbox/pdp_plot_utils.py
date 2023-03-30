@@ -29,9 +29,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import plotly.graph_objects as go
 
 
-def _set_pdp_xticks(
-    xlabel, xticklabels, plot_style, axes, is_numeric_line=False, show_xlabels=True
-):
+def _set_pdp_xticks(xticklabels, plot_style, axes, is_numeric_line=False):
     if xticklabels is not None:
         xticks = np.arange(len(xticklabels))
         if is_numeric_line:
@@ -41,15 +39,6 @@ def _set_pdp_xticks(
 
         axes.set_xticks(xticks)
         axes.set_xticklabels(xticklabels, rotation=plot_style.tick["xticks_rotation"])
-
-    if show_xlabels:
-        axes.set_xlabel(
-            xlabel,
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
-        )
-    else:
-        axes.set_xlabel("")
 
 
 def _get_pdp_xticks(pdp_isolate_obj, plot_style):
@@ -84,9 +73,9 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
                 2,
                 1,
                 subplot_spec=inner_grid[i],
-                wspace=0,
-                hspace=0.2,
-                height_ratios=[7, 0.5],
+                wspace=plot_style.gaps["inner_x"],
+                hspace=plot_style.gaps["inner_y"],
+                height_ratios=plot_style.subplot_ratio["y"],
             )
             inner_line_axes = plt.subplot(inner[0])
             inner_dist_axes = plt.subplot(inner[1])
@@ -106,25 +95,17 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
         is_numeric, line_xticklabels, dist_xticklabels = _get_pdp_xticks(
             pdp_isolate_obj, plot_style
         )
-        tick_params = {"xlabel": f"class_{t}", "plot_style": plot_style}
-        if inner_dist_axes is not None:
+        if plot_style.plot_pts_dist:
             fig.add_subplot(inner_dist_axes)
 
             if line_xticklabels is not None and not is_numeric:
                 line_xticklabels = [""] * len(line_xticklabels)
 
+            _set_pdp_xticks(line_xticklabels, plot_style, inner_line_axes, is_numeric)
             _set_pdp_xticks(
-                xticklabels=line_xticklabels,
-                axes=inner_line_axes,
-                is_numeric_line=is_numeric,
-                show_xlabels=False,
-                **tick_params,
-            )
-            _set_pdp_xticks(
-                xticklabels=dist_xticklabels,
-                axes=inner_dist_axes,
-                show_xlabels=True,
-                **tick_params,
+                dist_xticklabels,
+                plot_style,
+                inner_dist_axes,
             )
             _pdp_dist_plot(
                 pdp_isolate_obj,
@@ -135,13 +116,13 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
             )
             dist_axes.append(inner_dist_axes)
         else:
-            _set_pdp_xticks(
-                xticklabels=line_xticklabels,
-                axes=inner_line_axes,
-                is_numeric_line=is_numeric,
-                show_xlabels=True,
-                **tick_params,
-            )
+            _set_pdp_xticks(line_xticklabels, plot_style, inner_line_axes, is_numeric)
+
+        inner_line_axes.set_title(
+            f"class_{t}",
+            fontsize=plot_style.title["subplot_title"]["font_size"],
+            fontdict={"family": plot_style.font_family},
+        )
 
         if len(plot_style.percentile_columns) > 0:
             plot_style.percentile_columns = [
@@ -154,26 +135,52 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
     return fig, axes
 
 
+def _update_pdp_domains(fig, nc, nr, grids, title_text, plot_style):
+    plot_sizes = plot_style.plot_sizes
+    gaps = plot_style.gaps
+    group_w = plot_sizes["group_w"] + gaps["outer_x"]
+    group_h = plot_sizes["group_h"] + gaps["outer_y"]
+    line_grids, dist_grids = grids
+
+    line_x0, line_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
+    line_domain_x = [line_x0, line_x0 + plot_sizes["line_w"]]
+    line_domain_y = [1.0 - (line_y0 + plot_sizes["line_h"]), 1.0 - line_y0]
+
+    fig.update_xaxes(domain=line_domain_x, **line_grids)
+    fig.update_yaxes(domain=line_domain_y, **line_grids)
+
+    if plot_style.plot_pts_dist:
+        dist_y0 = line_y0 + plot_sizes["line_h"] + gaps["inner_y"]
+        fig.update_xaxes(domain=line_domain_x, **dist_grids)
+        fig.update_yaxes(
+            domain=[1.0 - (dist_y0 + plot_sizes["dist_h"]), 1.0 - dist_y0],
+            **dist_grids,
+        )
+
+    title = go.layout.Annotation(
+        x=sum(line_domain_x) / 2,
+        y=line_domain_y[1],
+        xref="paper",
+        yref="paper",
+        text=title_text,
+        showarrow=False,
+        xanchor="center",
+        yanchor="bottom",
+    )
+    return title
+
+
 def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
     plot_style = _prepare_plot_style(feat_name, target, plot_params, "pdp_isolate")
     nrows, ncols = plot_style.nrows, plot_style.ncols
-
-    row_heights = []
-    if plot_style.plot_pts_dist:
-        for i in range(nrows):
-            row_heights += [7, 0.5]
-    else:
-        row_heights = [7] * nrows
-    row_heights = [v / sum(row_heights) for v in row_heights]
-
     plot_args = {
-        "rows": len(row_heights),
+        "rows": nrows * (2 if plot_style.plot_pts_dist else 1),
         "cols": ncols,
-        "horizontal_spacing": plot_style.horizontal_spacing,
-        "vertical_spacing": plot_style.vertical_spacing,
-        "row_heights": row_heights,
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
+    subplot_titles = []
 
     cmaps = plot_style.line["cmaps"]
     for i, t in enumerate(target):
@@ -182,6 +189,11 @@ def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
         line_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
         dist_grids = {"col": grids["col"], "row": grids["row"] * 2}
+        nr, nc = grids["row"], grids["col"]
+        title = _update_pdp_domains(
+            fig, nc, nr, (line_grids, dist_grids), f"class_{t}", plot_style
+        )
+        subplot_titles.append(title)
 
         line_traces = _pdp_line_plot(
             t,
@@ -206,7 +218,7 @@ def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
             _set_pdp_xticks_plotly(
                 fig, "", line_xticklabels, line_grids, is_numeric_line=is_numeric
             )
-            _set_pdp_xticks_plotly(fig, f"class_{t}", dist_xticklabels, dist_grids)
+            _set_pdp_xticks_plotly(fig, "", dist_xticklabels, dist_grids)
             fig.update_yaxes(
                 showticklabels=False,
                 **dist_grids,
@@ -216,7 +228,9 @@ def _pdp_plot_plotly(pdp_isolate_obj, feat_name, target, plot_params):
                 fig.update_xaxes(showgrid=False, showticklabels=False, **dist_grids)
                 fig.update_yaxes(showgrid=False, **dist_grids)
         else:
-            _set_pdp_xticks_plotly(fig, f"class_{t}", line_xticklabels, line_grids)
+            _set_pdp_xticks_plotly(fig, "", line_xticklabels, line_grids)
+
+    fig.update_layout(annotations=subplot_titles)
 
     return fig
 
@@ -526,40 +540,36 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
                 2,
                 2,
                 subplot_spec=inner_grid[i],
-                wspace=0.2
-                if plot_style.show_percentile
-                and not plot_style.x_quantile
-                and plot_style.plot_pdp
-                else 0.1,
-                hspace=0.2,
-                height_ratios=[0.5, 7],
-                width_ratios=[0.5, 7],
+                wspace=plot_style.gaps["inner_x"],
+                hspace=plot_style.gaps["inner_y"],
+                height_ratios=plot_style.subplot_ratio["y"],
+                width_ratios=plot_style.subplot_ratio["x"],
             )
-            inner_iso_x_axes = plt.subplot(inner[1])
-            inner_iso_y_axes = plt.subplot(inner[2])
-            inner_inter_axes = plt.subplot(inner[3])
+            iso_x_axes = plt.subplot(inner[1])
+            iso_y_axes = plt.subplot(inner[2])
+            inter_axes = plt.subplot(inner[3])
             pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
         else:
-            inner_inter_axes = plt.subplot(inner_grid[i])
-            inner_iso_x_axes = None
-            inner_iso_y_axes = None
+            inter_axes = plt.subplot(inner_grid[i])
+            iso_x_axes = None
+            iso_y_axes = None
             pdp_values = pdp_inter
 
-        interact_axes.append(inner_inter_axes)
-        isolate_axes.append([inner_iso_x_axes, inner_iso_y_axes])
+        interact_axes.append(inter_axes)
+        isolate_axes.append([iso_x_axes, iso_y_axes])
 
         pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
         norm = mpl.colors.Normalize(vmin=pdp_min, vmax=pdp_max)
         vmean = norm.vmin + (norm.vmax - norm.vmin) * 0.5
 
-        fig.add_subplot(inner_inter_axes)
+        fig.add_subplot(inter_axes)
         im = _pdp_inter_xy_plot(
             pdp_inter,
             pdp_inter_obj.feature_grids,
             norm,
             cmap,
             plot_style,
-            inner_inter_axes,
+            inter_axes,
         )
 
         iso_plot_params = {
@@ -572,60 +582,60 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
         boundaries = [
             round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
         ]
-
-        if inner_iso_x_axes is None and inner_iso_y_axes is None:
+        xlabel = r"$\bf{" + "target\\_{}".format(t) + "}$" + "\n" + feat_names[0]
+        if plot_style.plot_pdp:
+            _pdp_iso_xy_plot(pdp_x, axes=iso_x_axes, y=False, **iso_plot_params)
+            fig.add_subplot(iso_x_axes)
             _set_xy_ticks(
-                feat_names[0],
+                xlabel,
                 plot_style.display_columns[0],
                 plot_style,
-                inner_inter_axes,
-                xy=True,
+                iso_x_axes,
+                xy=False,
                 y=False,
             )
+            _display_percentile_inter(plot_style, iso_x_axes, x=True, y=False)
+
+            _pdp_iso_xy_plot(pdp_y, axes=iso_y_axes, y=True, **iso_plot_params)
+            fig.add_subplot(iso_y_axes)
             _set_xy_ticks(
                 feat_names[1],
                 plot_style.display_columns[1],
                 plot_style,
-                inner_inter_axes,
-                xy=True,
+                iso_y_axes,
+                xy=False,
                 y=True,
             )
-            _display_percentile_inter(plot_style, inner_inter_axes, x=True, y=True)
+            _display_percentile_inter(plot_style, iso_y_axes, x=False, y=True)
+            inter_axes.grid(False)
+            inter_axes.get_xaxis().set_visible(False)
+            inter_axes.get_yaxis().set_visible(False)
         else:
-            _pdp_iso_xy_plot(pdp_x, axes=inner_iso_x_axes, y=False, **iso_plot_params)
-            fig.add_subplot(inner_iso_x_axes)
             _set_xy_ticks(
-                feat_names[0],
+                xlabel,
                 plot_style.display_columns[0],
                 plot_style,
-                inner_iso_x_axes,
-                xy=False,
+                inter_axes,
+                xy=True,
                 y=False,
             )
-            _display_percentile_inter(plot_style, inner_iso_x_axes, x=True, y=False)
-
-            _pdp_iso_xy_plot(pdp_y, axes=inner_iso_y_axes, y=True, **iso_plot_params)
-            fig.add_subplot(inner_iso_y_axes)
             _set_xy_ticks(
                 feat_names[1],
                 plot_style.display_columns[1],
                 plot_style,
-                inner_iso_y_axes,
-                xy=False,
+                inter_axes,
+                xy=True,
                 y=True,
             )
-            _display_percentile_inter(plot_style, inner_iso_y_axes, x=False, y=True)
-            inner_inter_axes.grid(False)
-            inner_inter_axes.get_xaxis().set_visible(False)
-            inner_inter_axes.get_yaxis().set_visible(False)
+            _display_percentile_inter(plot_style, inter_axes, x=True, y=True)
 
         cax = inset_axes(
-            inner_inter_axes,
+            inter_axes,
             width="100%",
             height="100%",
             loc="right",
-            bbox_to_anchor=(1.05, 0.0, 0.03, 1),
-            bbox_transform=inner_inter_axes.transAxes,
+            bbox_to_anchor=(1.05, 0.0, 0.05, 1),
+            bbox_transform=inter_axes.transAxes,
             borderpad=0,
         )
         cb = plt.colorbar(im, cax=cax, boundaries=boundaries)
@@ -640,7 +650,7 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
     return fig, axes
 
 
-def _update_domains(fig, nc, nr, grids, plot_style):
+def _update_pdp_inter_domains(fig, nc, nr, grids, plot_style):
     plot_sizes = plot_style.plot_sizes
     gaps = plot_style.gaps
     group_w = plot_sizes["group_w"] + gaps["outer_x"]
@@ -657,7 +667,7 @@ def _update_domains(fig, nc, nr, grids, plot_style):
     fig.update_xaxes(domain=inter_domain_x, **inter_grids)
     fig.update_yaxes(domain=inter_domain_y, **inter_grids)
 
-    if iso_x_grids is not None:
+    if plot_style.plot_pdp:
         iso_x_y0 = group_h * (nr - 1) + gaps["top"]
         fig.update_xaxes(domain=inter_domain_x, **iso_x_grids)
         fig.update_yaxes(
@@ -665,7 +675,6 @@ def _update_domains(fig, nc, nr, grids, plot_style):
             **iso_x_grids,
         )
 
-    if iso_y_grids is not None:
         iso_y_x0 = group_w * (nc - 1)
         fig.update_xaxes(
             domain=[iso_y_x0, iso_y_x0 + plot_sizes["iso_y_w"]], **iso_y_grids
@@ -681,7 +690,7 @@ def _update_domains(fig, nc, nr, grids, plot_style):
     return cb_xyz
 
 
-def _get_subplot_grids(i, plot_style):
+def _get_pdp_inter_grids(i, plot_style):
     grids = {"col": i % plot_style.ncols + 1, "row": i // plot_style.ncols + 1}
     inter_grids = copy.deepcopy(grids)
     iso_x_grids, iso_y_grids = None, None
@@ -714,7 +723,9 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
         pdp_y = copy.deepcopy(pdp_iso_obj_y.results[t].pdp)
         pdp_inter = copy.deepcopy(pdp_inter_obj.results[t].pdp)
 
-        grids, inter_grids, iso_x_grids, iso_y_grids = _get_subplot_grids(i, plot_style)
+        grids, inter_grids, iso_x_grids, iso_y_grids = _get_pdp_inter_grids(
+            i, plot_style
+        )
         nc, nr = grids["col"], grids["row"]
 
         pdp_values = pdp_inter
@@ -722,7 +733,7 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
             pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
         pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
 
-        cb_xyz = _update_domains(
+        cb_xyz = _update_pdp_inter_domains(
             fig, nc, nr, (iso_x_grids, iso_y_grids, inter_grids), plot_style
         )
         inter_trace = _pdp_inter_xy_plot_plotly(
@@ -735,7 +746,11 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
         )
         fig.add_trace(inter_trace, **inter_grids)
 
-        if iso_x_grids is not None:
+        _, xticklabels = _get_ticks_plotly(feat_names[0], plot_style, idx=0)
+        _, yticklabels = _get_ticks_plotly(feat_names[1], plot_style, idx=1)
+        feat_type_x, feat_type_y = pdp_inter_obj.feature_types
+        xlabel = f"<b>target_{t}</b><br>{feat_names[0]}"
+        if plot_style.plot_pdp:
             iso_x_trace = _pdp_iso_xy_plot_plotly(
                 pdp_x,
                 cmap,
@@ -745,7 +760,6 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
             )
             fig.add_trace(iso_x_trace, **iso_x_grids)
 
-        if iso_y_grids is not None:
             iso_y_trace = _pdp_iso_xy_plot_plotly(
                 pdp_y,
                 cmap,
@@ -755,12 +769,8 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
             )
             fig.add_trace(iso_y_trace, **iso_y_grids)
 
-        xlabel, xticklabels = _get_ticks_plotly(feat_names[0], plot_style, idx=0)
-        ylabel, yticklabels = _get_ticks_plotly(feat_names[1], plot_style, idx=1)
-        feat_type_x, feat_type_y = pdp_inter_obj.feature_types
-        if plot_style.plot_pdp:
             _set_xy_ticks_plotly(
-                feat_names[0], xticklabels, iso_x_grids, fig, xy=False, y=False
+                xlabel, xticklabels, iso_x_grids, fig, xy=False, y=False
             )
             _set_xy_ticks_plotly(
                 feat_names[1], yticklabels, iso_y_grids, fig, xy=False, y=True
@@ -775,7 +785,7 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
                 yticklabels = None
 
             _set_xy_ticks_plotly(
-                feat_names[0], xticklabels, inter_grids, fig, xy=True, y=False
+                xlabel, xticklabels, inter_grids, fig, xy=True, y=False
             )
             _set_xy_ticks_plotly(
                 feat_names[1], yticklabels, inter_grids, fig, xy=True, y=True
@@ -1007,7 +1017,8 @@ def _set_xy_ticks(feat_name, ticklabels, plot_style, axes, xy=False, y=False):
         axes.set_ylabel(feat_name, fontdict=fontdict)
     else:
         axes.set_xlabel(feat_name, fontdict=fontdict)
-    _axes_modify(axes, plot_style)
+        axes.xaxis.set_label_position("top")
+    _axes_modify(axes, plot_style, top=True)
     axes.tick_params(axis="both", which="minor", length=0)
     axes.grid(False)
 
@@ -1019,8 +1030,6 @@ def _set_xy_ticks(feat_name, ticklabels, plot_style, axes, xy=False, y=False):
         if not xy:
             axes.get_xaxis().set_visible(False)
     else:
-        if not plot_style.show_percentile and not xy:
-            axes.xaxis.set_label_position("top")
         axes.set_xticks(range(len(ticklabels)), ticklabels)
         if not xy:
             axes.get_yaxis().set_visible(False)
@@ -1029,13 +1038,13 @@ def _set_xy_ticks(feat_name, ticklabels, plot_style, axes, xy=False, y=False):
 def _set_xy_ticks_plotly(feat_name, ticklabels, grids, fig, xy=False, y=False):
     tick_params = dict(
         title_text=feat_name,
+        title_standoff=0,
     )
     if ticklabels is not None:
         tick_params.update(
             dict(
                 ticktext=ticklabels,
                 tickvals=np.arange(len(ticklabels)),
-                title=dict(standoff=0),
             )
         )
     tick_params.update(grids)

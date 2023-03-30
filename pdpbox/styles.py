@@ -67,6 +67,11 @@ def _prepare_plot_style(feat_name, target, plot_params, plot_type):
     return plot_style
 
 
+def _update_gaps(gaps, mul):
+    for k in gaps:
+        gaps[k] *= mul
+
+
 class plotStyle:
     def __init__(self, target, plot_params):
         if plot_params is None:
@@ -139,6 +144,14 @@ class plotStyle:
                 "font_size": 11,
                 "color": defaultColors.black,
             },
+        }
+
+        self.gaps = {
+            "top": 0.05,
+            "outer_x": 0.05,
+            "outer_y": 0.05,
+            "inner_x": 0.02,
+            "inner_y": 0.02,
         }
 
 
@@ -400,6 +413,55 @@ class PDPIsolatePlotStyle(plotStyle):
             "font_size": 10,
         }
 
+        self.subplot_ratio = {
+            "y": [7, 0.5],
+        }
+        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
+        self.gaps.update(
+            {
+                "top": 0.01,
+                "outer_x": 0.08,
+                "outer_y": 0.08,
+            }
+        )
+        update_style(self.gaps, plot_params.get("gaps", {}))
+        if self.engine == "matplotlib":
+            self.gaps.update(
+                {
+                    "top": 0.02,
+                    "outer_x": 0.2,
+                    "inner_y": 0.2,
+                    "outer_y": 0.2,
+                }
+            )
+
+        self.plot_sizes = {
+            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
+            "group_h": (
+                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
+            )
+            / self.nrows,
+            "dist_w": 0,
+            "dist_h": 0,
+        }
+        self.plot_sizes.update(
+            {
+                "line_w": self.plot_sizes["group_w"],
+                "line_h": self.plot_sizes["group_h"],
+            }
+        )
+        if self.plot_pts_dist:
+            unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
+                self.subplot_ratio["y"]
+            )
+            self.plot_sizes.update(
+                {
+                    "line_h": unit_h * self.subplot_ratio["y"][0],
+                    "dist_h": unit_h * self.subplot_ratio["y"][1],
+                    "dist_w": self.plot_sizes["line_w"],
+                }
+            )
+
 
 class PDPInteractPlotStyle(plotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type):
@@ -442,14 +504,16 @@ class PDPInteractPlotStyle(plotStyle):
             "y": [0.5, 7],
         }
         update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
-        self.gaps = {
-            "top": 0.05,
-            "outer_x": 0.15,
-            "outer_y": 0.08,
-            "inner_x": 0.02,
-            "inner_y": 0.02,
-        }
+        self.gaps.update(
+            {
+                "outer_x": 0.15,
+                "outer_y": 0.08,
+            }
+        )
         update_style(self.gaps, plot_params.get("gaps", {}))
+        if self.engine == "matplotlib":
+            _update_gaps(self.gaps, 2)
+
         self.plot_sizes = {
             "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
             "group_h": (

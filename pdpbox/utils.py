@@ -597,7 +597,7 @@ def _make_subplots(plot_style):
         nrows=2,
         ncols=1,
         wspace=0.0,
-        hspace=0.0,
+        hspace=plot_style.gaps["top"],
         height_ratios=[title_ratio, plot_style.figsize[1] - title_ratio],
     )
     title_axes = plt.subplot(outer_grid[0])
@@ -608,8 +608,8 @@ def _make_subplots(plot_style):
         plot_style.nrows,
         plot_style.ncols,
         subplot_spec=outer_grid[1],
-        wspace=0.3,
-        hspace=0.2,
+        wspace=plot_style.gaps["outer_x"],
+        hspace=plot_style.gaps["outer_y"],
     )
 
     return fig, inner_grid, title_axes
