@@ -408,8 +408,6 @@ class PDPInteractPlotStyle(plotStyle):
         feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
         grids1, grids2 = plot_params["n_grids"]
 
-        self.horizontal_spacing = plot_params.get("horizontal_spacing", 0.02)
-
         self.plot_type_to_title = {
             "title": {
                 "pdp_interact": f"PDP interact for features {feat1} and {feat2}",
@@ -438,3 +436,56 @@ class PDPInteractPlotStyle(plotStyle):
         update_style(self.isolate, plot_params.get("isolate", {}))
         self.plot_pdp = plot_params["plot_pdp"]
         self.x_quantile = plot_params["x_quantile"]
+
+        self.subplot_ratio = {
+            "x": [0.5, 7],
+            "y": [0.5, 7],
+        }
+        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
+        self.gaps = {
+            "top": 0.05,
+            "outer_x": 0.15,
+            "outer_y": 0.08,
+            "inner_x": 0.02,
+            "inner_y": 0.02,
+        }
+        update_style(self.gaps, plot_params.get("gaps", {}))
+        self.plot_sizes = {
+            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
+            "group_h": (
+                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
+            )
+            / self.nrows,
+            "iso_x_w": 0,
+            "iso_x_h": 0,
+            "iso_y_w": 0,
+            "iso_y_h": 0,
+        }
+        if self.plot_pdp:
+            unit_w = (self.plot_sizes["group_w"] - self.gaps["inner_x"]) / sum(
+                self.subplot_ratio["x"]
+            )
+            unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
+                self.subplot_ratio["y"]
+            )
+            self.plot_sizes.update(
+                {
+                    "inter_w": unit_w * self.subplot_ratio["x"][1],
+                    "inter_h": unit_h * self.subplot_ratio["y"][1],
+                    "iso_y_w": unit_w * self.subplot_ratio["x"][0],
+                    "iso_x_h": unit_h * self.subplot_ratio["y"][0],
+                }
+            )
+            self.plot_sizes.update(
+                {
+                    "iso_y_h": self.plot_sizes["inter_h"],
+                    "iso_x_w": self.plot_sizes["inter_w"],
+                }
+            )
+        else:
+            self.plot_sizes.update(
+                {
+                    "inter_w": self.plot_sizes["group_w"],
+                    "inter_h": self.plot_sizes["group_h"],
+                }
+            )

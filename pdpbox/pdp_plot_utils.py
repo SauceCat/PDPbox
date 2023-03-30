@@ -640,33 +640,71 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
     return fig, axes
 
 
+def _update_domains(fig, nc, nr, grids, plot_style):
+    plot_sizes = plot_style.plot_sizes
+    gaps = plot_style.gaps
+    group_w = plot_sizes["group_w"] + gaps["outer_x"]
+    group_h = plot_sizes["group_h"] + gaps["outer_y"]
+    iso_x_grids, iso_y_grids, inter_grids = grids
+
+    inter_x0, inter_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
+    if plot_style.plot_pdp:
+        inter_x0 += plot_sizes["iso_y_w"] + gaps["inner_x"]
+        inter_y0 += plot_sizes["iso_x_h"] + gaps["inner_y"]
+    inter_domain_x = [inter_x0, inter_x0 + plot_sizes["inter_w"]]
+    inter_domain_y = [1.0 - (inter_y0 + plot_sizes["inter_h"]), 1.0 - inter_y0]
+
+    fig.update_xaxes(domain=inter_domain_x, **inter_grids)
+    fig.update_yaxes(domain=inter_domain_y, **inter_grids)
+
+    if iso_x_grids is not None:
+        iso_x_y0 = group_h * (nr - 1) + gaps["top"]
+        fig.update_xaxes(domain=inter_domain_x, **iso_x_grids)
+        fig.update_yaxes(
+            domain=[1.0 - (iso_x_y0 + plot_sizes["iso_x_h"]), 1.0 - iso_x_y0],
+            **iso_x_grids,
+        )
+
+    if iso_y_grids is not None:
+        iso_y_x0 = group_w * (nc - 1)
+        fig.update_xaxes(
+            domain=[iso_y_x0, iso_y_x0 + plot_sizes["iso_y_w"]], **iso_y_grids
+        )
+        fig.update_yaxes(domain=inter_domain_y, **iso_y_grids)
+
+    cb_xyz = (
+        inter_domain_x[1] + plot_style.gaps["inner_x"] / 2,
+        inter_domain_y[0],
+        plot_style.plot_sizes["inter_h"],
+    )
+
+    return cb_xyz
+
+
+def _get_subplot_grids(i, plot_style):
+    grids = {"col": i % plot_style.ncols + 1, "row": i // plot_style.ncols + 1}
+    inter_grids = copy.deepcopy(grids)
+    iso_x_grids, iso_y_grids = None, None
+
+    if plot_style.plot_pdp:
+        inter_grids = {"col": grids["col"] * 2, "row": grids["row"] * 2}
+        iso_x_grids = {"col": grids["col"] * 2, "row": grids["row"] * 2 - 1}
+        iso_y_grids = {"col": grids["col"] * 2 - 1, "row": grids["row"] * 2}
+
+    return grids, inter_grids, iso_x_grids, iso_y_grids
+
+
 def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
     plot_style = _prepare_plot_style(feat_names, target, plot_params, "pdp_interact")
     nrows, ncols = plot_style.nrows, plot_style.ncols
     pdp_iso_obj_x, pdp_iso_obj_y = pdp_inter_obj.pdp_isolate_objs
     grids_x, grids_y = pdp_inter_obj.feature_grids
 
-    row_heights = []
-    column_widths = []
-    if plot_style.plot_pdp:
-        for i in range(nrows):
-            row_heights += [0.5, 7]
-        for i in range(ncols):
-            column_widths += [0.5, 7]
-    else:
-        row_heights = [7] * nrows
-        column_widths = [7] * ncols
-
-    row_heights = [v / sum(row_heights) for v in row_heights]
-    column_widths = [v / sum(column_widths) for v in column_widths]
-
     plot_args = {
-        "rows": len(row_heights),
-        "cols": len(column_widths),
-        "horizontal_spacing": plot_style.horizontal_spacing,
-        "vertical_spacing": plot_style.vertical_spacing,
-        "row_heights": row_heights,
-        "column_widths": column_widths,
+        "rows": nrows * (2 if plot_style.plot_pdp else 1),
+        "cols": ncols * (2 if plot_style.plot_pdp else 1),
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
 
@@ -676,28 +714,23 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
         pdp_y = copy.deepcopy(pdp_iso_obj_y.results[t].pdp)
         pdp_inter = copy.deepcopy(pdp_inter_obj.results[t].pdp)
 
-        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-        inter_grids = copy.deepcopy(grids)
-        iso_x_grids, iso_y_grids = None, None
+        grids, inter_grids, iso_x_grids, iso_y_grids = _get_subplot_grids(i, plot_style)
+        nc, nr = grids["col"], grids["row"]
+
         pdp_values = pdp_inter
         if plot_style.plot_pdp:
-            inter_grids = {"col": grids["col"] * 2, "row": grids["row"] * 2}
-            iso_x_grids = {"col": grids["col"] * 2, "row": grids["row"] * 2 - 1}
-            iso_y_grids = {"col": grids["col"] * 2 - 1, "row": grids["row"] * 2}
             pdp_values = np.concatenate((pdp_x, pdp_y, pdp_inter))
-
         pdp_min, pdp_max = np.min(pdp_values), np.max(pdp_values)
 
+        cb_xyz = _update_domains(
+            fig, nc, nr, (iso_x_grids, iso_y_grids, inter_grids), plot_style
+        )
         inter_trace = _pdp_inter_xy_plot_plotly(
             pdp_inter,
             pdp_inter_obj.feature_grids,
             cmap,
             plot_style,
-            (
-                np.sum(column_widths[: inter_grids["col"]]),
-                np.sum(row_heights[: inter_grids["row"]]),
-                1.0 / nrows,
-            ),
+            cb_xyz,
             (pdp_min, pdp_max),
         )
         fig.add_trace(inter_trace, **inter_grids)
@@ -726,8 +759,9 @@ def _pdp_inter_plot_plotly(pdp_inter_obj, feat_names, target, plot_params):
         ylabel, yticklabels = _get_ticks_plotly(feat_names[1], plot_style, idx=1)
         feat_type_x, feat_type_y = pdp_inter_obj.feature_types
         if plot_style.plot_pdp:
-            _set_xy_ticks_plotly(feat_names[0], [], inter_grids, fig, xy=True, y=False)
-            _set_xy_ticks_plotly("", xticklabels, iso_x_grids, fig, xy=False, y=False)
+            _set_xy_ticks_plotly(
+                feat_names[0], xticklabels, iso_x_grids, fig, xy=False, y=False
+            )
             _set_xy_ticks_plotly(
                 feat_names[1], yticklabels, iso_y_grids, fig, xy=False, y=True
             )
@@ -855,7 +889,7 @@ def _pdp_inter_xy_plot_plotly(
         colorscale=cmap,
         opacity=plot_style.interact["fill_alpha"],
         showscale=True,
-        colorbar=dict(len=cb_z, yanchor="top", y=cb_y, x=cb_x, xanchor="left"),
+        colorbar=dict(len=cb_z, yanchor="bottom", y=cb_y, x=cb_x, xanchor="left"),
         zmin=v_range[0],
         zmax=v_range[1],
         name="pdp interact",
@@ -998,17 +1032,21 @@ def _set_xy_ticks_plotly(feat_name, ticklabels, grids, fig, xy=False, y=False):
     )
     if ticklabels is not None:
         tick_params.update(
-            dict(ticktext=ticklabels, tickvals=np.arange(len(ticklabels)))
+            dict(
+                ticktext=ticklabels,
+                tickvals=np.arange(len(ticklabels)),
+                title=dict(standoff=0),
+            )
         )
     tick_params.update(grids)
 
     if y:
-        fig.update_yaxes(**tick_params)
         if not xy:
             fig.update_xaxes(showgrid=False, showticklabels=False, **grids)
+            # tick_params.update({"tickangle": -90})
+        fig.update_yaxes(**tick_params)
     else:
-        if not xy:
-            tick_params.update({"side": "top"})
+        tick_params.update({"side": "top"})
         fig.update_xaxes(**tick_params)
         if not xy:
             fig.update_yaxes(showgrid=False, showticklabels=False, **grids)
