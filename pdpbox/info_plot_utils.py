@@ -63,6 +63,11 @@ def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
             plot_style,
             line_color,
         )
+        inner_bar_axes.set_title(
+            t,
+            fontsize=plot_style.title["subplot_title"]["font_size"],
+            fontdict={"family": plot_style.font_family},
+        )
         bar_axes.append(inner_bar_axes)
         line_axes.append(inner_line_axes)
 
@@ -87,7 +92,11 @@ def _actual_plot(
     for i, p in enumerate(pred_cols):
         box_color = box_colors[i % len(box_colors)]
         inner = GridSpecFromSubplotSpec(
-            2, 1, subplot_spec=inner_grid[i], wspace=0, hspace=0.2
+            2,
+            1,
+            subplot_spec=inner_grid[i],
+            wspace=plot_style.gaps["inner_x"],
+            hspace=plot_style.gaps["inner_y"],
         )
         inner_box_axes = plt.subplot(inner[0])
         inner_bar_axes = plt.subplot(inner[1], sharex=inner_box_axes)
@@ -110,6 +119,12 @@ def _actual_plot(
         if i % plot_style.ncols != 0:
             inner_bar_axes.set_yticklabels([])
             inner_box_axes.set_yticklabels([])
+
+        inner_box_axes.set_title(
+            p,
+            fontsize=plot_style.title["subplot_title"]["font_size"],
+            fontdict={"family": plot_style.font_family},
+        )
 
         box_axes.append(inner_box_axes)
         bar_axes.append(inner_bar_axes)
@@ -136,7 +151,12 @@ def _info_plot_interact(
     cmaps = plot_style.marker["cmaps"]
     for i, t in enumerate(target):
         inner_grid = GridSpecFromSubplotSpec(
-            2, 1, subplot_spec=value_grid[i], height_ratios=[7, 1], hspace=0.3
+            2,
+            1,
+            subplot_spec=value_grid[i],
+            wspace=plot_style.gaps["inner_x"],
+            hspace=plot_style.gaps["inner_y"],
+            height_ratios=plot_style.subplot_ratio["y"],
         )
         inner_value_axes = plt.subplot(inner_grid[0])
         fig.add_subplot(inner_value_axes)
@@ -154,9 +174,15 @@ def _info_plot_interact(
         )
 
         # draw legend
-        inner_legend_grid = GridSpecFromSubplotSpec(
-            1, 2, subplot_spec=inner_grid[1], wspace=0, width_ratios=[1, 1]
-        )
+        if plot_style.ncols > 1:
+            inner_legend_grid = GridSpecFromSubplotSpec(
+                1, 2, subplot_spec=inner_grid[1], wspace=0, width_ratios=[1, 1]
+            )
+        else:
+            inner_legend_grid = GridSpecFromSubplotSpec(
+                1, 4, subplot_spec=inner_grid[1], wspace=0, width_ratios=[1, 1, 1, 1]
+            )
+
         inner_legend_axes = []
         for j in range(2):
             subplot = plt.subplot(inner_legend_grid[j])
@@ -178,6 +204,12 @@ def _info_plot_interact(
             plot_style.legend["circles"],
         )
         legend_axes.append(inner_legend_axes)
+
+        inner_value_axes.set_title(
+            t,
+            fontsize=plot_style.title["subplot_title"]["font_size"],
+            fontdict={"family": plot_style.font_family},
+        )
 
     axes = {
         "title_axes": title_axes,
@@ -210,6 +242,36 @@ def _draw_barplot_plotly(fig, bar_data, plot_style, row, col):
     )
 
 
+def _update_target_domains(fig, nr, nc, grids, title_text, plot_style):
+    plot_sizes = plot_style.plot_sizes
+    gaps = plot_style.gaps
+    group_w = plot_sizes["group_w"] + gaps["outer_x"]
+    group_h = plot_sizes["group_h"] + gaps["outer_y"]
+
+    x0, y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
+    domain_x = [x0, x0 + plot_sizes["group_w"]]
+    domain_y = [1.0 - (y0 + plot_sizes["group_h"]), 1.0 - y0]
+
+    fig.update_xaxes(domain=domain_x, **grids)
+    fig.update_yaxes(domain=domain_y, **grids)
+
+    title = go.layout.Annotation(
+        x=sum(domain_x) / 2,
+        y=domain_y[1] + gaps["inner_y"],
+        xref="paper",
+        yref="paper",
+        text=title_text,
+        showarrow=False,
+        xanchor="center",
+        yanchor="middle",
+        font=dict(
+            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
+        ),
+    )
+
+    return title
+
+
 def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
     """Internal call for target_plot, drawing with plotly"""
     plot_style = _prepare_plot_style(feat_name, target, plot_params, "target")
@@ -218,16 +280,19 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
         "rows": nrows,
         "cols": ncols,
         "specs": [[{"secondary_y": True} for _ in range(ncols)] for _ in range(nrows)],
-        "horizontal_spacing": plot_style.horizontal_spacing,
-        "vertical_spacing": plot_style.vertical_spacing,
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
+    subplot_titles = []
 
     line_colors = plot_style.line["colors"]
     for i, t in enumerate(target):
         line_color = line_colors[i % len(line_colors)]
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-
+        nr, nc = grids["row"], grids["col"]
+        title = _update_target_domains(fig, nr, nc, grids, t, plot_style)
+        subplot_titles.append(title)
         _draw_barplot_plotly(fig, bar_data, plot_style, **grids)
 
         line_data = (
@@ -254,7 +319,7 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
 
         title_text, ticktext = _get_ticks_plotly(feat_name, plot_style)
         fig.update_xaxes(
-            title_text=title_text,
+            title_text="",
             ticktext=ticktext,
             tickvals=bar_data["x"].values,
             **grids,
@@ -269,7 +334,46 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
             **grids,
         )
 
+    fig.update_layout(annotations=subplot_titles)
+
     return fig
+
+
+def _update_actual_domains(fig, nc, nr, grids, title_text, plot_style):
+    plot_sizes = plot_style.plot_sizes
+    gaps = plot_style.gaps
+    group_w = plot_sizes["group_w"] + gaps["outer_x"]
+    group_h = plot_sizes["group_h"] + gaps["outer_y"]
+    box_grids, bar_grids = grids
+
+    box_x0, box_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
+    box_domain_x = [box_x0, box_x0 + plot_sizes["box_w"]]
+    box_domain_y = [1.0 - (box_y0 + plot_sizes["box_h"]), 1.0 - box_y0]
+
+    fig.update_xaxes(domain=box_domain_x, **box_grids)
+    fig.update_yaxes(domain=box_domain_y, **box_grids)
+
+    bar_y0 = box_y0 + plot_sizes["box_h"] + gaps["inner_y"]
+    fig.update_xaxes(domain=box_domain_x, **bar_grids)
+    fig.update_yaxes(
+        domain=[1.0 - (bar_y0 + plot_sizes["bar_h"]), 1.0 - bar_y0],
+        **bar_grids,
+    )
+
+    title = go.layout.Annotation(
+        x=sum(box_domain_x) / 2,
+        y=box_domain_y[1],
+        xref="paper",
+        yref="paper",
+        text=title_text,
+        showarrow=False,
+        xanchor="center",
+        yanchor="bottom",
+        font=dict(
+            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
+        ),
+    )
+    return title
 
 
 def _actual_plot_plotly(
@@ -287,10 +391,11 @@ def _actual_plot_plotly(
         "rows": nrows * 2,
         "cols": ncols,
         "shared_xaxes": True,
-        "horizontal_spacing": plot_style.horizontal_spacing,
-        "vertical_spacing": plot_style.vertical_spacing,
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
+    subplot_titles = []
 
     box_colors = plot_style.box["colors"]
     for i, p in enumerate(pred_cols):
@@ -298,6 +403,11 @@ def _actual_plot_plotly(
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
         box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
         bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
+        nr, nc = grids["row"], grids["col"]
+        title = _update_actual_domains(
+            fig, nc, nr, (box_grids, bar_grids), p, plot_style
+        )
+        subplot_titles.append(title)
 
         box_data = plot_data[["x", p]].rename(columns={p: "y"})
         xs, ys = _prepare_box_data(box_data)
@@ -337,7 +447,7 @@ def _actual_plot_plotly(
         _draw_barplot_plotly(fig, bar_data, plot_style, **bar_grids)
         title_text, ticktext = _get_ticks_plotly(feat_name, plot_style)
         fig.update_xaxes(
-            title_text=title_text,
+            title_text="",
             ticktext=ticktext,
             tickvals=bar_data["x"].values,
             **bar_grids,
@@ -346,7 +456,56 @@ def _actual_plot_plotly(
         by = bar_data["fake_count"].values
         fig.update_yaxes(title_text="count", range=[0, np.max(by) * 1.15], **bar_grids)
 
+    fig.update_layout(annotations=subplot_titles)
+
     return fig
+
+
+def _update_info_inter_domains(fig, nc, nr, grids, title_text, plot_style):
+    plot_sizes = plot_style.plot_sizes
+    gaps = plot_style.gaps
+    group_w = plot_sizes["group_w"] + gaps["outer_x"]
+    group_h = plot_sizes["group_h"] + gaps["outer_y"]
+    scatter_grids, cb_grids, size_grids = grids
+
+    scatter_x0, scatter_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
+    scatter_domain_x = [scatter_x0, scatter_x0 + plot_sizes["scatter_w"]]
+    scatter_domain_y = [1.0 - (scatter_y0 + plot_sizes["scatter_h"]), 1.0 - scatter_y0]
+
+    fig.update_xaxes(domain=scatter_domain_x, **scatter_grids)
+    fig.update_yaxes(domain=scatter_domain_y, **scatter_grids)
+
+    cb_x0, cb_y0 = (
+        scatter_x0,
+        group_h * (nr - 1) + gaps["top"] + plot_sizes["scatter_h"] + gaps["inner_y"],
+    )
+    cb_domain_x = [cb_x0, cb_x0 + plot_sizes["cb_w"]]
+    cb_domain_y = [1.0 - (cb_y0 + plot_sizes["cb_h"]), 1.0 - cb_y0]
+
+    fig.update_xaxes(domain=cb_domain_x, **cb_grids)
+    fig.update_yaxes(domain=cb_domain_y, **cb_grids)
+
+    size_x0, size_y0 = cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"], cb_y0
+    size_domain_x = [size_x0, size_x0 + plot_sizes["size_w"]]
+    size_domain_y = [1.0 - (size_y0 + plot_sizes["size_h"]), 1.0 - size_y0]
+
+    fig.update_xaxes(domain=size_domain_x, **size_grids)
+    fig.update_yaxes(domain=size_domain_y, **size_grids)
+
+    title = go.layout.Annotation(
+        x=sum(scatter_domain_x) / 2,
+        y=scatter_domain_y[1],
+        xref="paper",
+        yref="paper",
+        text=title_text,
+        showarrow=False,
+        xanchor="center",
+        yanchor="bottom",
+        font=dict(
+            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
+        ),
+    )
+    return title, cb_domain_x, cb_domain_y
 
 
 def _info_plot_interact_plotly(
@@ -376,16 +535,27 @@ def _info_plot_interact_plotly(
     plot_args = {
         "rows": nrows * 2,
         "cols": ncols * 2,
-        "horizontal_spacing": plot_style.horizontal_spacing,
-        "vertical_spacing": plot_style.vertical_spacing,
-        "specs": specs,
-        "row_heights": row_heights,
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
+        # "specs": specs,
+        # "row_heights": row_heights,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
+    subplot_titles = []
+    cb_texts = []
 
     cmaps = plot_style.marker["cmaps"]
     for i, t in enumerate(target):
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
+        scatter_grids = {"row": grids["row"] * 2 - 1, "col": grids["col"] * 2 - 1}
+        cb_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2 - 1}
+        size_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2}
+        nc, nr = grids["col"], grids["row"]
+        title, cb_domain_x, cb_domain_y = _update_info_inter_domains(
+            fig, nc, nr, (scatter_grids, cb_grids, size_grids), t, plot_style
+        )
+        subplot_titles.append(title)
+
         cmap = cmaps[i % len(cmaps)]
         sx = plot_data["x1"].values
         sy = plot_data["x2"].values
@@ -395,10 +565,9 @@ def _info_plot_interact_plotly(
             for item in plot_data.to_dict("records")
         ]
         colors = getattr(px.colors.sequential, cmap)
-        line_color = colors[len(colors) // 2]
+        line_color = colors[len(colors) // 3]
         edge_color = colors[-1]
 
-        scatter_grids = {"row": grids["row"] * 2 - 1, "col": grids["col"] * 2 - 1}
         fig.add_trace(
             go.Scatter(
                 x=sx,
@@ -440,7 +609,6 @@ def _info_plot_interact_plotly(
             else:
                 fig.update_yaxes(**kwargs)
 
-        cb_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2 - 1}
         colorbar = go.Figure(
             data=go.Heatmap(z=[np.arange(1000)], showscale=False, colorscale=cmap),
         )
@@ -448,26 +616,31 @@ def _info_plot_interact_plotly(
         fig.update_yaxes(showticklabels=False, **cb_grids)
         fig.update_xaxes(showticklabels=False, **cb_grids)
 
-        fig.add_annotation(
-            x=0,
-            y=0,
-            text=str(round(np.min(sv), 3)),
-            showarrow=False,
-            xanchor="left",
-            font=dict(color=edge_color),
-            **cb_grids,
-        )
-        fig.add_annotation(
-            x=999,
-            y=0,
-            text=str(round(np.max(sv), 3)),
-            showarrow=False,
-            xanchor="right",
-            font=dict(color="#ffffff"),
-            **cb_grids,
-        )
+        cb_texts += [
+            go.layout.Annotation(
+                x=cb_domain_x[0],
+                y=np.mean(cb_domain_y),
+                xref="paper",
+                yref="paper",
+                text=str(round(np.min(sv), 3)),
+                showarrow=False,
+                xanchor="left",
+                yanchor="middle",
+                font=dict(color=edge_color),
+            ),
+            go.layout.Annotation(
+                x=cb_domain_x[1],
+                y=np.mean(cb_domain_y),
+                xref="paper",
+                yref="paper",
+                text=str(round(np.max(sv), 3)),
+                showarrow=False,
+                xanchor="right",
+                yanchor="middle",
+                font=dict(color="#ffffff"),
+            ),
+        ]
 
-        size_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2}
         fig.add_trace(
             go.Scatter(
                 x=[0.25, 0.75],
@@ -475,7 +648,7 @@ def _info_plot_interact_plotly(
                 text=[count_min, count_max],
                 mode="markers+lines+text",
                 marker=dict(
-                    size=[15, 25],
+                    size=[15, 30],
                     color=line_color,
                 ),
             ),
@@ -483,6 +656,8 @@ def _info_plot_interact_plotly(
         )
         fig.update_yaxes(visible=False, **size_grids)
         fig.update_xaxes(visible=False, range=[0, 1], **size_grids)
+
+    fig.update_layout(annotations=subplot_titles + cb_texts)
 
     return fig
 
@@ -614,7 +789,7 @@ def _draw_barplot(feat_name, data_axes, plot_style, single=True):
     num_xticks = len(plot_style.display_columns)
 
     # bar plot
-    axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
+    # axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
     axes.set_ylabel("count", fontdict=plot_style.label["fontdict"])
     axes.set_xticks(range(num_xticks))
     axes.set_xticklabels(

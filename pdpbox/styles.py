@@ -93,8 +93,6 @@ class plotStyle:
             figsize = plot_params["figsize"]
         self.display_columns = plot_params["display_columns"]
         self.percentile_columns = plot_params["percentile_columns"]
-        self.horizontal_spacing = plot_params.get("horizontal_spacing", 0.1)
-        self.vertical_spacing = plot_params.get("vertical_spacing", 0.05)
         self.show_percentile = plot_params["show_percentile"]
 
         nrows = plot_params.get("nrows", 1)
@@ -272,6 +270,53 @@ class infoPlotStyle(plotStyle):
             self.bar["width"] *= self.ncols
             self.box["width"] *= self.ncols
 
+        self.subplot_ratio = {
+            "y": [1, 1],
+        }
+        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
+
+        self.gaps.update(
+            {
+                "top": 0.02,
+                "outer_x": 0.15,
+            }
+        )
+        if self.show_percentile:
+            self.gaps["outer_y"] = 0.15
+        update_style(self.gaps, plot_params.get("gaps", {}))
+        if self.engine == "matplotlib":
+            self.gaps.update(
+                {
+                    "outer_x": 0.3,
+                    "outer_y": 0.2,
+                    "inner_y": 0.2,
+                }
+            )
+
+        self.plot_sizes = {
+            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
+            "group_h": (
+                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
+            )
+            / self.nrows,
+        }
+
+        self.plot_sizes.update(
+            {
+                "box_w": self.plot_sizes["group_w"],
+                "bar_w": self.plot_sizes["group_w"],
+            }
+        )
+        unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
+            self.subplot_ratio["y"]
+        )
+        self.plot_sizes.update(
+            {
+                "box_h": unit_h * self.subplot_ratio["y"][0],
+                "bar_h": unit_h * self.subplot_ratio["y"][1],
+            }
+        )
+
 
 class infoPlotInterStyle(plotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type="target"):
@@ -312,7 +357,6 @@ class infoPlotInterStyle(plotStyle):
 
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-        self.vertical_spacing = 0.1
         self.annotate = plot_params["annotate"]
 
         if self.engine == "matplotlib":
@@ -360,6 +404,65 @@ class infoPlotInterStyle(plotStyle):
                 "fontfamily": self.font_family,
             },
         }
+
+        self.subplot_ratio = {
+            "y": [7, 1],
+            "x": [1, 1],
+        }
+        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
+
+        self.gaps.update(
+            {
+                "top": 0.02,
+                "outer_x": 0.15,
+                "inner_y": 0.1,
+            }
+        )
+        if self.show_percentile:
+            self.gaps["outer_y"] = 0.15
+        update_style(self.gaps, plot_params.get("gaps", {}))
+        if self.engine == "matplotlib":
+            self.gaps.update(
+                {
+                    "outer_x": 0.3,
+                    "outer_y": 0.1,
+                    "inner_y": 0.2,
+                }
+            )
+
+        self.plot_sizes = {
+            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
+            "group_h": (
+                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
+            )
+            / self.nrows,
+        }
+
+        self.plot_sizes.update(
+            {
+                "scatter_w": self.plot_sizes["group_w"],
+            }
+        )
+        unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
+            self.subplot_ratio["y"]
+        )
+        unit_w = (self.plot_sizes["group_w"] - self.gaps["inner_x"]) / sum(
+            self.subplot_ratio["x"]
+        )
+        self.plot_sizes.update(
+            {
+                "scatter_h": unit_h * self.subplot_ratio["y"][0],
+                "cb_h": unit_h * self.subplot_ratio["y"][1],
+                "size_h": unit_h * self.subplot_ratio["y"][1],
+                "cb_w": unit_w * self.subplot_ratio["x"][0],
+                "size_w": unit_w * self.subplot_ratio["x"][1],
+            }
+        )
+        if self.ncols == 1:
+            for key in ["cb_w", "size_w"]:
+                self.plot_sizes[key] /= 2
+        if self.engine == "plotly":
+            self.plot_sizes["cb_h"] *= 0.7
 
 
 class PDPIsolatePlotStyle(plotStyle):
