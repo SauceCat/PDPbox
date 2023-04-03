@@ -1,14 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 class defaultColors:
-    cmap = "tab20"
-    cmap_seq = "Blues"
     cmap_inter = "viridis"
     cmaps = ["Blues", "Greens", "Oranges", "Reds", "Purples", "Greys"]
-    colors = px.colors.qualitative.Plotly
+    colors = ["tab20", px.colors.qualitative.Plotly]
     darkGreen = "#1A4E5D"
     lightGreen = "#5BB573"
     darkGray = "#424242"
@@ -22,11 +21,11 @@ class defaultColors:
 
 
 default_font_family = "Arial"
-default_figsize = (16, 9)
 default_figsize_plotly = (1200, 600)
+default_figsize = (16, 9)
 
 
-def update_style(curr, update):
+def _update_style(curr, update):
     for key in update:
         if isinstance(curr[key], dict):
             if isinstance(update[key], dict):
@@ -35,184 +34,196 @@ def update_style(curr, update):
             curr[key] = update[key]
 
 
-def _get_colors(colors, cmap, engine, is_seq=False):
+def _get_colors(colors, engine):
     if colors is None:
         if engine == "matplotlib":
-            colors = plt.get_cmap(cmap)(np.arange(20))
+            colors = plt.get_cmap(defaultColors.colors[0])(np.arange(20))
         else:
-            if is_seq:
-                colors = defaultColors.colors_seq
-            else:
-                colors = defaultColors.colors
+            colors = defaultColors.colors[1]
     return colors
 
 
-def _get_bold_text(text, engine):
-    if engine == "matplotlib":
-        bold_text = r"$\bf{" + text.replace("_", "\\_") + "}$"
+def _get_bold_text(text, engine, is_inter=False):
+    if is_inter:
+        if engine == "matplotlib":
+            bold_text = " and ".join([r"$\bf{" + v + "}$" for v in text]).replace(
+                "_", "\\_"
+            )
+        else:
+            bold_text = " and ".join([f"<b>{v}</b>" for v in text])
     else:
-        bold_text = f"<b>{text}</b>"
+        if engine == "matplotlib":
+            bold_text = r"$\bf{" + text.replace("_", "\\_") + "}$"
+        else:
+            bold_text = f"<b>{text}</b>"
+
     return bold_text
 
 
 def _prepare_plot_style(feat_name, target, plot_params, plot_type):
-    if plot_type in ["target", "actual"]:
-        plot_style = infoPlotStyle(feat_name, target, plot_params, plot_type)
-    elif plot_type in ["target_interact", "actual_interact"]:
-        plot_style = infoPlotInterStyle(feat_name, target, plot_params, plot_type)
-    elif plot_type in ["pdp_isolate"]:
-        plot_style = PDPIsolatePlotStyle(feat_name, target, plot_params, plot_type)
-    elif plot_type in ["pdp_interact"]:
-        plot_style = PDPInteractPlotStyle(feat_name, target, plot_params, plot_type)
+    plot_style_classes = {
+        "target": infoPlotStyle,
+        "actual": infoPlotStyle,
+        "target_interact": infoPlotInterStyle,
+        "actual_interact": infoPlotInterStyle,
+        "pdp_isolate": PDPIsolatePlotStyle,
+        "pdp_interact": PDPInteractPlotStyle,
+    }
+
+    args = (feat_name, target, plot_params, plot_type)
+    plot_style = plot_style_classes[plot_type](*args)
     return plot_style
 
 
-def _update_gaps(gaps, mul):
-    for k in gaps:
-        gaps[k] *= mul
+def _get_plot_sizes(subplot_ratio, gaps, ncols, nrows):
+    def calc_dim(outer_gap, inner_gap, length, ratios, is_y=False):
+        adjusted_gap = gaps["top"] if is_y else 0
+        group_dim = (1.0 - outer_gap * (length - 1) - adjusted_gap) / length
+        subplot_dim = group_dim + outer_gap if length > 1 else group_dim
+        unit_dim = (
+            (group_dim - inner_gap * (len(ratios) - 1)) / sum(ratios) if ratios else 0
+        )
+        return group_dim, subplot_dim, unit_dim
+
+    dimensions = ["group_w", "group_h", "subplot_w", "subplot_h", "unit_w", "unit_h"]
+    group_w, subplot_w, unit_w = calc_dim(
+        gaps["outer_x"], gaps["inner_x"], ncols, subplot_ratio.get("x")
+    )
+    group_h, subplot_h, unit_h = calc_dim(
+        gaps["outer_y"], gaps["inner_y"], nrows, subplot_ratio.get("y"), True
+    )
+
+    return dict(
+        zip(dimensions, [group_w, group_h, subplot_w, subplot_h, unit_w, unit_h])
+    )
+
+
+def _get_subplot_title(x, y, title_text):
+    return go.layout.Annotation(
+        x=x,
+        y=y,
+        xref="paper",
+        yref="paper",
+        text=f"<b>{title_text}</b>",
+        showarrow=False,
+        xanchor="center",
+        yanchor="middle",
+    )
 
 
 class plotStyle:
     def __init__(self, target, plot_params):
         if plot_params is None:
             plot_params = {}
+        self.plot_params = plot_params
 
-        self.dpi = plot_params["dpi"]
-        self.engine = plot_params["engine"]
-        self.fontdict_keys = {
-            "family": "family" if self.engine == "plotly" else "fontfamily",
-            "size": "size" if self.engine == "plotly" else "fontsize",
-        }
-        self.template = plot_params["template"]
-        self.font_family = plot_params.get("font_family", default_font_family)
-        if plot_params["figsize"] is None:
+        self.set_default_attributes()
+        self.set_figsize(target)
+        self.set_tick_style()
+        self.set_label_style()
+        self.set_title_style()
+
+    def set_default_attributes(self):
+        attributes = [
+            "dpi",
+            "engine",
+            "template",
+            "display_columns",
+            "percentile_columns",
+            "show_percentile",
+        ]
+        for attr in attributes:
+            setattr(self, attr, self.plot_params[attr])
+        self.font_family = self.plot_params.get("font_family", default_font_family)
+
+    def set_figsize(self, target):
+        if self.plot_params["figsize"] is None:
             figsize = (
-                default_figsize_plotly if self.engine == "plotly" else default_figsize
+                default_figsize
+                if self.engine == "matplotlib"
+                else default_figsize_plotly
             )
         else:
-            figsize = plot_params["figsize"]
-        self.display_columns = plot_params["display_columns"]
-        self.percentile_columns = plot_params["percentile_columns"]
-        self.show_percentile = plot_params["show_percentile"]
-
-        nrows = plot_params.get("nrows", 1)
-        ncols = plot_params.get("ncols", 1)
+            figsize = self.plot_params["figsize"]
+        nrows, ncols = 1, self.plot_params.get("ncols", 1)
         width, height = figsize
+
         if len(target) > 1:
-            nrows = int(np.ceil(len(target) * 1.0 / ncols))
             ncols = np.min([len(target), ncols])
+            nrows = int(np.ceil(len(target) * 1.0 / ncols))
             height = height * nrows
         else:
             ncols = 1
+
         self.figsize = (width, height)
         self.nrows, self.ncols = int(nrows), int(ncols)
 
+    def set_tick_style(self):
         self.tick = {
             "xticks_rotation": 0,
             "tick_params": {
                 "axis": "both",
                 "which": "major",
-                "labelsize": 8,
+                "labelsize": 9,
                 "labelcolor": defaultColors.darkGray,
                 "colors": defaultColors.lightGray,
             },
         }
-        update_style(self.tick, plot_params.get("tick", {}))
+        _update_style(self.tick, self.plot_params.get("tick", {}))
 
+    def set_label_style(self):
         self.label = {
             "fontdict": {
-                self.fontdict_keys["family"]: self.font_family,
-                self.fontdict_keys["size"]: 10,
+                "fontfamily": self.font_family,
+                "fontsize": 10,
             }
         }
-        update_style(self.label, plot_params.get("label", {}))
+        _update_style(self.label, self.plot_params.get("label", {}))
 
+    def set_title_style(self):
         self.title = {
             "title": {
-                "font_size": 15,
+                "fontsize": 13,
                 "color": defaultColors.black,
                 "text": "",
             },
             "subtitle": {
-                "font_size": 12,
+                "fontsize": 11,
                 "color": defaultColors.lightGray,
                 "text": "",
             },
             "subplot_title": {
-                "font_size": 11,
+                "fontsize": 11,
                 "color": defaultColors.black,
+                "fontweight": "bold",
             },
-        }
-
-        self.gaps = {
-            "top": 0.05,
-            "outer_x": 0.05,
-            "outer_y": 0.05,
-            "inner_x": 0.02,
-            "inner_y": 0.02,
         }
 
 
 class infoPlotStyle(plotStyle):
     def __init__(self, feat_name, target, plot_params, plot_type="target"):
-        """
-        Style configuration for info plots
-
-        Parameters
-        ----------
-        feat_name: string
-            name of the feature, not necessary a column name
-        plot_params: dict
-            detailed style configuration
-        plot_type: "target" or "actual"
-
-        Note
-        ----
-        plot_params configurable values:
-            figure:
-                - font_family
-                - nrows
-                - ncols
-            line:
-                - color
-                - colors: for multiple lines
-                - cmap: used when colors are not provided
-                - width
-                - fontdict: https://matplotlib.org/stable/api/text_api.html#matplotlib.text.Text
-            bar:
-                - width
-                - color
-                - fontdict: https://matplotlib.org/stable/api/text_api.html#matplotlib.text.Text
-            box:
-                - width
-                - line_width
-                - color
-                - colors: for multiple boxes
-                - cmap: used when colors are not provided
-            tick:
-                - xticks_rotation
-                - tick_params: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.tick_params.html#matplotlib.axes.Axes.tick_params
-            label:
-                - fontdict: https://matplotlib.org/stable/api/text_api.html#matplotlib.text.Text
-            title:
-                title:
-                    - font_size
-                    - color
-                    - text
-                subtitle:
-                    - font_size
-                    - color
-                    - text
-        """
-
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-        feat_name_bold = _get_bold_text(feat_name, self.engine)
 
+        self.set_plot_title(feat_name)
+        self.set_line_style()
+        self.set_bar_style()
+        self.set_box_style()
+        self.set_subplot_ratio()
+        self.set_gaps()
+
+        self.plot_sizes = _get_plot_sizes(
+            self.subplot_ratio, self.gaps, self.ncols, self.nrows
+        )
+        self.set_plot_sizes()
+        self.update_styles()
+
+    def set_plot_title(self, feat_name):
+        bold_text = _get_bold_text(feat_name, self.engine)
         self.plot_type_to_title = {
             "title": {
-                "target": "Target plot for feature " + feat_name_bold,
-                "actual": "Actual prediction plot for feature " + feat_name_bold,
+                "target": "Target plot for feature " + bold_text,
+                "actual": "Actual prediction plot for feature " + bold_text,
             },
             "subtitle": {
                 "target": "Average target value by different feature values.",
@@ -222,176 +233,158 @@ class infoPlotStyle(plotStyle):
 
         for key in ["title", "subtitle"]:
             self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
-        update_style(self.title, plot_params.get("title", {}))
 
+    def set_line_style(self):
         self.line = {
-            "color": defaultColors.darkGreen,
             "colors": None,
-            "cmap": defaultColors.cmap,
             "width": 1,
-            "fontdict": {
-                self.fontdict_keys["family"]: self.font_family,
-                self.fontdict_keys["size"]: 9,
-            },
+            "fontdict": self.label["fontdict"],
         }
-        update_style(self.line, plot_params.get("line", {}))
-        self.line["colors"] = _get_colors(
-            self.line["colors"], self.line["cmap"], self.engine, is_seq=False
-        )
+        _update_style(self.line, self.plot_params.get("line", {}))
+        self.line["colors"] = _get_colors(self.line["colors"], self.engine)
 
+    def set_bar_style(self):
         self.bar = {
             "width": None,
             "color": defaultColors.lightGreen,
-            "fontdict": {
-                self.fontdict_keys["family"]: self.font_family,
-                self.fontdict_keys["size"]: 9,
-            },
+            "fontdict": self.label["fontdict"],
         }
-        update_style(self.bar, plot_params.get("bar", {}))
+        _update_style(self.bar, self.plot_params.get("bar", {}))
         if self.bar["width"] is None:
             self.bar["width"] = np.min([0.4, 0.4 / (10.0 / len(self.display_columns))])
 
+    def set_box_style(self):
         self.box = {
-            "width": None,
+            "width": self.bar["width"],
             "line_width": 2,
-            "color": defaultColors.blue,
             "colors": None,
-            "cmap": defaultColors.cmap,
+            "fontdict": self.label["fontdict"],
         }
-        update_style(self.box, plot_params.get("box", {}))
+        _update_style(self.box, self.plot_params.get("box", {}))
         self.box["colors"] = _get_colors(
-            self.box["colors"], self.box["cmap"], self.engine, is_seq=False
+            self.box["colors"],
+            self.engine,
         )
 
-        if self.box["width"] is None:
-            self.box["width"] = self.bar["width"]
-
-        if plot_type in ["target", "actual"]:
-            self.bar["width"] *= self.ncols
-            self.box["width"] *= self.ncols
-
+    def set_subplot_ratio(self):
         self.subplot_ratio = {
             "y": [1, 1],
         }
-        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
 
-        self.gaps.update(
-            {
-                "top": 0.02,
-                "outer_x": 0.15,
-            }
-        )
-        if self.show_percentile:
-            self.gaps["outer_y"] = 0.15
-        update_style(self.gaps, plot_params.get("gaps", {}))
-        if self.engine == "matplotlib":
-            self.gaps.update(
-                {
-                    "outer_x": 0.3,
-                    "outer_y": 0.2,
-                    "inner_y": 0.2,
-                }
-            )
-
-        self.plot_sizes = {
-            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
-            "group_h": (
-                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
-            )
-            / self.nrows,
+    def set_gaps(self):
+        self.gaps = {
+            "top": 0.02,
+            "outer_x": 0.08 if self.plot_type == "actual" else 0.12,
+            "outer_y": 0.15 if self.show_percentile else 0.05,
+            "inner_x": 0.02,
+            "inner_y": 0.02,
         }
+        if self.engine == "matplotlib":
+            self.gaps = {
+                "top": 0.02,
+                "outer_x": 0.1 if self.plot_type == "actual" else 0.3,
+                "outer_y": 0.2,
+                "inner_x": 0.02,
+                "inner_y": 0.2,
+            }
+
+    def set_plot_sizes(self):
+        group_w = self.plot_sizes["group_w"]
+        group_h = self.plot_sizes["group_h"]
+        unit_h = self.plot_sizes["unit_h"]
+        y1, y2 = self.subplot_ratio["y"]
 
         self.plot_sizes.update(
             {
-                "box_w": self.plot_sizes["group_w"],
-                "bar_w": self.plot_sizes["group_w"],
+                "box_w": group_w,
+                "bar_w": group_w,
+                "box_h": unit_h * y1,
+                "bar_h": unit_h * y2 if self.plot_type == "actual" else group_h,
             }
         )
-        unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
-            self.subplot_ratio["y"]
+
+    def update_styles(self):
+        styles = [
+            ("title", self.title),
+            ("subplot_ratio", self.subplot_ratio),
+            ("gaps", self.gaps),
+        ]
+        for style_name, style_dict in styles:
+            _update_style(style_dict, self.plot_params.get(style_name, {}))
+
+    def update_plot_domains(self, fig, nr, nc, grids, title_text):
+        subplot_w, subplot_h = (
+            self.plot_sizes["subplot_w"],
+            self.plot_sizes["subplot_h"],
         )
-        self.plot_sizes.update(
-            {
-                "box_h": unit_h * self.subplot_ratio["y"][0],
-                "bar_h": unit_h * self.subplot_ratio["y"][1],
-            }
-        )
+        group_w, group_h = self.plot_sizes["group_w"], self.plot_sizes["group_h"]
+        x0, y0 = subplot_w * (nc - 1), subplot_h * (nr - 1) + self.gaps["top"]
+
+        common_domain_x = [x0, x0 + group_w]
+
+        if self.plot_type == "target":
+            box_grids, box_domain_y = None, None
+            bar_grids, bar_domain_y = grids, [1.0 - (y0 + group_h), 1.0 - y0]
+        else:
+            box_grids, bar_grids = grids
+            box_domain_y = [1.0 - (y0 + self.plot_sizes["box_h"]), 1.0 - y0]
+            bar_y0 = y0 + self.plot_sizes["box_h"] + self.gaps["inner_y"]
+            bar_domain_y = [1.0 - (bar_y0 + self.plot_sizes["bar_h"]), 1.0 - bar_y0]
+
+        fig.update_xaxes(domain=common_domain_x, **bar_grids)
+        fig.update_yaxes(domain=bar_domain_y, **bar_grids)
+
+        if box_grids is not None:
+            fig.update_xaxes(domain=common_domain_x, **box_grids)
+            fig.update_yaxes(domain=box_domain_y, **box_grids)
+
+        tx, ty = sum(common_domain_x) / 2, 1.0 - y0 + self.gaps["inner_y"]
+        return _get_subplot_title(tx, ty, title_text)
 
 
 class infoPlotInterStyle(plotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type="target"):
-        """
-        Style configuration for info interaction plots
-
-        Parameters
-        ----------
-        feat_names: list
-            name of the features, not necessary column names
-        plot_params: dict
-            detailed style configuration
-        plot_type: "target_interact" or "actual_interact"
-
-        Note
-        ----
-        plot_params configurable values:
-            figure:
-                - font_family
-                - nrows
-                - ncols
-
-            tick:
-                - xticks_rotation
-                - tick_params: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.tick_params.html#matplotlib.axes.Axes.tick_params
-            label:
-                - fontdict: https://matplotlib.org/stable/api/text_api.html#matplotlib.text.Text
-            title:
-                title:
-                    - font_size
-                    - color
-                    - text
-                subtitle:
-                    - font_size
-                    - color
-                    - text
-        """
-
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-        self.annotate = plot_params["annotate"]
+        self.annotate = self.plot_params["annotate"]
 
-        if self.engine == "matplotlib":
-            feat_name_bold = " & ".join(
-                [r"$\bf{" + v + "}$" for v in feat_names]
-            ).replace("_", "\\_")
-        else:
-            feat_name_bold = " & ".join([f"<b>{v}</b>" for v in feat_names])
+        self.set_plot_title(feat_names)
+        self.set_marker_style()
+        self.set_legend_style()
+        self.set_subplot_ratio()
+        self.set_gaps()
 
+        self.plot_sizes = _get_plot_sizes(
+            self.subplot_ratio, self.gaps, self.ncols, self.nrows
+        )
+        self.set_plot_sizes()
+        self.update_styles()
+
+    def set_plot_title(self, feat_names):
+        bold_text = _get_bold_text(feat_names, self.engine, is_inter=True)
         self.plot_type_to_title = {
             "title": {
-                "target_interact": "Target plot for features " + feat_name_bold,
-                "actual_interact": "Actual prediction plot for features "
-                + feat_name_bold,
+                "target_interact": "Target plot for features " + bold_text,
+                "actual_interact": "Actual prediction plot for features " + bold_text,
             },
             "subtitle": {
                 "target_interact": "Average target value by different feature value combinations.",
                 "actual_interact": "Medium value of actual prediction by different feature value combinations.",
             },
         }
-
         for key in ["title", "subtitle"]:
             self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
-        update_style(self.title, plot_params.get("title", {}))
 
+    def set_marker_style(self):
         self.marker = {
             "line_width": 1,
-            "cmap": defaultColors.cmap_seq,
             "cmaps": defaultColors.cmaps,
             "min_size": 50 if self.engine == "matplotlib" else 10,
             "max_size": 1500 if self.engine == "matplotlib" else 50,
             "fontsize": 10,
         }
-        update_style(self.marker, plot_params.get("marker", {}))
 
+    def set_legend_style(self):
         self.legend = {
             "colorbar": {
                 "height": "50%",
@@ -405,76 +398,98 @@ class infoPlotInterStyle(plotStyle):
             },
         }
 
-        self.subplot_ratio = {
-            "y": [7, 1],
-            "x": [1, 1],
-        }
-        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
+    def set_subplot_ratio(self):
+        self.subplot_ratio = {"y": [7, 1], "x": [1, 1]}
 
-        self.gaps.update(
-            {
-                "top": 0.02,
-                "outer_x": 0.15,
-                "inner_y": 0.1,
-            }
-        )
-        if self.show_percentile:
-            self.gaps["outer_y"] = 0.15
-        update_style(self.gaps, plot_params.get("gaps", {}))
+    def set_gaps(self):
+        self.gaps = {
+            "top": 0.02,
+            "outer_x": 0.15,
+            "outer_y": 0.15 if self.show_percentile else 0.05,
+            "inner_x": 0.02,
+            "inner_y": 0.1,
+        }
         if self.engine == "matplotlib":
-            self.gaps.update(
-                {
-                    "outer_x": 0.3,
-                    "outer_y": 0.1,
-                    "inner_y": 0.2,
-                }
-            )
+            self.gaps = {
+                "top": 0.02,
+                "outer_x": 0.3,
+                "outer_y": 0.1,
+                "inner_x": 0.02,
+                "inner_y": 0.2,
+            }
 
-        self.plot_sizes = {
-            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
-            "group_h": (
-                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
-            )
-            / self.nrows,
-        }
+    def set_plot_sizes(self):
+        group_w = self.plot_sizes["group_w"]
+        unit_h = self.plot_sizes["unit_h"]
+        unit_w = self.plot_sizes["unit_w"]
+        y1, y2 = self.subplot_ratio["y"]
+        x1, x2 = self.subplot_ratio["x"]
+        div = 2 if self.ncols == 1 else 1
 
         self.plot_sizes.update(
             {
-                "scatter_w": self.plot_sizes["group_w"],
+                "scatter_w": group_w,
+                "scatter_h": unit_h * y1,
+                "cb_h": unit_h * y2,
+                "size_h": unit_h * y2,
+                "cb_w": unit_w * x1 / div,
+                "size_w": unit_w * x2 / div,
             }
         )
-        unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
-            self.subplot_ratio["y"]
-        )
-        unit_w = (self.plot_sizes["group_w"] - self.gaps["inner_x"]) / sum(
-            self.subplot_ratio["x"]
-        )
-        self.plot_sizes.update(
-            {
-                "scatter_h": unit_h * self.subplot_ratio["y"][0],
-                "cb_h": unit_h * self.subplot_ratio["y"][1],
-                "size_h": unit_h * self.subplot_ratio["y"][1],
-                "cb_w": unit_w * self.subplot_ratio["x"][0],
-                "size_w": unit_w * self.subplot_ratio["x"][1],
-            }
-        )
-        if self.ncols == 1:
-            for key in ["cb_w", "size_w"]:
-                self.plot_sizes[key] /= 2
-        if self.engine == "plotly":
-            self.plot_sizes["cb_h"] *= 0.7
+
+    def update_styles(self):
+        styles = [
+            ("title", self.title),
+            ("marker", self.marker),
+            ("legend", self.legend),
+            ("subplot_ratio", self.subplot_ratio),
+            ("gaps", self.gaps),
+        ]
+        for style_name, style_dict in styles:
+            _update_style(style_dict, self.plot_params.get(style_name, {}))
 
 
 class PDPIsolatePlotStyle(plotStyle):
     def __init__(self, feat_name, target, plot_params, plot_type):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-        feat_name_bold = _get_bold_text(feat_name, self.engine)
 
-        n_grids = plot_params["n_grids"]
+        self.set_plot_attributes()
+        self.set_plot_title(feat_name)
+        self.set_line_style()
+        self.set_dist_style()
+        self.set_subplot_ratio()
+        self.set_gaps()
+
+        self.plot_sizes = _get_plot_sizes(
+            self.subplot_ratio, self.gaps, self.ncols, self.nrows
+        )
+        self.set_plot_sizes()
+        self.update_styles()
+
+    def set_plot_attributes(self):
+        attributes = [
+            "plot_lines",
+            "frac_to_plot",
+            "center",
+            "clustering",
+            "plot_pts_dist",
+            "x_quantile",
+        ]
+        for attr in attributes:
+            setattr(self, attr, self.plot_params[attr])
+
+        self.std_fill = self.plot_params.get("std_fill", True)
+        if self.plot_lines:
+            self.std_fill = False
+        self.pdp_hl = self.plot_params.get("pdp_hl", False)
+
+    def set_plot_title(self, feat_name):
+        bold_text = _get_bold_text(feat_name, self.engine)
+        n_grids = self.plot_params["n_grids"]
         self.plot_type_to_title = {
             "title": {
-                "pdp_isolate": "PDP for feature " + feat_name_bold,
+                "pdp_isolate": "PDP for feature " + bold_text,
             },
             "subtitle": {
                 "pdp_isolate": f"Number of unique grid points: {n_grids}",
@@ -483,96 +498,108 @@ class PDPIsolatePlotStyle(plotStyle):
 
         for key in ["title", "subtitle"]:
             self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
-        update_style(self.title, plot_params.get("title", {}))
 
-        self.plot_lines = plot_params["plot_lines"]
-        self.frac_to_plot = plot_params["frac_to_plot"]
-        self.center = plot_params["center"]
-        self.clustering = plot_params["clustering"]
-        self.std_fill = plot_params.get("std_fill", True)
-        if self.plot_lines:
-            self.std_fill = False
-        self.pdp_hl = plot_params.get("pdp_hl", False)
-
+    def set_line_style(self):
         self.line = {
             "hl_color": defaultColors.yellow,
             "zero_color": defaultColors.red,
             "cmaps": defaultColors.cmaps,
-            "width": 1,
-            "fontdict": {
-                self.fontdict_keys["family"]: self.font_family,
-                self.fontdict_keys["size"]: 9,
-            },
+            "width": 1 if self.engine == "matplotlib" else 1.5,
+            "fontdict": self.label["fontdict"],
             "fill_alpha": 0.8,
             "hl_alpha": 0.8,
-            "markersize": 3,
+            "markersize": 3 if self.engine == "matplotlib" else 5,
         }
-        update_style(self.line, plot_params.get("line", {}))
-        self.plot_pts_dist = plot_params["plot_pts_dist"]
-        self.x_quantile = plot_params["x_quantile"]
+
+    def set_dist_style(self):
         self.dist = {
             "markersize": 20,
             "fill_alpha": 0.8,
             "font_size": 10,
         }
 
+    def set_subplot_ratio(self):
         self.subplot_ratio = {
             "y": [7, 0.5],
         }
-        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
-        self.gaps.update(
+
+    def set_gaps(self):
+        self.gaps = {
+            "top": 0.01,
+            "outer_x": 0.04,
+            "outer_y": 0.08,
+            "inner_x": 0.02,
+            "inner_y": 0.05,
+        }
+        if self.engine == "matplotlib":
+            self.gaps = {
+                "top": 0.02,
+                "outer_x": 0.2,
+                "outer_y": 0.2,
+                "inner_x": 0.02,
+                "inner_y": 0.3,
+            }
+
+    def set_plot_sizes(self):
+        group_w = self.plot_sizes["group_w"]
+        group_h = self.plot_sizes["group_h"]
+        unit_h = self.plot_sizes["unit_h"]
+
+        self.plot_sizes.update(
             {
-                "top": 0.01,
-                "outer_x": 0.08,
-                "outer_y": 0.08,
+                "line_w": group_w,
+                "line_h": group_h,
             }
         )
-        update_style(self.gaps, plot_params.get("gaps", {}))
-        if self.engine == "matplotlib":
-            self.gaps.update(
+
+        if self.plot_pts_dist:
+            y1, y2 = self.subplot_ratio["y"]
+
+            self.plot_sizes.update(
                 {
-                    "top": 0.02,
-                    "outer_x": 0.2,
-                    "inner_y": 0.2,
-                    "outer_y": 0.2,
+                    "line_h": unit_h * y1,
+                    "dist_h": unit_h * y2,
+                    "dist_w": group_w,
                 }
             )
 
-        self.plot_sizes = {
-            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
-            "group_h": (
-                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
-            )
-            / self.nrows,
-            "dist_w": 0,
-            "dist_h": 0,
-        }
-        self.plot_sizes.update(
-            {
-                "line_w": self.plot_sizes["group_w"],
-                "line_h": self.plot_sizes["group_h"],
-            }
-        )
-        if self.plot_pts_dist:
-            unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
-                self.subplot_ratio["y"]
-            )
-            self.plot_sizes.update(
-                {
-                    "line_h": unit_h * self.subplot_ratio["y"][0],
-                    "dist_h": unit_h * self.subplot_ratio["y"][1],
-                    "dist_w": self.plot_sizes["line_w"],
-                }
-            )
+    def update_styles(self):
+        styles = [
+            ("title", self.title),
+            ("line", self.line),
+            ("dist", self.dist),
+            ("subplot_ratio", self.subplot_ratio),
+            ("gaps", self.gaps),
+        ]
+        for style_name, style_dict in styles:
+            _update_style(style_dict, self.plot_params.get(style_name, {}))
 
 
 class PDPInteractPlotStyle(plotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
-        feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
-        grids1, grids2 = plot_params["n_grids"]
 
+        self.set_plot_attributes()
+        self.set_plot_title(feat_names)
+        self.set_interact_style()
+        self.set_isolate_style()
+        self.set_subplot_ratio()
+        self.set_gaps()
+
+        self.plot_sizes = _get_plot_sizes(
+            self.subplot_ratio, self.gaps, self.ncols, self.nrows
+        )
+        self.set_plot_sizes()
+        self.update_styles()
+
+    def set_plot_attributes(self):
+        self.plot_pdp = self.plot_params["plot_pdp"]
+        self.x_quantile = self.plot_params["x_quantile"]
+
+    def set_plot_title(self, feat_names):
+        feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
+        grids1, grids2 = self.plot_params["n_grids"]
         self.plot_type_to_title = {
             "title": {
                 "pdp_interact": f"PDP interact for features {feat1} and {feat2}",
@@ -584,75 +611,79 @@ class PDPInteractPlotStyle(plotStyle):
 
         for key in ["title", "subtitle"]:
             self.title[key]["text"] = self.plot_type_to_title[key][self.plot_type]
-        update_style(self.title, plot_params.get("title", {}))
 
+    def set_interact_style(self):
         self.interact = {
             "cmap": defaultColors.cmap_inter,
             "fill_alpha": 0.8,
-            "type": plot_params["plot_type"],
+            "type": self.plot_params["plot_type"],
             "font_size": 10,
         }
-        update_style(self.interact, plot_params.get("interact", {}))
 
+    def set_isolate_style(self):
         self.isolate = {
             "fill_alpha": 0.8,
             "font_size": 10,
         }
-        update_style(self.isolate, plot_params.get("isolate", {}))
-        self.plot_pdp = plot_params["plot_pdp"]
-        self.x_quantile = plot_params["x_quantile"]
 
+    def set_subplot_ratio(self):
         self.subplot_ratio = {
             "x": [0.5, 7],
             "y": [0.5, 7],
         }
-        update_style(self.subplot_ratio, plot_params.get("subplot_ratio", {}))
-        self.gaps.update(
-            {
-                "outer_x": 0.15,
-                "outer_y": 0.08,
-            }
-        )
-        update_style(self.gaps, plot_params.get("gaps", {}))
-        if self.engine == "matplotlib":
-            _update_gaps(self.gaps, 2)
 
-        self.plot_sizes = {
-            "group_w": (1.0 - self.gaps["outer_x"] * (self.ncols - 1)) / self.ncols,
-            "group_h": (
-                1.0 - self.gaps["top"] - self.gaps["outer_y"] * (self.nrows - 1)
-            )
-            / self.nrows,
-            "iso_x_w": 0,
-            "iso_x_h": 0,
-            "iso_y_w": 0,
-            "iso_y_h": 0,
+    def set_gaps(self):
+        self.gaps = {
+            "top": 0.05,
+            "outer_x": 0.15,
+            "outer_y": 0.08,
+            "inner_x": 0.02,
+            "inner_y": 0.05 if self.show_percentile else 0.02,
         }
+        if self.engine == "matplotlib":
+            self.gaps = {
+                "top": 0.05,
+                "outer_x": 0.3,
+                "outer_y": 0.15,
+                "inner_x": 0.15 if self.show_percentile else 0.04,
+                "inner_y": 0.2 if self.show_percentile else 0.04,
+            }
+
+    def set_plot_sizes(self):
+        unit_w = self.plot_sizes["unit_w"]
+        unit_h = self.plot_sizes["unit_h"]
+        x1, x2 = self.subplot_ratio["x"]
+        y1, y2 = self.subplot_ratio["y"]
+
         if self.plot_pdp:
-            unit_w = (self.plot_sizes["group_w"] - self.gaps["inner_x"]) / sum(
-                self.subplot_ratio["x"]
-            )
-            unit_h = (self.plot_sizes["group_h"] - self.gaps["inner_y"]) / sum(
-                self.subplot_ratio["y"]
-            )
             self.plot_sizes.update(
                 {
-                    "inter_w": unit_w * self.subplot_ratio["x"][1],
-                    "inter_h": unit_h * self.subplot_ratio["y"][1],
-                    "iso_y_w": unit_w * self.subplot_ratio["x"][0],
-                    "iso_x_h": unit_h * self.subplot_ratio["y"][0],
-                }
-            )
-            self.plot_sizes.update(
-                {
-                    "iso_y_h": self.plot_sizes["inter_h"],
-                    "iso_x_w": self.plot_sizes["inter_w"],
+                    "inter_w": unit_w * x2,
+                    "inter_h": unit_h * y2,
+                    "iso_y_w": unit_w * x1,
+                    "iso_y_h": unit_h * y2,
+                    "iso_x_w": unit_w * x2,
+                    "iso_x_h": unit_h * y1,
                 }
             )
         else:
+            group_w = self.plot_sizes["group_w"]
+            group_h = self.plot_sizes["group_h"]
+
             self.plot_sizes.update(
                 {
-                    "inter_w": self.plot_sizes["group_w"],
-                    "inter_h": self.plot_sizes["group_h"],
+                    "inter_w": group_w,
+                    "inter_h": group_h,
                 }
             )
+
+    def update_styles(self):
+        styles = [
+            ("title", self.title),
+            ("interact", self.interact),
+            ("isolate", self.isolate),
+            ("subplot_ratio", self.subplot_ratio),
+            ("gaps", self.gaps),
+        ]
+        for style_name, style_dict in styles:
+            _update_style(style_dict, self.plot_params.get(style_name, {}))

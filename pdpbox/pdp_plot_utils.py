@@ -120,8 +120,7 @@ def _pdp_plot(pdp_isolate_obj, feat_name, target, plot_params):
 
         inner_line_axes.set_title(
             f"class_{t}",
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
+            **plot_style.title["subplot_title"],
         )
 
         if len(plot_style.percentile_columns) > 0:
@@ -145,6 +144,8 @@ def _update_pdp_domains(fig, nc, nr, grids, title_text, plot_style):
     line_x0, line_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
     line_domain_x = [line_x0, line_x0 + plot_sizes["line_w"]]
     line_domain_y = [1.0 - (line_y0 + plot_sizes["line_h"]), 1.0 - line_y0]
+    line_domain_x = [np.clip(v, 0, 1) for v in line_domain_x]
+    line_domain_y = [np.clip(v, 0, 1) for v in line_domain_y]
 
     fig.update_xaxes(domain=line_domain_x, **line_grids)
     fig.update_yaxes(domain=line_domain_y, **line_grids)
@@ -152,8 +153,10 @@ def _update_pdp_domains(fig, nc, nr, grids, title_text, plot_style):
     if plot_style.plot_pts_dist:
         dist_y0 = line_y0 + plot_sizes["line_h"] + gaps["inner_y"]
         fig.update_xaxes(domain=line_domain_x, **dist_grids)
+        dist_domain_y = [1.0 - (dist_y0 + plot_sizes["dist_h"]), 1.0 - dist_y0]
+        dist_domain_y = [np.clip(v, 0, 1) for v in dist_domain_y]
         fig.update_yaxes(
-            domain=[1.0 - (dist_y0 + plot_sizes["dist_h"]), 1.0 - dist_y0],
+            domain=dist_domain_y,
             **dist_grids,
         )
 
@@ -582,12 +585,11 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
         boundaries = [
             round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
         ]
-        xlabel = r"$\bf{" + "target\\_{}".format(t) + "}$" + "\n" + feat_names[0]
         if plot_style.plot_pdp:
             _pdp_iso_xy_plot(pdp_x, axes=iso_x_axes, y=False, **iso_plot_params)
             fig.add_subplot(iso_x_axes)
             _set_xy_ticks(
-                xlabel,
+                feat_names[0],
                 plot_style.display_columns[0],
                 plot_style,
                 iso_x_axes,
@@ -610,9 +612,14 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
             inter_axes.grid(False)
             inter_axes.get_xaxis().set_visible(False)
             inter_axes.get_yaxis().set_visible(False)
+
+            iso_x_axes.set_title(
+                f"target_{t}",
+                **plot_style.title["subplot_title"],
+            )
         else:
             _set_xy_ticks(
-                xlabel,
+                feat_names[0],
                 plot_style.display_columns[0],
                 plot_style,
                 inter_axes,
@@ -628,13 +635,21 @@ def _pdp_inter_plot(pdp_inter_obj, feat_names, target, plot_params):
                 y=True,
             )
             _display_percentile_inter(plot_style, inter_axes, x=True, y=True)
+            inter_axes.set_title(f"target_{t}", **plot_style.title["subplot_title"])
 
         cax = inset_axes(
             inter_axes,
             width="100%",
             height="100%",
             loc="right",
-            bbox_to_anchor=(1.05, 0.0, 0.05, 1),
+            bbox_to_anchor=(
+                1.08
+                if plot_style.show_percentile and not plot_style.plot_pdp
+                else 1.02,
+                0.0,
+                0.03,
+                1,
+            ),
             bbox_transform=inter_axes.transAxes,
             borderpad=0,
         )
@@ -663,6 +678,8 @@ def _update_pdp_inter_domains(fig, nc, nr, grids, plot_style):
         inter_y0 += plot_sizes["iso_x_h"] + gaps["inner_y"]
     inter_domain_x = [inter_x0, inter_x0 + plot_sizes["inter_w"]]
     inter_domain_y = [1.0 - (inter_y0 + plot_sizes["inter_h"]), 1.0 - inter_y0]
+    inter_domain_x = [np.clip(v, 0, 1) for v in inter_domain_x]
+    inter_domain_y = [np.clip(v, 0, 1) for v in inter_domain_y]
 
     fig.update_xaxes(domain=inter_domain_x, **inter_grids)
     fig.update_yaxes(domain=inter_domain_y, **inter_grids)
@@ -670,15 +687,17 @@ def _update_pdp_inter_domains(fig, nc, nr, grids, plot_style):
     if plot_style.plot_pdp:
         iso_x_y0 = group_h * (nr - 1) + gaps["top"]
         fig.update_xaxes(domain=inter_domain_x, **iso_x_grids)
+        iso_x_domain_y = [1.0 - (iso_x_y0 + plot_sizes["iso_x_h"]), 1.0 - iso_x_y0]
+        iso_x_domain_y = [np.clip(v, 0, 1) for v in iso_x_domain_y]
         fig.update_yaxes(
-            domain=[1.0 - (iso_x_y0 + plot_sizes["iso_x_h"]), 1.0 - iso_x_y0],
+            domain=iso_x_domain_y,
             **iso_x_grids,
         )
 
         iso_y_x0 = group_w * (nc - 1)
-        fig.update_xaxes(
-            domain=[iso_y_x0, iso_y_x0 + plot_sizes["iso_y_w"]], **iso_y_grids
-        )
+        iso_y_domain_x = [iso_y_x0, iso_y_x0 + plot_sizes["iso_y_w"]]
+        iso_y_domain_x = [np.clip(v, 0, 1) for v in iso_y_domain_x]
+        fig.update_xaxes(domain=iso_y_domain_x, **iso_y_grids)
         fig.update_yaxes(domain=inter_domain_y, **iso_y_grids)
 
     cb_xyz = (
@@ -1008,16 +1027,12 @@ def _pdp_iso_xy_plot_plotly(
 
 
 def _set_xy_ticks(feat_name, ticklabels, plot_style, axes, xy=False, y=False):
-    fontdict = {
-        "family": plot_style.font_family,
-        "fontsize": plot_style.title["subplot_title"]["font_size"],
-    }
-
     if y:
-        axes.set_ylabel(feat_name, fontdict=fontdict)
+        axes.set_ylabel(feat_name, fontdict=plot_style.label["fontdict"])
     else:
-        axes.set_xlabel(feat_name, fontdict=fontdict)
-        axes.xaxis.set_label_position("top")
+        axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
+        if not plot_style.show_percentile:
+            axes.xaxis.set_label_position("top")
     _axes_modify(axes, plot_style, top=True)
     axes.tick_params(axis="both", which="minor", length=0)
     axes.grid(False)

@@ -65,8 +65,7 @@ def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
         )
         inner_bar_axes.set_title(
             t,
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
+            **plot_style.title["subplot_title"],
         )
         bar_axes.append(inner_bar_axes)
         line_axes.append(inner_line_axes)
@@ -122,8 +121,7 @@ def _actual_plot(
 
         inner_box_axes.set_title(
             p,
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
+            **plot_style.title["subplot_title"],
         )
 
         box_axes.append(inner_box_axes)
@@ -205,11 +203,7 @@ def _info_plot_interact(
         )
         legend_axes.append(inner_legend_axes)
 
-        inner_value_axes.set_title(
-            t,
-            fontsize=plot_style.title["subplot_title"]["font_size"],
-            fontdict={"family": plot_style.font_family},
-        )
+        inner_value_axes.set_title(t, **plot_style.title["subplot_title"])
 
     axes = {
         "title_axes": title_axes,
@@ -242,36 +236,6 @@ def _draw_barplot_plotly(fig, bar_data, plot_style, row, col):
     )
 
 
-def _update_target_domains(fig, nr, nc, grids, title_text, plot_style):
-    plot_sizes = plot_style.plot_sizes
-    gaps = plot_style.gaps
-    group_w = plot_sizes["group_w"] + gaps["outer_x"]
-    group_h = plot_sizes["group_h"] + gaps["outer_y"]
-
-    x0, y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
-    domain_x = [x0, x0 + plot_sizes["group_w"]]
-    domain_y = [1.0 - (y0 + plot_sizes["group_h"]), 1.0 - y0]
-
-    fig.update_xaxes(domain=domain_x, **grids)
-    fig.update_yaxes(domain=domain_y, **grids)
-
-    title = go.layout.Annotation(
-        x=sum(domain_x) / 2,
-        y=domain_y[1] + gaps["inner_y"],
-        xref="paper",
-        yref="paper",
-        text=title_text,
-        showarrow=False,
-        xanchor="center",
-        yanchor="middle",
-        font=dict(
-            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
-        ),
-    )
-
-    return title
-
-
 def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
     """Internal call for target_plot, drawing with plotly"""
     plot_style = _prepare_plot_style(feat_name, target, plot_params, "target")
@@ -291,7 +255,7 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
         line_color = line_colors[i % len(line_colors)]
         grids = {"col": i % ncols + 1, "row": i // ncols + 1}
         nr, nc = grids["row"], grids["col"]
-        title = _update_target_domains(fig, nr, nc, grids, t, plot_style)
+        title = plot_style.update_plot_domains(fig, nr, nc, grids, t)
         subplot_titles.append(title)
         _draw_barplot_plotly(fig, bar_data, plot_style, **grids)
 
@@ -339,43 +303,6 @@ def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
     return fig
 
 
-def _update_actual_domains(fig, nc, nr, grids, title_text, plot_style):
-    plot_sizes = plot_style.plot_sizes
-    gaps = plot_style.gaps
-    group_w = plot_sizes["group_w"] + gaps["outer_x"]
-    group_h = plot_sizes["group_h"] + gaps["outer_y"]
-    box_grids, bar_grids = grids
-
-    box_x0, box_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
-    box_domain_x = [box_x0, box_x0 + plot_sizes["box_w"]]
-    box_domain_y = [1.0 - (box_y0 + plot_sizes["box_h"]), 1.0 - box_y0]
-
-    fig.update_xaxes(domain=box_domain_x, **box_grids)
-    fig.update_yaxes(domain=box_domain_y, **box_grids)
-
-    bar_y0 = box_y0 + plot_sizes["box_h"] + gaps["inner_y"]
-    fig.update_xaxes(domain=box_domain_x, **bar_grids)
-    fig.update_yaxes(
-        domain=[1.0 - (bar_y0 + plot_sizes["bar_h"]), 1.0 - bar_y0],
-        **bar_grids,
-    )
-
-    title = go.layout.Annotation(
-        x=sum(box_domain_x) / 2,
-        y=box_domain_y[1],
-        xref="paper",
-        yref="paper",
-        text=title_text,
-        showarrow=False,
-        xanchor="center",
-        yanchor="bottom",
-        font=dict(
-            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
-        ),
-    )
-    return title
-
-
 def _actual_plot_plotly(
     feat_name,
     pred_cols,
@@ -404,9 +331,7 @@ def _actual_plot_plotly(
         box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
         bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
         nr, nc = grids["row"], grids["col"]
-        title = _update_actual_domains(
-            fig, nc, nr, (box_grids, bar_grids), p, plot_style
-        )
+        title = plot_style.update_plot_domains(fig, nr, nc, (box_grids, bar_grids), p)
         subplot_titles.append(title)
 
         box_data = plot_data[["x", p]].rename(columns={p: "y"})
@@ -471,23 +396,36 @@ def _update_info_inter_domains(fig, nc, nr, grids, title_text, plot_style):
     scatter_x0, scatter_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
     scatter_domain_x = [scatter_x0, scatter_x0 + plot_sizes["scatter_w"]]
     scatter_domain_y = [1.0 - (scatter_y0 + plot_sizes["scatter_h"]), 1.0 - scatter_y0]
+    scatter_domain_x = [np.clip(v, 0, 1) for v in scatter_domain_x]
+    scatter_domain_y = [np.clip(v, 0, 1) for v in scatter_domain_y]
 
     fig.update_xaxes(domain=scatter_domain_x, **scatter_grids)
     fig.update_yaxes(domain=scatter_domain_y, **scatter_grids)
 
     cb_x0, cb_y0 = (
         scatter_x0,
-        group_h * (nr - 1) + gaps["top"] + plot_sizes["scatter_h"] + gaps["inner_y"],
+        group_h * (nr - 1)
+        + gaps["top"]
+        + plot_sizes["scatter_h"]
+        + gaps["inner_y"]
+        + plot_sizes["cb_h"] * 0.25,
     )
     cb_domain_x = [cb_x0, cb_x0 + plot_sizes["cb_w"]]
-    cb_domain_y = [1.0 - (cb_y0 + plot_sizes["cb_h"]), 1.0 - cb_y0]
+    cb_domain_y = [1.0 - (cb_y0 + plot_sizes["cb_h"] * 0.5), 1.0 - cb_y0]
+    cb_domain_x = [np.clip(v, 0, 1) for v in cb_domain_x]
+    cb_domain_y = [np.clip(v, 0, 1) for v in cb_domain_y]
 
     fig.update_xaxes(domain=cb_domain_x, **cb_grids)
     fig.update_yaxes(domain=cb_domain_y, **cb_grids)
 
-    size_x0, size_y0 = cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"], cb_y0
+    size_x0, size_y0 = (
+        cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"],
+        cb_y0 - plot_sizes["cb_h"] * 0.25,
+    )
     size_domain_x = [size_x0, size_x0 + plot_sizes["size_w"]]
     size_domain_y = [1.0 - (size_y0 + plot_sizes["size_h"]), 1.0 - size_y0]
+    size_domain_x = [np.clip(v, 0, 1) for v in size_domain_x]
+    size_domain_y = [np.clip(v, 0, 1) for v in size_domain_y]
 
     fig.update_xaxes(domain=size_domain_x, **size_grids)
     fig.update_yaxes(domain=size_domain_y, **size_grids)
@@ -497,13 +435,13 @@ def _update_info_inter_domains(fig, nc, nr, grids, title_text, plot_style):
         y=scatter_domain_y[1],
         xref="paper",
         yref="paper",
-        text=title_text,
+        text=f"<b>{title_text}</b>",
         showarrow=False,
         xanchor="center",
         yanchor="bottom",
-        font=dict(
-            size=plot_style.title["title"]["font_size"], family=plot_style.font_family
-        ),
+        # font=dict(
+        #     size=plot_style.title["title"]["font_size"], family=plot_style.font_family
+        # ),
     )
     return title, cb_domain_x, cb_domain_y
 
@@ -865,12 +803,9 @@ def _prepare_box_data(box_data):
     return xs, ys
 
 
-def _draw_boxplot(box_data, box_line_data, box_axes, plot_style, box_color=None):
+def _draw_boxplot(box_data, box_line_data, box_axes, plot_style, box_color):
     """Draw box plot"""
     xs, ys = _prepare_box_data(box_data)
-    if box_color is None:
-        box_color = plot_style.box["color"]
-
     boxprops = dict(linewidth=plot_style.box["line_width"], color=box_color)
     medianprops = dict(linewidth=0)
     whiskerprops = copy.deepcopy(boxprops)
@@ -904,9 +839,9 @@ def _draw_boxplot(box_data, box_line_data, box_axes, plot_style, box_color=None)
             "%.3f" % box_line_data.loc[idx, "y"],
             ha="center",
             va="top",
-            size=10,
             bbox=bbox_props,
             color=box_color,
+            **plot_style.box["fontdict"],
         )
     box_axes.set_xticklabels([])
 
@@ -920,12 +855,9 @@ def _plot_interact(
     plot_axes,
     plot_style,
     marker_sizes,
-    cmap=None,
+    cmap,
 ):
     """Interact scatter plot"""
-    if cmap is None:
-        cmap = plot_style.marker["cmap"]
-
     xs, ys = plot_style.display_columns
     plot_axes.set_xticks(
         range(len(xs)), xs, rotation=plot_style.tick["xticks_rotation"]

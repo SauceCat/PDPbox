@@ -177,26 +177,15 @@ def _check_frac_to_plot(frac_to_plot):
 def _plot_title(axes, plot_style):
     """Add plot title."""
     title_params = {
-        "fontname": plot_style.font_family,
         "x": 0,
         "va": "top",
         "ha": "left",
     }
     axes.set_facecolor("white")
-    title_style, subtitle_style = (
-        plot_style.title["title"],
-        plot_style.title["subtitle"],
-    )
-    axes.text(
-        y=0.7, s=title_style["text"], fontsize=title_style["font_size"], **title_params
-    )
-    axes.text(
-        y=0.5,
-        s=subtitle_style["text"],
-        fontsize=subtitle_style["font_size"],
-        color=subtitle_style["color"],
-        **title_params,
-    )
+    title_text = plot_style.title["title"].pop("text")
+    subtitle_text = plot_style.title["subtitle"].pop("text")
+    axes.text(y=0.7, s=title_text, **title_params, **plot_style.title["title"])
+    axes.text(y=0.5, s=subtitle_text, **title_params, **plot_style.title["subtitle"])
     axes.axis("off")
 
 
