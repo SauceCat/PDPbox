@@ -3,7 +3,6 @@ import numpy as np
 from sklearn.cluster import MiniBatchKMeans, KMeans
 import copy
 from .utils import _get_string, _find_bucket, _calc_preds, _make_list
-from .info_plot_utils import _prepare_data_x
 
 
 def _calc_grid_results(

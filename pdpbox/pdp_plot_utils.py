@@ -1,12 +1,6 @@
 from .utils import (
-    _axes_modify,
-    _modify_legend_axes,
     _get_string,
-    _make_subplots,
-    _make_subplots_plotly,
-    _display_percentile,
     _to_rgba,
-    _get_ticks_plotly,
     _display_percentile_inter,
 )
 from .styles import _prepare_plot_style

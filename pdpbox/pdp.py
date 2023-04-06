@@ -10,26 +10,13 @@ from .pdp_plot_utils import (
     _pdp_inter_plot_plotly,
 )
 from .utils import (
-    _check_model,
-    _check_dataset,
-    _check_percentile_range,
-    _check_feature,
-    _check_grid_type,
-    _check_memory_limit,
     _check_frac_to_plot,
     _make_list,
     _expand_default,
-    _plot_title,
-    _calc_memory_usage,
-    _get_grids,
     _get_grid_combos,
     _check_classes,
-    _calc_figsize,
     _get_string,
-    _check_plot_params,
-    _get_grids_and_cols,
     _calc_n_jobs,
-    _prepare_plot_params,
 )
 
 import pandas as pd

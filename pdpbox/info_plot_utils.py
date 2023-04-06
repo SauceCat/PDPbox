@@ -1,34 +1,19 @@
 from .utils import (
-    _axes_modify,
-    _modify_legend_axes,
-    _make_bucket_column_names,
-    _make_bucket_column_names_percentile,
-    _check_dataset,
-    _check_percentile_range,
-    _check_feature,
-    _check_grid_type,
-    _expand_default,
-    _plot_title,
-    _get_grids,
-    _check_model,
-    _check_classes,
     _q2,
-    _check_plot_params,
     _check_interact_plot_params,
-    _get_grids_and_cols,
-    _calc_preds,
-    _make_subplots,
-    _display_percentile,
-    _make_subplots_plotly,
-    _get_ticks_plotly,
     _display_percentile_inter,
 )
-from .styles import infoPlotStyle, infoPlotInterStyle, _prepare_plot_style
+from .styles import (
+    _prepare_plot_style,
+    _axes_modify,
+    _display_percentile,
+    _display_ticks_plotly,
+)
 
 import numpy as np
 import pandas as pd
 import copy
-from itertools import product
+from itertools import product, cycle
 import plotly.express as px
 
 import matplotlib as mpl
@@ -40,56 +25,113 @@ import matplotlib.patheffects as PathEffects
 import plotly.graph_objects as go
 
 
-def _target_plot(feat_name, target, bar_data, target_lines, plot_params):
+def _target_plot(plot_obj, plot_params):
     """Internal call for target_plot"""
-    plot_style = _prepare_plot_style(feat_name, target, plot_params, "target")
-    fig, inner_grid, title_axes = _make_subplots(plot_style)
+    feature_info = plot_obj.feature_info
+    plot_style = _prepare_plot_style(
+        feature_info.name, plot_obj.target, plot_params, plot_obj.plot_type
+    )
+    fig, inner_grid, title_axes = plot_style.make_subplots()
 
-    bar_axes, line_axes = [], []
-    line_colors = plot_style.line["colors"]
-    for i, t in enumerate(target):
-        inner_bar_axes = plt.subplot(inner_grid[i])
-        inner_line_axes = inner_bar_axes.twinx()
-        fig.add_subplot(inner_bar_axes)
+    axes = {"title_axes": title_axes, "bar_axes": [], "line_axes": []}
+    line_colors = cycle(plot_style.line["colors"])
 
-        line_color = line_colors[i % len(line_colors)]
+    for i, target in enumerate(plot_obj.target):
+        line_color = next(line_colors)
+        bar_axes = plt.subplot(inner_grid[i])
+        line_axes = bar_axes.twinx()
         line_data = (
-            target_lines[i].rename(columns={t: "y"}).sort_values("x", ascending=True)
+            plot_obj.target_lines[i]
+            .rename(columns={target: "y"})
+            .sort_values("x", ascending=True)
         )
-        _draw_barplot(feat_name, [bar_data, inner_bar_axes], plot_style)
+        _draw_barplot(
+            plot_obj.count_df, bar_axes, feature_info.display_columns, plot_style
+        )
         _draw_lineplot(
-            "Average " + t,
-            [line_data, inner_line_axes],
-            plot_style,
+            f"Average {target}",
+            line_data,
+            line_axes,
             line_color,
+            plot_style,
         )
-        inner_bar_axes.set_title(
-            t,
-            **plot_style.title["subplot_title"],
-        )
-        bar_axes.append(inner_bar_axes)
-        line_axes.append(inner_line_axes)
+        _axes_modify(line_axes, plot_style, right=True, grid=False)
 
-    axes = {"title_axes": title_axes, "bar_axes": bar_axes, "line_axes": line_axes}
+        if len(plot_obj.target) > 1:
+            bar_axes.set_title(
+                target,
+                **plot_style.title["subplot_title"],
+            )
+
+        if plot_style.show_percentile:
+            _display_percentile(bar_axes, feature_info.percentile_columns, plot_style)
+
+        axes["bar_axes"].append(bar_axes)
+        axes["line_axes"].append(line_axes)
+
     return fig, axes
 
 
-def _actual_plot(
-    feat_name,
-    pred_cols,
-    plot_data,
-    bar_data,
-    box_lines,
-    plot_params,
-):
-    """Internal call for actual_plot"""
-    plot_style = _prepare_plot_style(feat_name, pred_cols, plot_params, "actual")
-    fig, inner_grid, title_axes = _make_subplots(plot_style)
+def _target_plot_plotly(plot_obj, plot_params):
+    """Internal call for target_plot, drawing with plotly"""
+    feature_info = plot_obj.feature_info
+    plot_style = _prepare_plot_style(
+        feature_info.name, plot_obj.target, plot_params, plot_obj.plot_type
+    )
+    nrows, ncols = plot_style.nrows, plot_style.ncols
+    plot_args = {
+        "rows": nrows,
+        "cols": ncols,
+        "specs": [[{"secondary_y": True} for _ in range(ncols)] for _ in range(nrows)],
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
+    }
+    fig = plot_style.make_subplots_plotly(plot_args)
+    subplot_titles = []
+    line_colors = cycle(plot_style.line["colors"])
+    for i, target in enumerate(plot_obj.target):
+        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
+        nr, nc = grids["row"], grids["col"]
+        title = plot_style.update_plot_domains(fig, nr, nc, grids, target)
+        subplot_titles.append(title)
+        line_color = next(line_colors)
+        line_data = (
+            plot_obj.target_lines[i]
+            .rename(columns={target: "y"})
+            .sort_values("x", ascending=True)
+        )
+        _draw_barplot_plotly(fig, plot_obj.count_df, plot_style, grids)
+        _draw_lineplot_plotly(target, fig, line_data, line_color, grids)
+        _display_ticks_plotly(
+            feature_info.display_columns,
+            feature_info.percentile_columns if plot_style.show_percentile else [],
+            fig,
+            grids,
+            is_y=False,
+        )
+        fig.update_yaxes(title_text="count", secondary_y=False, **grids)
+        fig.update_yaxes(
+            title_text=f"Average {target}", secondary_y=True, showgrid=False, **grids
+        )
 
-    box_axes, bar_axes = [], []
-    box_colors = plot_style.box["colors"]
-    for i, p in enumerate(pred_cols):
-        box_color = box_colors[i % len(box_colors)]
+    if len(plot_obj.target) > 1:
+        fig.update_layout(annotations=subplot_titles)
+
+    return fig, None
+
+
+def _predict_plot(plot_obj, plot_params):
+    """Internal call for actual_plot"""
+    feature_info = plot_obj.feature_info
+    plot_style = _prepare_plot_style(
+        feature_info.name, plot_obj.target, plot_params, plot_obj.plot_type
+    )
+    fig, inner_grid, title_axes = plot_style.make_subplots()
+    axes = {"title_axes": title_axes, "bar_axes": [], "box_axes": []}
+
+    box_colors = cycle(plot_style.box["colors"])
+    for i, target in enumerate(plot_obj.target):
+        box_color = next(box_colors)
         inner = GridSpecFromSubplotSpec(
             2,
             1,
@@ -97,38 +139,79 @@ def _actual_plot(
             wspace=plot_style.gaps["inner_x"],
             hspace=plot_style.gaps["inner_y"],
         )
-        inner_box_axes = plt.subplot(inner[0])
-        inner_bar_axes = plt.subplot(inner[1], sharex=inner_box_axes)
-        fig.add_subplot(inner_box_axes)
-        fig.add_subplot(inner_bar_axes)
-
-        inner_box_data = plot_data[["x", p]].rename(columns={p: "y"})
-        inner_box_line_data = box_lines[i].rename(columns={p + "_q2": "y"})
-
-        _draw_boxplot(
-            inner_box_data,
-            inner_box_line_data,
-            inner_box_axes,
-            plot_style,
-            box_color,
+        box_axes = plt.subplot(inner[0])
+        bar_axes = plt.subplot(inner[1])
+        box_df = plot_obj.df[["x", target]].rename(columns={target: "y"})
+        line_df = plot_obj.target_lines[i].rename(columns={target + "_q2": "y"})
+        _draw_boxplot(box_df, line_df, box_axes, box_color, plot_style)
+        box_axes.set(ylabel=f"{target} dist", xticklabels=[])
+        _draw_barplot(
+            plot_obj.count_df, bar_axes, feature_info.display_columns, plot_style
         )
-        inner_box_axes.set_ylabel("%s dist" % p)
-        _draw_barplot(feat_name, (bar_data, inner_bar_axes), plot_style, single=False)
+        if len(plot_obj.target) > 1:
+            box_axes.set_title(
+                target,
+                **plot_style.title["subplot_title"],
+            )
 
-        if i % plot_style.ncols != 0:
-            inner_bar_axes.set_yticklabels([])
-            inner_box_axes.set_yticklabels([])
+        if plot_style.show_percentile:
+            _display_percentile(box_axes, feature_info.percentile_columns, plot_style)
 
-        inner_box_axes.set_title(
-            p,
-            **plot_style.title["subplot_title"],
-        )
+        axes["bar_axes"].append(bar_axes)
+        axes["box_axes"].append(box_axes)
 
-        box_axes.append(inner_box_axes)
-        bar_axes.append(inner_bar_axes)
-
-    axes = {"title_axes": title_axes, "box_axes": box_axes, "bar_axes": bar_axes}
     return fig, axes
+
+
+def _predict_plot_plotly(plot_obj, plot_params):
+    """Internal call for actual_plot"""
+    feature_info = plot_obj.feature_info
+    plot_style = _prepare_plot_style(
+        feature_info.name, plot_obj.target, plot_params, plot_obj.plot_type
+    )
+    nrows, ncols = plot_style.nrows, plot_style.ncols
+    plot_args = {
+        "rows": nrows * 2,
+        "cols": ncols,
+        "shared_xaxes": True,
+        "horizontal_spacing": 0,
+        "vertical_spacing": 0,
+    }
+    fig = plot_style.make_subplots_plotly(plot_args)
+    subplot_titles = []
+    box_colors = cycle(plot_style.box["colors"])
+    for i, target in enumerate(plot_obj.target):
+        box_color = next(box_colors)
+        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
+        box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
+        bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
+        nr, nc = grids["row"], grids["col"]
+        title = plot_style.update_plot_domains(
+            fig, nr, nc, (box_grids, bar_grids), target
+        )
+        subplot_titles.append(title)
+
+        box_df = plot_obj.df[["x", target]].rename(columns={target: "y"})
+        line_df = plot_obj.target_lines[i].rename(columns={target + "_q2": "y"})
+
+        _draw_boxplot_plotly(
+            target, box_df, line_df, fig, box_color, plot_style, box_grids
+        )
+        _draw_barplot_plotly(fig, plot_obj.count_df, plot_style, bar_grids)
+        _display_ticks_plotly(
+            feature_info.display_columns,
+            feature_info.percentile_columns if plot_style.show_percentile else [],
+            fig,
+            bar_grids,
+            is_y=False,
+        )
+        fig.update_yaxes(title_text="count", **bar_grids)
+        fig.update_yaxes(title_text=f"{target} dist", **box_grids)
+
+    if len(plot_obj.target) > 1:
+        fig.update_layout(annotations=subplot_titles)
+
+    return fig, None
 
 
 def _info_plot_interact(
@@ -203,247 +286,12 @@ def _info_plot_interact(
         )
         legend_axes.append(inner_legend_axes)
 
-        inner_value_axes.set_title(t, **plot_style.title["subplot_title"])
-
     axes = {
         "title_axes": title_axes,
         "value_axes": value_axes,
         "legend_axes": legend_axes,
     }
     return fig, axes
-
-
-def _draw_barplot_plotly(fig, bar_data, plot_style, row, col):
-    bx = bar_data["x"].values
-    by = bar_data["fake_count"].values
-
-    fig.add_trace(
-        go.Bar(
-            x=bx,
-            y=by,
-            text=by,
-            textposition="outside",
-            width=plot_style.bar["width"],
-            name="count",
-            marker=dict(
-                color=plot_style.bar["color"],
-                opacity=0.5,
-            ),
-        ),
-        row=row,
-        col=col,
-        secondary_y=False,
-    )
-
-
-def _target_plot_plotly(feat_name, target, bar_data, target_lines, plot_params):
-    """Internal call for target_plot, drawing with plotly"""
-    plot_style = _prepare_plot_style(feat_name, target, plot_params, "target")
-    nrows, ncols = plot_style.nrows, plot_style.ncols
-    plot_args = {
-        "rows": nrows,
-        "cols": ncols,
-        "specs": [[{"secondary_y": True} for _ in range(ncols)] for _ in range(nrows)],
-        "horizontal_spacing": 0,
-        "vertical_spacing": 0,
-    }
-    fig = _make_subplots_plotly(plot_args, plot_style)
-    subplot_titles = []
-
-    line_colors = plot_style.line["colors"]
-    for i, t in enumerate(target):
-        line_color = line_colors[i % len(line_colors)]
-        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-        nr, nc = grids["row"], grids["col"]
-        title = plot_style.update_plot_domains(fig, nr, nc, grids, t)
-        subplot_titles.append(title)
-        _draw_barplot_plotly(fig, bar_data, plot_style, **grids)
-
-        line_data = (
-            target_lines[i].rename(columns={t: "y"}).sort_values("x", ascending=True)
-        )
-        lx = line_data["x"].values
-        ly = line_data["y"].values
-
-        fig.add_trace(
-            go.Scatter(
-                x=lx,
-                y=ly,
-                text=[round(v, 3) for v in ly],
-                textposition="top center",
-                mode="lines+markers+text",
-                yaxis="y2",
-                name="Average " + t,
-                line=dict(color=line_color),
-                marker=dict(color=line_color),
-            ),
-            secondary_y=True,
-            **grids,
-        )
-
-        title_text, ticktext = _get_ticks_plotly(feat_name, plot_style)
-        fig.update_xaxes(
-            title_text="",
-            ticktext=ticktext,
-            tickvals=bar_data["x"].values,
-            **grids,
-        )
-
-        if grids["col"] == 1:
-            fig.update_yaxes(title_text="count", secondary_y=False, **grids)
-
-        fig.update_yaxes(
-            title_text="Average " + t,
-            secondary_y=True,
-            **grids,
-        )
-
-    fig.update_layout(annotations=subplot_titles)
-
-    return fig
-
-
-def _actual_plot_plotly(
-    feat_name,
-    pred_cols,
-    plot_data,
-    bar_data,
-    box_lines,
-    plot_params,
-):
-    """Internal call for actual_plot"""
-    plot_style = _prepare_plot_style(feat_name, pred_cols, plot_params, "actual")
-    nrows, ncols = plot_style.nrows, plot_style.ncols
-    plot_args = {
-        "rows": nrows * 2,
-        "cols": ncols,
-        "shared_xaxes": True,
-        "horizontal_spacing": 0,
-        "vertical_spacing": 0,
-    }
-    fig = _make_subplots_plotly(plot_args, plot_style)
-    subplot_titles = []
-
-    box_colors = plot_style.box["colors"]
-    for i, p in enumerate(pred_cols):
-        box_color = box_colors[i % len(box_colors)]
-        grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-        box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
-        bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
-        nr, nc = grids["row"], grids["col"]
-        title = plot_style.update_plot_domains(fig, nr, nc, (box_grids, bar_grids), p)
-        subplot_titles.append(title)
-
-        box_data = plot_data[["x", p]].rename(columns={p: "y"})
-        xs, ys = _prepare_box_data(box_data)
-        for iy, y in enumerate(ys):
-            fig.add_trace(
-                go.Box(
-                    x0=iy,
-                    y=y,
-                    width=plot_style.box["width"],
-                    marker=dict(
-                        color=box_color,
-                        opacity=0.5,
-                    ),
-                    name=f"{p} dist",
-                    boxpoints=False,
-                ),
-                **box_grids,
-            )
-
-        box_line_data = box_lines[i].rename(columns={p + "_q2": "y"})
-        lx = box_line_data["x"].values
-        ly = box_line_data["y"].values
-        fig.add_trace(
-            go.Scatter(
-                x=lx,
-                y=ly,
-                text=[round(v, 3) for v in ly],
-                textposition="top center",
-                mode="lines+markers+text",
-                line=dict(color=box_color),
-                marker=dict(color=box_color),
-            ),
-            **box_grids,
-        )
-        fig.update_yaxes(title_text=f"{p} dist", **box_grids)
-
-        _draw_barplot_plotly(fig, bar_data, plot_style, **bar_grids)
-        title_text, ticktext = _get_ticks_plotly(feat_name, plot_style)
-        fig.update_xaxes(
-            title_text="",
-            ticktext=ticktext,
-            tickvals=bar_data["x"].values,
-            **bar_grids,
-        )
-
-        by = bar_data["fake_count"].values
-        fig.update_yaxes(title_text="count", range=[0, np.max(by) * 1.15], **bar_grids)
-
-    fig.update_layout(annotations=subplot_titles)
-
-    return fig
-
-
-def _update_info_inter_domains(fig, nc, nr, grids, title_text, plot_style):
-    plot_sizes = plot_style.plot_sizes
-    gaps = plot_style.gaps
-    group_w = plot_sizes["group_w"] + gaps["outer_x"]
-    group_h = plot_sizes["group_h"] + gaps["outer_y"]
-    scatter_grids, cb_grids, size_grids = grids
-
-    scatter_x0, scatter_y0 = group_w * (nc - 1), group_h * (nr - 1) + gaps["top"]
-    scatter_domain_x = [scatter_x0, scatter_x0 + plot_sizes["scatter_w"]]
-    scatter_domain_y = [1.0 - (scatter_y0 + plot_sizes["scatter_h"]), 1.0 - scatter_y0]
-    scatter_domain_x = [np.clip(v, 0, 1) for v in scatter_domain_x]
-    scatter_domain_y = [np.clip(v, 0, 1) for v in scatter_domain_y]
-
-    fig.update_xaxes(domain=scatter_domain_x, **scatter_grids)
-    fig.update_yaxes(domain=scatter_domain_y, **scatter_grids)
-
-    cb_x0, cb_y0 = (
-        scatter_x0,
-        group_h * (nr - 1)
-        + gaps["top"]
-        + plot_sizes["scatter_h"]
-        + gaps["inner_y"]
-        + plot_sizes["cb_h"] * 0.25,
-    )
-    cb_domain_x = [cb_x0, cb_x0 + plot_sizes["cb_w"]]
-    cb_domain_y = [1.0 - (cb_y0 + plot_sizes["cb_h"] * 0.5), 1.0 - cb_y0]
-    cb_domain_x = [np.clip(v, 0, 1) for v in cb_domain_x]
-    cb_domain_y = [np.clip(v, 0, 1) for v in cb_domain_y]
-
-    fig.update_xaxes(domain=cb_domain_x, **cb_grids)
-    fig.update_yaxes(domain=cb_domain_y, **cb_grids)
-
-    size_x0, size_y0 = (
-        cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"],
-        cb_y0 - plot_sizes["cb_h"] * 0.25,
-    )
-    size_domain_x = [size_x0, size_x0 + plot_sizes["size_w"]]
-    size_domain_y = [1.0 - (size_y0 + plot_sizes["size_h"]), 1.0 - size_y0]
-    size_domain_x = [np.clip(v, 0, 1) for v in size_domain_x]
-    size_domain_y = [np.clip(v, 0, 1) for v in size_domain_y]
-
-    fig.update_xaxes(domain=size_domain_x, **size_grids)
-    fig.update_yaxes(domain=size_domain_y, **size_grids)
-
-    title = go.layout.Annotation(
-        x=sum(scatter_domain_x) / 2,
-        y=scatter_domain_y[1],
-        xref="paper",
-        yref="paper",
-        text=f"<b>{title_text}</b>",
-        showarrow=False,
-        xanchor="center",
-        yanchor="bottom",
-        # font=dict(
-        #     size=plot_style.title["title"]["font_size"], family=plot_style.font_family
-        # ),
-    )
-    return title, cb_domain_x, cb_domain_y
 
 
 def _info_plot_interact_plotly(
@@ -479,7 +327,6 @@ def _info_plot_interact_plotly(
         # "row_heights": row_heights,
     }
     fig = _make_subplots_plotly(plot_args, plot_style)
-    subplot_titles = []
     cb_texts = []
 
     cmaps = plot_style.marker["cmaps"]
@@ -489,10 +336,9 @@ def _info_plot_interact_plotly(
         cb_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2 - 1}
         size_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2}
         nc, nr = grids["col"], grids["row"]
-        title, cb_domain_x, cb_domain_y = _update_info_inter_domains(
-            fig, nc, nr, (scatter_grids, cb_grids, size_grids), t, plot_style
+        cb_domain_x, cb_domain_y = plot_style.update_plot_domains(
+            fig, nc, nr, (scatter_grids, cb_grids, size_grids), t
         )
-        subplot_titles.append(title)
 
         cmap = cmaps[i % len(cmaps)]
         sx = plot_data["x1"].values
@@ -595,107 +441,27 @@ def _info_plot_interact_plotly(
         fig.update_yaxes(visible=False, **size_grids)
         fig.update_xaxes(visible=False, range=[0, 1], **size_grids)
 
-    fig.update_layout(annotations=subplot_titles + cb_texts)
+    fig.update_layout(annotations=cb_texts)
 
     return fig
 
 
-def _prepare_data_x(
-    feature,
-    feature_type,
-    data,
-    num_grid_points,
-    grid_type,
-    percentile_range,
-    grid_range,
-    cust_grid_points,
-    show_percentile,
-    show_outliers,
-    endpoint,
-):
-    """Map value to bucket based on feature grids"""
-    cols, uppers, lowers = [], [], []
-    per_cols, per_uppers, per_lowers = [], [], []
-    data_x = data.copy()
+def _draw_barplot(df, axes, xticklabels, plot_style):
+    bar_style = plot_style.bar
 
-    grids, cols, percentiles = _get_grids_and_cols(
-        feature,
-        feature_type,
-        data,
-        num_grid_points,
-        grid_type,
-        percentile_range,
-        grid_range,
-        cust_grid_points,
-    )
-    results = {"feature_grids": grids, "percentile_grids": percentiles}
-
-    if feature_type == "binary":
-        data_x["x"] = data_x[feature]
-    elif feature_type == "onehot":
-        data_x["x"] = np.argmax(data_x[feature].values, axis=1)
-        data_x = data_x[~data_x["x"].isnull()].reset_index(drop=True)
-    else:
-        if endpoint:
-            grids[-1] *= 1.01
-
-        if show_outliers:
-            grids = np.array(
-                [data_x[feature].min() * 0.99]
-                + list(grids)
-                + [data_x[feature].max() * 1.01]
-            )
-            grids = sorted(list(np.unique(grids)))
-        else:
-            data_x = data_x[
-                (data_x[feature] >= grids[0]) & (data_x[feature] <= grids[-1])
-            ].reset_index(drop=True)
-
-        # map feature value into value buckets
-        # data_x["x"] = data_x[feature].apply(lambda x: _find_bucket(x, grids_raw, endpoint))
-        data_x["x"] = pd.cut(data_x[feature].values, bins=grids, right=False).codes
-        if not show_outliers:
-            data_x["x"] += 1
-        uni_xs = sorted(data_x["x"].unique())
-
-        # create bucket names
-        ranges = np.arange(uni_xs[0], uni_xs[-1] + 1)
-        if endpoint:
-            grids[-1] /= 1.01
-        cols, lowers, uppers = _make_bucket_column_names(grids, endpoint, ranges)
-
-        # create percentile bucket names
-        if show_percentile and grid_type == "percentile":
-            (
-                per_cols,
-                per_lowers,
-                per_uppers,
-            ) = _make_bucket_column_names_percentile(percentiles, endpoint, ranges)
-
-        # offset results
-        data_x["x"] = data_x["x"] - data_x["x"].min()
-
-    data_x["x"] = data_x["x"].map(int)
-    results.update(
-        {
-            "data": data_x,
-            "value_display": [list(lst) for lst in [cols, lowers, uppers]],
-            "percentile_display": [
-                list(lst) for lst in [per_cols, per_lowers, per_uppers]
-            ],
-        }
+    rects = axes.bar(
+        x=df["x"],
+        height=df["count"],
+        width=bar_style["width"],
+        color=bar_style["color"],
+        alpha=bar_style["alpha"],
     )
 
-    return results
-
-
-def _autolabel(rects, axes, color, fontdict):
-    """Create label for bar plot"""
     for rect in rects:
         height = rect.get_height()
         bbox_props = {
             "facecolor": "white",
-            "edgecolor": color,
+            "edgecolor": bar_style["color"],
             "boxstyle": "square,pad=0.5",
         }
         axes.text(
@@ -705,75 +471,135 @@ def _autolabel(rects, axes, color, fontdict):
             ha="center",
             va="center",
             bbox=bbox_props,
-            color=color,
-            fontdict=fontdict,
+            color=bar_style["color"],
+            fontdict=bar_style["fontdict"],
         )
 
-
-def _draw_barplot(feat_name, data_axes, plot_style, single=True):
-    """Draw bar plot"""
-    data, axes = data_axes
-
-    # add value label for bar plot
-    rects = axes.bar(
-        x=data["x"],
-        height=data["fake_count"],
-        width=plot_style.bar["width"],
-        color=plot_style.bar["color"],
-        alpha=0.5,
-    )
-    _autolabel(rects, axes, plot_style.bar["color"], plot_style.bar["fontdict"])
-    _axes_modify(axes, plot_style)
-    num_xticks = len(plot_style.display_columns)
-
-    # bar plot
-    # axes.set_xlabel(feat_name, fontdict=plot_style.label["fontdict"])
     axes.set_ylabel("count", fontdict=plot_style.label["fontdict"])
-    axes.set_xticks(range(num_xticks))
-    axes.set_xticklabels(
-        plot_style.display_columns, rotation=plot_style.tick["xticks_rotation"]
+    axes.set_xticks(range(len(xticklabels)), labels=xticklabels)
+    axes.set_xlim(-0.5, len(xticklabels) - 0.5)
+    _axes_modify(axes, plot_style)
+
+
+def _draw_barplot_plotly(fig, df, plot_style, grids):
+    bar_style = plot_style.bar
+    fig.add_trace(
+        go.Bar(
+            x=df["x"],
+            y=df["count"],
+            text=df["count"],
+            textposition="outside",
+            width=bar_style["width"],
+            name="count",
+            marker=dict(
+                color=bar_style["color"],
+                opacity=0.5,
+            ),
+        ),
+        secondary_y=False,
+        **grids,
     )
-    axes.set_xlim(-0.5, num_xticks - 0.5)
-
-    if single:
-        _display_percentile(axes, plot_style)
+    fig.update_yaxes(range=[0, df["count"].max() * 1.2], secondary_y=False, **grids)
 
 
-def _draw_lineplot(target_ylabel, data_axes, plot_style, line_color=None):
-    """Draw line plot"""
-    data, axes = data_axes
-    if line_color is None:
-        line_color = plot_style.line["color"]
+def _draw_lineplot(ylabel, df, axes, line_color, plot_style):
+    line_style = plot_style.line
 
-    axes.plot(
-        data["x"],
-        data["y"],
-        linewidth=plot_style.line["width"],
-        c=line_color,
-        marker="o",
-    )
-    for idx in data.index.values:
+    axes.plot(df["x"], df["y"], linewidth=line_style["width"], c=line_color, marker="o")
+
+    for _, row in df.iterrows():
+        x, y = row["x"], row["y"]
         bbox_props = {
             "facecolor": line_color,
             "edgecolor": "none",
             "boxstyle": "square,pad=0.5",
         }
-        y = data.loc[idx, "y"]
+
         axes.text(
-            data.loc[idx, "x"],
+            x,
             y,
             f"{y:.3f}",
             ha="center",
             va="top",
             bbox=bbox_props,
             color="#ffffff",
-            fontdict=plot_style.line["fontdict"],
+            fontdict=line_style["fontdict"],
         )
 
-    _axes_modify(axes, plot_style)
-    axes.get_yaxis().tick_right()
-    axes.grid(False)
-    axes.set_ylabel(target_ylabel, fontdict=plot_style.label["fontdict"])
+    axes.set_ylabel(ylabel, fontdict=plot_style.label["fontdict"])
+
+
+def _draw_lineplot_plotly(target, fig, df, line_color, grids, y2=True):
+    fig.add_trace(
+        go.Scatter(
+            x=df["x"],
+            y=df["y"],
+            text=[round(v, 3) for v in df["y"].values],
+            textposition="top center",
+            mode="lines+markers+text",
+            yaxis="y2",
+            name=target,
+            line=dict(color=line_color),
+            marker=dict(color=line_color),
+        ),
+        secondary_y=y2,
+        **grids,
+    )
+
+
+def _prepare_box_data(df):
+    xs = sorted(df["x"].unique())
+    ys = []
+    for x in xs:
+        ys.append(df[df["x"] == x]["y"].values)
+    return xs, ys
+
+
+def _draw_boxplot(box_df, line_df, axes, box_color, plot_style):
+    """Draw box plot"""
+    box_style = plot_style.box
+    xs, ys = _prepare_box_data(box_df)
+    common_props = dict(
+        linewidth=box_style["line_width"], color=box_color, alpha=box_style["alpha"]
+    )
+    boxplot_args = {
+        "whiskerprops": common_props,
+        "capprops": common_props,
+        "boxprops": common_props,
+        "medianprops": dict(linewidth=0),
+    }
+
+    axes.boxplot(
+        ys,
+        positions=xs,
+        showfliers=False,
+        widths=box_style["width"],
+        **boxplot_args,
+    )
+
+    _draw_lineplot("", line_df, axes, box_color, plot_style)
+    _axes_modify(axes, plot_style, right=False, grid=True)
+
+
+def _draw_boxplot_plotly(target, box_df, line_df, fig, box_color, plot_style, grids):
+    box_style = plot_style.box
+    xs, ys = _prepare_box_data(box_df)
+    for i, y in enumerate(ys):
+        fig.add_trace(
+            go.Box(
+                x0=i,
+                y=y,
+                width=box_style["width"],
+                marker=dict(
+                    color=box_color,
+                    opacity=box_style["alpha"],
+                ),
+                boxpoints=False,
+                name=target,
+            ),
+            **grids,
+        )
+    _draw_lineplot_plotly(target, fig, line_df, box_color, grids, y2=False)
 
 
 def _prepare_info_interact_plot(
@@ -793,59 +619,6 @@ def _prepare_info_interact_plot(
         marker_sizes.append(size)
 
     return plot_style, (count_min, count_max), marker_sizes
-
-
-def _prepare_box_data(box_data):
-    xs = sorted(box_data["x"].unique())
-    ys = []
-    for x in xs:
-        ys.append(box_data[box_data["x"] == x]["y"].values)
-    return xs, ys
-
-
-def _draw_boxplot(box_data, box_line_data, box_axes, plot_style, box_color):
-    """Draw box plot"""
-    xs, ys = _prepare_box_data(box_data)
-    boxprops = dict(linewidth=plot_style.box["line_width"], color=box_color)
-    medianprops = dict(linewidth=0)
-    whiskerprops = copy.deepcopy(boxprops)
-    capprops = copy.deepcopy(boxprops)
-
-    box_axes.boxplot(
-        ys,
-        positions=xs,
-        showfliers=False,
-        widths=plot_style.box["width"],
-        whiskerprops=whiskerprops,
-        capprops=capprops,
-        boxprops=boxprops,
-        medianprops=medianprops,
-    )
-    _axes_modify(box_axes, plot_style)
-
-    box_axes.plot(
-        box_line_data["x"], box_line_data["y"], linewidth=1, c=box_color, linestyle="--"
-    )
-    for idx in box_line_data.index.values:
-        bbox_props = {
-            "facecolor": "white",
-            "edgecolor": box_color,
-            "boxstyle": "square,pad=0.5",
-            "lw": 1,
-        }
-        box_axes.text(
-            box_line_data.loc[idx, "x"],
-            box_line_data.loc[idx, "y"],
-            "%.3f" % box_line_data.loc[idx, "y"],
-            ha="center",
-            va="top",
-            bbox=bbox_props,
-            color=box_color,
-            **plot_style.box["fontdict"],
-        )
-    box_axes.set_xticklabels([])
-
-    _display_percentile(box_axes, plot_style)
 
 
 def _plot_interact(
@@ -979,62 +752,6 @@ def _plot_legend_circles(count_min, count_max, axes, cmap, style):
     _modify_legend_axes(axes, style["fontfamily"])
 
 
-def _prepare_info_plot_data(
-    feature,
-    feature_type,
-    data,
-    num_grid_points,
-    grid_type,
-    percentile_range,
-    grid_range,
-    cust_grid_points,
-    show_percentile,
-    show_outliers,
-    endpoint,
-):
-    """Prepare data for information plots"""
-    prepared_results = _prepare_data_x(
-        feature,
-        feature_type,
-        data,
-        num_grid_points,
-        grid_type,
-        percentile_range,
-        grid_range,
-        cust_grid_points,
-        show_percentile,
-        show_outliers,
-        endpoint,
-    )
-    data_x = prepared_results["data"]
-    cols, lowers, uppers = prepared_results["value_display"]
-    per_cols, per_lowers, per_uppers = prepared_results["percentile_display"]
-
-    data_x["fake_count"] = 1
-    bar_data = (
-        data_x.groupby("x", as_index=False)
-        .agg({"fake_count": "count"})
-        .sort_values("x", ascending=True)
-    )
-
-    summary_df = pd.DataFrame(
-        np.arange(data_x["x"].min(), data_x["x"].max() + 1), columns=["x"]
-    )
-    summary_df = summary_df.merge(
-        bar_data.rename(columns={"fake_count": "count"}), on="x", how="left"
-    ).fillna(0)
-    summary_df["x"] = summary_df["x"].map(int)
-    summary_df["value"] = summary_df["x"].apply(lambda x: cols[x])
-    info_cols = ["x", "value"]
-
-    if len(per_cols) != 0:
-        summary_df["percentile"] = summary_df["x"].apply(lambda x: per_cols[x])
-        info_cols.append("percentile")
-    summary_df = summary_df[info_cols + ["count"]]
-
-    return data_x, bar_data, summary_df, cols, per_cols
-
-
 def _prepare_info_plot_interact_data(
     features,
     feature_types,
@@ -1112,25 +829,6 @@ def _prepare_info_plot_interact_data(
     return plot_data, plot_data, summary_df, cols, per_cols
 
 
-def _check_info_plot_params(
-    df,
-    feature,
-    grid_type,
-    percentile_range,
-    grid_range,
-    cust_grid_points,
-    show_outliers,
-):
-    """Check information plot parameters"""
-    feature_type = _check_plot_params(df, feature, grid_type, percentile_range)
-
-    # show_outliers should be only turned on when necessary
-    if all(v is None for v in [percentile_range, grid_range, cust_grid_points]):
-        show_outliers = False
-
-    return feature_type, show_outliers
-
-
 def _check_info_plot_interact_params(
     df,
     features,
@@ -1164,29 +862,3 @@ def _check_info_plot_interact_params(
     res["show_outliers"] = show_outliers
 
     return res
-
-
-def _prepare_actual_plot_data(
-    model, X, n_classes, pred_func, predict_kwds, features, which_classes, chunk_size
-):
-    n_classes, pred_func, from_model = _check_model(model, n_classes, pred_func)
-    preds = _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size)
-
-    info_df = X[features]
-    pred_cols = ["pred"]
-    if n_classes == 0:
-        info_df["pred"] = preds
-    elif n_classes == 2:
-        info_df["pred"] = preds[:, 1]
-    else:
-        plot_classes = range(n_classes)
-        if which_classes is not None:
-            _check_classes(which_classes, n_classes)
-            plot_classes = sorted(which_classes)
-
-        pred_cols = []
-        for class_idx in plot_classes:
-            info_df[f"pred_{class_idx}"] = preds[:, class_idx]
-            pred_cols.append(f"pred_{class_idx}")
-
-    return info_df, pred_cols

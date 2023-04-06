@@ -8,63 +8,244 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+class FeatureInfo:
+    def __init__(
+        self,
+        feature,
+        feature_name,
+        df,
+        cust_grid_points=None,
+        grid_type="percentile",
+        num_grid_points=10,
+        percentile_range=None,
+        grid_range=None,
+        show_outliers=False,
+        endpoint=True,
+    ):
+        self.col_name = feature
+        self.name = feature_name
+        self.type = _check_col(self.col_name, df, is_target=False)
+        self.cust_grid_points = cust_grid_points
+        self.grid_type = grid_type
+        self.num_grid_points = num_grid_points
+        self.percentile_range = percentile_range
+        self.grid_range = grid_range
+        self.show_outliers = show_outliers
+        self.endpoint = endpoint
+
+        self._check_grid_type()
+        self._check_range()
+
+        if all(
+            v is None
+            for v in [self.percentile_range, self.grid_range, self.cust_grid_points]
+        ):
+            self.show_outliers = False
+
+    def _check_grid_type(self):
+        assert self.grid_type in {
+            "percentile",
+            "equal",
+        }, "grid_type should be either 'percentile' or 'equal'"
+
+    def _check_range(self):
+        for name, range_value in zip(
+            ["grid_range", "percentile_range"], [self.grid_range, self.percentile_range]
+        ):
+            if range_value is not None:
+                assert isinstance(range_value, tuple), f"{name} should be a tuple"
+                assert len(range_value) == 2, f"{name} should contain 2 elements"
+                assert range_value[0] < range_value[1], f"{name} should be in order"
+                if name == "percentile_range":
+                    assert all(
+                        0 <= v <= 100 for v in range_value
+                    ), f"{name} should be between 0 and 100"
+
+    def prepare(self, df):
+        self._get_grids(df)
+        df = self._map_values_to_buckets(df).reset_index(drop=True)
+        df["count"] = 1
+        count_df = (
+            df.groupby("x", as_index=False).agg({"count": "count"}).sort_values("x")
+        )
+
+        summary_df = pd.DataFrame(
+            np.arange(df["x"].min(), df["x"].max() + 1), columns=["x"]
+        )
+        summary_df = summary_df.merge(count_df, on="x", how="left").fillna(0)
+        summary_df["x"] = summary_df["x"].astype(int)
+        summary_df["value"] = summary_df["x"].apply(lambda x: self.display_columns[x])
+
+        info_cols = ["x", "value"]
+        if len(self.percentile_columns):
+            summary_df["percentile"] = summary_df["x"].apply(
+                lambda x: self.percentile_columns[x]
+            )
+            info_cols.append("percentile")
+
+        summary_df = summary_df[info_cols + ["count"]]
+
+        return df, count_df, summary_df
+
+    def _get_grids(self, df):
+        self.percentiles = None
+        if self.type == "binary":
+            self.grids = np.array([0, 1])
+            self.num_bins = 2
+        elif self.type == "onehot":
+            self.grids = np.array(self.col_name)
+            self.num_bins = len(self.grids)
+        else:
+            if self.cust_grid_points is None:
+                self.grids, self.percentiles = self._get_numeric_grids(
+                    df[self.col_name].values,
+                )
+            else:
+                self.grids = np.array(sorted(np.unique(self.cust_grid_points)))
+            self.num_bins = len(self.grids) - 1
+
+    def _get_numeric_grids(self, values):
+        if self.grid_type == "percentile":
+            start, end = self.percentile_range or (0, 100)
+            percentiles = np.linspace(start=start, stop=end, num=self.num_grid_points)
+            grids_df = (
+                pd.DataFrame(
+                    {
+                        "percentiles": [round(x, 2) for x in percentiles],
+                        "grids": np.percentile(values, percentiles),
+                    }
+                )
+                .groupby(["grids"], as_index=False)
+                .agg({"percentiles": lambda x: list(x)})
+                .sort_values("grids", ascending=True)
+            )
+            return grids_df["grids"].values, grids_df["percentiles"].values
+        else:
+            min_value, max_value = self.grid_range or (np.min(values), np.max(values))
+            return np.linspace(min_value, max_value, self.num_grid_points), None
+
+    def _map_values_to_buckets(self, df):
+        col_name, grids = self.col_name, self.grids
+        percentile_columns = []
+
+        if self.type == "binary":
+            df["x"] = df[col_name]
+            display_columns = [f"{col_name}_{v}" for v in grids]
+        elif self.type == "onehot":
+            df["x"] = np.argmax(df[col_name].values, axis=1)
+            df = df[~df["x"].isnull()].reset_index(drop=True)
+            display_columns = list(grids)
+        else:
+            # map feature value into value buckets
+            cut_result = pd.cut(
+                df[self.col_name].values, bins=self.grids, right=False, precision=2
+            )
+            df["x"] = cut_result.codes
+            display_columns = [str(v) for v in cut_result.categories]
+            # 1 ... 2 ... 3, index from 0
+            x_max = len(self.grids) - 2
+
+            if self.endpoint:
+                df["x"] = df.apply(
+                    lambda row: x_max
+                    if row[self.col_name] == self.grids[-1]
+                    else row["x"],
+                    axis=1,
+                )
+                display_columns[-1] = display_columns[-1].replace(")", "]")
+
+            if self.grid_type == "percentile":
+                for i, col in enumerate(display_columns):
+                    per_vals = self.percentiles[i] + self.percentiles[i + 1]
+                    per_min, per_max = str(min(per_vals)), str(max(per_vals))
+                    percentile_columns.append(
+                        col[0] + ", ".join([per_min, per_max]) + col[-1]
+                    )
+
+            if self.show_outliers:
+
+                def _assign_x(row):
+                    if row["x"] != -1:
+                        return row["x"]
+                    if row[col_name] < grids[0]:
+                        return -1
+                    # if self.endpoint, grids[-1] is already assigned with x_max
+                    if row[col_name] >= grids[-1]:
+                        return x_max + 1
+
+                df["x"] = df.apply(lambda row: _assign_x(row), axis=1)
+                if df["x"].min() == -1:
+                    display_columns = ["<" + str(self.grids[0])] + display_columns
+                    percentile_columns = [
+                        "<" + str(min(self.percentiles[0]))
+                    ] + percentile_columns
+                if df["x"].max() == x_max + 1:
+                    display_columns += [
+                        (">" if self.endpoint else ">=") + str(self.grids[-1])
+                    ]
+                    percentile_columns += [
+                        (">" if self.endpoint else ">=")
+                        + str(max(self.percentiles[-1]))
+                    ]
+            else:
+                df = df[df["x"] != -1]
+
+            # offset results
+            df["x"] -= df["x"].min()
+
+        df["x"] = df["x"].map(int)
+        self.display_columns = display_columns
+        self.percentile_columns = percentile_columns
+
+        return df
+
+
 def _to_rgba(color, opacity=1.0):
     color = [str(int(v * 255)) for v in color[:3]] + [str(opacity)]
     return "rgba({})".format(",".join(color))
 
 
-def _check_percentile_range(percentile_range):
-    """Make sure percentile range is valid"""
-    if percentile_range is not None:
-        name = "percentile_range"
-        assert isinstance(percentile_range, tuple), f"{name} should be a tuple"
-        assert len(percentile_range) == 2, f"{name} should contain 2 elements"
-        assert all(
-            0 <= v <= 100 for v in percentile_range
-        ), f"{name} should be between 0 and 100"
-        assert percentile_range[0] < percentile_range[1], f"{name} should be in order"
-
-
 def _check_col(col, df, is_target=True):
     """Validate column and return type"""
-    cols = set(df.columns.values)
+
+    def _validate_cols(cols, df_cols, name):
+        missing_cols = cols - df_cols
+        if missing_cols:
+            raise ValueError(f"{name} does not exist: {missing_cols}")
+        return True
+
+    df_cols = set(df.columns)
     name = "target" if is_target else "feature"
+
     if isinstance(col, list):
-        assert (
-            len(col) > 1
-        ), f"a list of {name} should contain more than 1 element, \
-        please provide the full list or just use the single element"
-        assert set(col) < cols, f"{name} does not exist: {set(col) - cols}"
-        assert set(np.unique(df[col].values)) == {
-            0,
-            1,
-        }, f"one-hot encoded {name} should only contain 0 or 1"
-        if not is_target:
-            assert set(df[col].sum(axis=1).unique()) == {
-                1
-            }, f"{name} should be one-hot encoded"
-        col_type = "multi-class" if is_target else "onehot"
+        if len(col) <= 1:
+            raise ValueError(
+                f"a list of {name} should contain more than 1 element, "
+                f"please provide the full list or just use the single element"
+            )
+
+        _validate_cols(set(col), df_cols, name)
+
+        unique_values = set(np.unique(df[col].values))
+        if unique_values != {0, 1}:
+            raise ValueError(f"one-hot encoded {name} should only contain 0 or 1")
+
+        if is_target:
+            col_type = "multi-class"
+        else:
+            if set(df[col].sum(axis=1).unique()) != {1}:
+                raise ValueError(f"{name} should be one-hot encoded")
+            col_type = "onehot"
     else:
-        assert col in cols, f"{name} does not exist: {col}"
-        if set(np.unique(df[col].values)) == {0, 1}:
+        _validate_cols({col}, df_cols, name)
+
+        unique_values = set(np.unique(df[col].values))
+        if unique_values == {0, 1}:
             col_type = "binary"
         else:
             col_type = "regression" if is_target else "numeric"
 
     return col_type
-
-
-def _check_feature(feature, df):
-    """Make sure feature exists and infer feature type
-
-    Feature types
-    -------------
-    1. binary
-    2. onehot
-    3. numeric
-    """
-
-    return _check_col(feature, df, False)
 
 
 def _check_target(target, df):
@@ -133,14 +314,6 @@ def _check_model(model, n_classes, pred_func):
     return n_classes, pred_func, from_model
 
 
-def _check_grid_type(grid_type):
-    """Make sure grid type is percentile or equal"""
-    assert grid_type in {
-        "percentile",
-        "equal",
-    }, "grid_type should be either 'percentile' or 'equal'"
-
-
 def _check_classes(classes_list, n_classes):
     """Makre sure classes list is valid
 
@@ -174,21 +347,6 @@ def _check_frac_to_plot(frac_to_plot):
         raise ValueError("frac_to_plot: should be float or integer")
 
 
-def _plot_title(axes, plot_style):
-    """Add plot title."""
-    title_params = {
-        "x": 0,
-        "va": "top",
-        "ha": "left",
-    }
-    axes.set_facecolor("white")
-    title_text = plot_style.title["title"].pop("text")
-    subtitle_text = plot_style.title["subtitle"].pop("text")
-    axes.text(y=0.7, s=title_text, **title_params, **plot_style.title["title"])
-    axes.text(y=0.5, s=subtitle_text, **title_params, **plot_style.title["subtitle"])
-    axes.axis("off")
-
-
 def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
     """Calculate n_jobs to use"""
     unit_memory = df.memory_usage(deep=True).sum()
@@ -210,85 +368,6 @@ def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
         memory_limit,
     )
     return true_n_jobs
-
-
-def _axes_modify(axes, plot_style, top=False, right=False, grid=False):
-    """Modify matplotlib Axes
-
-    Parameters
-    ----------
-    top: bool, default=False
-        xticks location=top
-    right: bool, default=False
-        yticks, location=right
-    grid: bool, default=False
-        whether it is for grid plot
-    """
-    axes.set_facecolor("white")
-    axes.tick_params(**plot_style.tick["tick_params"])
-    for ticks in [axes.get_xticklabels(), axes.get_yticklabels()]:
-        for tick in ticks:
-            tick.set_fontname(plot_style.font_family)
-    axes.set_frame_on(False)
-    axes.get_xaxis().tick_bottom()
-    axes.get_yaxis().tick_left()
-
-    if top:
-        axes.get_xaxis().tick_top()
-    if right:
-        axes.get_yaxis().tick_right()
-    if not grid:
-        axes.grid(True, "major", "both", ls="--", lw=0.5, c="k", alpha=0.3)
-
-
-def _modify_legend_axes(axes, font_family):
-    """Modify legend like Axes"""
-    axes.set_frame_on(False)
-
-    for tick in axes.get_xticklabels():
-        tick.set_fontname(font_family)
-    for tick in axes.get_yticklabels():
-        tick.set_fontname(font_family)
-
-    axes.set_facecolor("white")
-    axes.set_xticks([])
-    axes.set_yticks([])
-
-
-def _get_grids(values, num_grid_points, grid_type, percentile_range, grid_range):
-    """Calculate grid points for numeric feature"""
-    if grid_type == "percentile":
-        # grid points are calculated based on percentile in unique level
-        # thus the final number of grid points might be smaller than num_grid_points
-        start, end = 0, 100
-        if percentile_range is not None:
-            start, end = percentile_range
-
-        percentiles = np.linspace(start=start, stop=end, num=num_grid_points)
-        grids_df = pd.DataFrame(
-            {
-                "percentiles": [round(x, 2) for x in percentiles],
-                "grids": np.percentile(values, percentiles),
-            }
-        )
-
-        # sometimes different percentiles correspond to the same value
-        grids_df = (
-            grids_df.groupby(["grids"], as_index=False)
-            .agg({"percentiles": lambda x: tuple(x)})
-            .sort_values("grids", ascending=True)
-        )
-        grids, percentiles = (
-            grids_df["grids"].values,
-            grids_df["percentiles"].values,
-        )
-    else:
-        if grid_range is not None:
-            values = grid_range
-        grids = np.linspace(np.min(values), np.max(values), num_grid_points)
-        percentiles = None
-
-    return grids, percentiles
 
 
 def _get_grid_combos(feature_grids, feature_types):
@@ -447,13 +526,13 @@ def _q3(x):
     return x.quantile(0.75)
 
 
-def _check_plot_params(df, feature, grid_type, percentile_range):
-    _check_dataset(df)
-    feature_type = _check_feature(feature, df)
-    _check_grid_type(grid_type)
-    _check_percentile_range(percentile_range)
+# def _check_plot_params(df, feature, grid_type, percentile_range):
+#     _check_dataset(df)
+#     feature_type = _check_feature(feature, df)
+#     _check_grid_type(grid_type)
+#     _check_percentile_range(percentile_range)
 
-    return feature_type
+#     return feature_type
 
 
 def _check_interact_plot_params(
@@ -486,40 +565,6 @@ def _check_interact_plot_params(
         "cust_grid_points": cust_grid_points,
         "feature_types": feature_types,
     }
-
-
-def _get_grids_and_cols(
-    feature,
-    feature_type,
-    data,
-    num_grid_points,
-    grid_type,
-    percentile_range,
-    grid_range,
-    cust_grid_points,
-):
-    percentiles = None
-
-    if feature_type == "binary":
-        grids = np.array([0, 1])
-        cols = [f"{feature}_{g}" for g in grids]
-    elif feature_type == "onehot":
-        grids = np.array(feature)
-        cols = grids[:]
-    else:
-        if cust_grid_points is None:
-            grids, percentiles = _get_grids(
-                data[feature].values,
-                num_grid_points,
-                grid_type,
-                percentile_range,
-                grid_range,
-            )
-        else:
-            grids = np.array(sorted(np.unique(cust_grid_points)))
-        cols = [_get_string(v) for v in grids]
-
-    return grids, cols, percentiles
 
 
 def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
@@ -579,61 +624,6 @@ def _prepare_plot_params(
     return plot_params
 
 
-def _make_subplots(plot_style):
-    fig = plt.figure(figsize=plot_style.figsize, dpi=plot_style.dpi)
-    title_ratio = 2
-    outer_grid = GridSpec(
-        nrows=2,
-        ncols=1,
-        wspace=0.0,
-        hspace=plot_style.gaps["top"],
-        height_ratios=[title_ratio, plot_style.figsize[1] - title_ratio],
-    )
-    title_axes = plt.subplot(outer_grid[0])
-    fig.add_subplot(title_axes)
-    _plot_title(title_axes, plot_style)
-
-    inner_grid = GridSpecFromSubplotSpec(
-        plot_style.nrows,
-        plot_style.ncols,
-        subplot_spec=outer_grid[1],
-        wspace=plot_style.gaps["outer_x"],
-        hspace=plot_style.gaps["outer_y"],
-    )
-
-    return fig, inner_grid, title_axes
-
-
-def _make_subplots_plotly(plot_args, plot_style):
-    fig = make_subplots(**plot_args)
-    fig.update_layout(
-        width=plot_style.figsize[0],
-        height=plot_style.figsize[1],
-        template=plot_style.template,
-        showlegend=False,
-        title=go.layout.Title(
-            text=f"{plot_style.title['title']['text']} <br><sup>{plot_style.title['subtitle']['text']}</sup>",
-            xref="paper",
-            x=0,
-        ),
-    )
-
-    return fig
-
-
-def _display_percentile(axes, plot_style):
-    percentile_columns = plot_style.percentile_columns
-    if len(percentile_columns) > 0 and plot_style.show_percentile:
-        per_axes = axes.twiny()
-        per_axes.set_xticks(axes.get_xticks())
-        per_axes.set_xbound(axes.get_xbound())
-        per_axes.set_xticklabels(
-            percentile_columns, rotation=plot_style.tick["xticks_rotation"]
-        )
-        per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
-        _axes_modify(per_axes, plot_style, top=True)
-
-
 def _display_percentile_inter(plot_style, axes, x=True, y=True):
     per_xaxes, per_yaxes = None, None
     if plot_style.show_percentile:
@@ -657,21 +647,3 @@ def _display_percentile_inter(plot_style, axes, x=True, y=True):
             per_yaxes.grid(False)
 
     return per_xaxes, per_yaxes
-
-
-def _get_ticks_plotly(feat_name, plot_style, idx=None):
-    if idx is None:
-        ticktext = plot_style.display_columns.copy()
-        percentiles = plot_style.percentile_columns
-    else:
-        ticktext = plot_style.display_columns[idx].copy()
-        percentiles = plot_style.percentile_columns[idx]
-
-    if len(percentiles) > 0 and plot_style.show_percentile:
-        for j, p in enumerate(percentiles):
-            ticktext[j] += f"<br><sup><b>{p}</b></sup>"
-        title_text = f"<b>{feat_name}</b> (value+percentile)"
-    else:
-        title_text = f"<b>{feat_name}</b> (value)"
-
-    return title_text, ticktext

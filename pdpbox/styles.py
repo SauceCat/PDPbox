@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 
 class defaultColors:
@@ -62,10 +64,10 @@ def _get_bold_text(text, engine, is_inter=False):
 
 def _prepare_plot_style(feat_name, target, plot_params, plot_type):
     plot_style_classes = {
-        "target": infoPlotStyle,
-        "actual": infoPlotStyle,
-        "target_interact": infoPlotInterStyle,
-        "actual_interact": infoPlotInterStyle,
+        "target": InfoPlotStyle,
+        "predict": InfoPlotStyle,
+        "target_interact": InfoPlotInteractiveStyle,
+        "predict_interact": InfoPlotInteractiveStyle,
         "pdp_isolate": PDPIsolatePlotStyle,
         "pdp_interact": PDPInteractPlotStyle,
     }
@@ -111,7 +113,7 @@ def _get_subplot_title(x, y, title_text):
     )
 
 
-class plotStyle:
+class PlotStyle:
     def __init__(self, target, plot_params):
         if plot_params is None:
             plot_params = {}
@@ -128,9 +130,8 @@ class plotStyle:
             "dpi",
             "engine",
             "template",
-            "display_columns",
-            "percentile_columns",
             "show_percentile",
+            "num_bins",
         ]
         for attr in attributes:
             setattr(self, attr, self.plot_params[attr])
@@ -160,14 +161,12 @@ class plotStyle:
 
     def set_tick_style(self):
         self.tick = {
-            "xticks_rotation": 0,
-            "tick_params": {
-                "axis": "both",
-                "which": "major",
-                "labelsize": 9,
-                "labelcolor": defaultColors.darkGray,
-                "colors": defaultColors.lightGray,
-            },
+            "axis": "both",
+            "which": "major",
+            "labelsize": 9,
+            "labelcolor": defaultColors.darkGray,
+            "colors": defaultColors.lightGray,
+            "labelrotation": 0,
         }
         _update_style(self.tick, self.plot_params.get("tick", {}))
 
@@ -199,8 +198,61 @@ class plotStyle:
             },
         }
 
+    def make_subplots(self):
+        def _plot_title(axes):
+            """Add plot title."""
+            title_params = {
+                "x": 0,
+                "va": "top",
+                "ha": "left",
+            }
+            axes.set_facecolor("white")
+            title_text = self.title["title"].pop("text")
+            subtitle_text = self.title["subtitle"].pop("text")
+            axes.text(y=0.7, s=title_text, **title_params, **self.title["title"])
+            axes.text(y=0.5, s=subtitle_text, **title_params, **self.title["subtitle"])
+            axes.axis("off")
 
-class infoPlotStyle(plotStyle):
+        fig = plt.figure(figsize=self.figsize, dpi=self.dpi)
+        title_ratio = 2
+        outer_grid = GridSpec(
+            nrows=2,
+            ncols=1,
+            wspace=0.0,
+            hspace=self.gaps["top"],
+            height_ratios=[title_ratio, self.figsize[1] - title_ratio],
+        )
+        title_axes = plt.subplot(outer_grid[0])
+        _plot_title(title_axes)
+
+        inner_grid = GridSpecFromSubplotSpec(
+            self.nrows,
+            self.ncols,
+            subplot_spec=outer_grid[1],
+            wspace=self.gaps["outer_x"],
+            hspace=self.gaps["outer_y"],
+        )
+
+        return fig, inner_grid, title_axes
+
+    def make_subplots_plotly(self, plot_args):
+        fig = make_subplots(**plot_args)
+        fig.update_layout(
+            width=self.figsize[0],
+            height=self.figsize[1],
+            template=self.template,
+            showlegend=False,
+            title=go.layout.Title(
+                text=f"{self.title['title']['text']} <br><sup>{self.title['subtitle']['text']}</sup>",
+                xref="paper",
+                x=0,
+            ),
+        )
+
+        return fig
+
+
+class InfoPlotStyle(PlotStyle):
     def __init__(self, feat_name, target, plot_params, plot_type="target"):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
@@ -223,11 +275,11 @@ class infoPlotStyle(plotStyle):
         self.plot_type_to_title = {
             "title": {
                 "target": "Target plot for feature " + bold_text,
-                "actual": "Actual prediction plot for feature " + bold_text,
+                "predict": "Prediction plot for feature " + bold_text,
             },
             "subtitle": {
                 "target": "Average target value by different feature values.",
-                "actual": "Distribution of actual prediction by different feature values.",
+                "predict": "Distribution of predict prediction by different feature values.",
             },
         }
 
@@ -248,17 +300,19 @@ class infoPlotStyle(plotStyle):
             "width": None,
             "color": defaultColors.lightGreen,
             "fontdict": self.label["fontdict"],
+            "alpha": 0.5,
         }
         _update_style(self.bar, self.plot_params.get("bar", {}))
         if self.bar["width"] is None:
-            self.bar["width"] = np.min([0.4, 0.4 / (10.0 / len(self.display_columns))])
+            self.bar["width"] = np.min([0.4, 0.4 / (10.0 / self.num_bins)])
 
     def set_box_style(self):
         self.box = {
             "width": self.bar["width"],
-            "line_width": 2,
+            "line_width": 1.5,
             "colors": None,
             "fontdict": self.label["fontdict"],
+            "alpha": 0.8,
         }
         _update_style(self.box, self.plot_params.get("box", {}))
         self.box["colors"] = _get_colors(
@@ -274,7 +328,7 @@ class infoPlotStyle(plotStyle):
     def set_gaps(self):
         self.gaps = {
             "top": 0.02,
-            "outer_x": 0.08 if self.plot_type == "actual" else 0.12,
+            "outer_x": 0.08 if self.plot_type == "predict" else 0.12,
             "outer_y": 0.15 if self.show_percentile else 0.05,
             "inner_x": 0.02,
             "inner_y": 0.02,
@@ -282,7 +336,7 @@ class infoPlotStyle(plotStyle):
         if self.engine == "matplotlib":
             self.gaps = {
                 "top": 0.02,
-                "outer_x": 0.1 if self.plot_type == "actual" else 0.3,
+                "outer_x": 0.1 if self.plot_type == "predict" else 0.3,
                 "outer_y": 0.2,
                 "inner_x": 0.02,
                 "inner_y": 0.2,
@@ -299,7 +353,7 @@ class infoPlotStyle(plotStyle):
                 "box_w": group_w,
                 "bar_w": group_w,
                 "box_h": unit_h * y1,
-                "bar_h": unit_h * y2 if self.plot_type == "actual" else group_h,
+                "bar_h": unit_h * y2 if self.plot_type == "predict" else group_h,
             }
         )
 
@@ -342,7 +396,7 @@ class infoPlotStyle(plotStyle):
         return _get_subplot_title(tx, ty, title_text)
 
 
-class infoPlotInterStyle(plotStyle):
+class InfoPlotInteractiveStyle(PlotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type="target"):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
@@ -365,11 +419,11 @@ class infoPlotInterStyle(plotStyle):
         self.plot_type_to_title = {
             "title": {
                 "target_interact": "Target plot for features " + bold_text,
-                "actual_interact": "Actual prediction plot for features " + bold_text,
+                "predict_interact": "Actual prediction plot for features " + bold_text,
             },
             "subtitle": {
                 "target_interact": "Average target value by different feature value combinations.",
-                "actual_interact": "Medium value of actual prediction by different feature value combinations.",
+                "predict_interact": "Medium value of predict prediction by different feature value combinations.",
             },
         }
         for key in ["title", "subtitle"]:
@@ -448,8 +502,47 @@ class infoPlotInterStyle(plotStyle):
         for style_name, style_dict in styles:
             _update_style(style_dict, self.plot_params.get(style_name, {}))
 
+    def update_plot_domains(self, fig, nc, nr, grids, title_text):
+        plot_sizes, gaps = self.plot_sizes, self.gaps
+        subplot_w, subplot_h = plot_sizes["subplot_w"], plot_sizes["subplot_h"]
+        x0, y0 = subplot_w * (nc - 1), subplot_h * (nr - 1) + gaps["top"]
+        scatter_grids, cb_grids, size_grids = grids
 
-class PDPIsolatePlotStyle(plotStyle):
+        def update_axes(x0, y0, width_key, height_key, grids, w_mul=1, h_mul=1):
+            x_domain = [x0, x0 + plot_sizes[width_key] * w_mul]
+            y_domain = [1.0 - (y0 + plot_sizes[height_key] * h_mul), 1.0 - y0]
+            fig.update_xaxes(domain=x_domain, **grids)
+            fig.update_yaxes(domain=y_domain, **grids)
+            return x_domain, y_domain
+
+        scatter_domain_x, scatter_domain_y = update_axes(
+            x0, y0, "scatter_w", "scatter_h", scatter_grids
+        )
+
+        cb_height = 0.5
+        cb_x0, cb_y0 = (
+            x0,
+            y0
+            + plot_sizes["scatter_h"]
+            + gaps["inner_y"]
+            + plot_sizes["cb_h"] * (1 - cb_height) / 2,
+        )
+        cb_domain_x, cb_domain_y = update_axes(
+            cb_x0, cb_y0, "cb_w", "cb_h", cb_grids, h_mul=cb_height
+        )
+
+        size_x0, size_y0 = (
+            cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"],
+            cb_y0 - plot_sizes["cb_h"] * (1 - cb_height) / 2,
+        )
+        size_domain_x, size_domain_y = update_axes(
+            size_x0, size_y0, "size_w", "size_h", size_grids
+        )
+
+        return cb_domain_x, cb_domain_y
+
+
+class PDPIsolatePlotStyle(PlotStyle):
     def __init__(self, feat_name, target, plot_params, plot_type):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
@@ -575,7 +668,7 @@ class PDPIsolatePlotStyle(plotStyle):
             _update_style(style_dict, self.plot_params.get(style_name, {}))
 
 
-class PDPInteractPlotStyle(plotStyle):
+class PDPInteractPlotStyle(PlotStyle):
     def __init__(self, feat_names, target, plot_params, plot_type):
         super().__init__(target, plot_params)
         self.plot_type = plot_type
@@ -687,3 +780,67 @@ class PDPInteractPlotStyle(plotStyle):
         ]
         for style_name, style_dict in styles:
             _update_style(style_dict, self.plot_params.get(style_name, {}))
+
+
+def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
+    """Modify matplotlib Axes"""
+    axes.set_facecolor("white")
+    axes.tick_params(**plot_style.tick)
+    axes.set_xticks(
+        axes.get_xticks(),
+        labels=[tick.get_text() for tick in axes.get_xticklabels()],
+        fontname=plot_style.font_family,
+    )
+    axes.set_yticks(
+        axes.get_yticks(),
+        labels=[tick.get_text() for tick in axes.get_yticklabels()],
+        fontname=plot_style.font_family,
+    )
+    axes.set_frame_on(False)
+    axes.xaxis.set_ticks_position("top" if top else "bottom")
+    axes.yaxis.set_ticks_position("right" if right else "left")
+
+    if grid:
+        axes.grid(True, "major", "both", ls="--", lw=0.5, c="k", alpha=0.3)
+
+
+def _modify_legend_axes(axes, font_family):
+    """Modify legend like Axes"""
+    axes.set_frame_on(False)
+
+    for tick in axes.get_xticklabels():
+        tick.set_fontname(font_family)
+    for tick in axes.get_yticklabels():
+        tick.set_fontname(font_family)
+
+    axes.set_facecolor("white")
+    axes.set_xticks([])
+    axes.set_yticks([])
+
+
+def _display_percentile(axes, percentile_columns, plot_style):
+    if len(percentile_columns) > 0:
+        per_axes = axes.twiny()
+        per_axes.set_xticks(axes.get_xticks(), labels=percentile_columns)
+        per_axes.set_xbound(axes.get_xbound())
+        per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
+        _axes_modify(per_axes, plot_style, top=True)
+
+
+def _display_ticks_plotly(display_columns, percentile_columns, fig, grids, is_y=False):
+    ticktext = display_columns.copy()
+    if len(percentile_columns) > 0:
+        for i, p in enumerate(percentile_columns):
+            ticktext[i] += f"<br><sup><b>{p}</b></sup>"
+
+    tick_params = dict(
+        title_text="",
+        ticktext=ticktext,
+        tickvals=np.arange(len(ticktext)),
+        col=grids["col"],
+        row=grids["row"],
+    )
+    if is_y:
+        fig.update_yaxes(**tick_params)
+    else:
+        fig.update_xaxes(**tick_params)
