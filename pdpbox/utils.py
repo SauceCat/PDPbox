@@ -280,6 +280,12 @@ def _expand_default(x, default):
     return x
 
 
+def _expand_values(name, value, num):
+    if isinstance(value, (list, tuple)):
+        assert len(value) == num, f"{name}: length should be {num}."
+    return [value] * num
+
+
 def _check_model(model, n_classes, pred_func):
     """Check model input, return class information and predict function"""
 
@@ -526,45 +532,13 @@ def _q3(x):
     return x.quantile(0.75)
 
 
-# def _check_plot_params(df, feature, grid_type, percentile_range):
-#     _check_dataset(df)
-#     feature_type = _check_feature(feature, df)
-#     _check_grid_type(grid_type)
-#     _check_percentile_range(percentile_range)
-
-#     return feature_type
-
-
-def _check_interact_plot_params(
-    df,
-    features,
-    grid_types,
-    percentile_ranges,
-    grid_ranges,
-    num_grid_points,
-    cust_grid_points,
-):
-    _check_dataset(df)
-    num_grid_points = _expand_default(num_grid_points, 10)
-
-    grid_types = _expand_default(grid_types, "percentile")
-    [_check_grid_type(v) for v in grid_types]
-
-    percentile_ranges = _expand_default(percentile_ranges, None)
-    [_check_percentile_range(v) for v in percentile_ranges]
-
-    grid_ranges = _expand_default(grid_ranges, None)
-    cust_grid_points = _expand_default(cust_grid_points, None)
-    feature_types = [_check_feature(f, df) for f in features]
-
-    return {
-        "num_grid_points": num_grid_points,
-        "grid_types": grid_types,
-        "percentile_ranges": percentile_ranges,
-        "grid_ranges": grid_ranges,
-        "cust_grid_points": cust_grid_points,
-        "feature_types": feature_types,
-    }
+def _expand_params_for_interact(params):
+    for name, value in params.items():
+        if isinstance(value, list):
+            assert len(value) == 2, f"{name}: length should be 2."
+        else:
+            params[name] = _expand_values(name, value, 2)
+    return params
 
 
 def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
@@ -622,28 +596,3 @@ def _prepare_plot_params(
         }
     )
     return plot_params
-
-
-def _display_percentile_inter(plot_style, axes, x=True, y=True):
-    per_xaxes, per_yaxes = None, None
-    if plot_style.show_percentile:
-        xs, ys = plot_style.percentile_columns
-        if x and len(xs) > 0:
-            per_xaxes = axes.twiny()
-            per_xaxes.set_xticks(axes.get_xticks())
-            per_xaxes.set_xbound(axes.get_xbound())
-            per_xaxes.set_xticklabels(xs, rotation=plot_style.tick["xticks_rotation"])
-            per_xaxes.set_xlabel("percentile buckets")
-            _axes_modify(per_xaxes, plot_style, top=True)
-            per_xaxes.grid(False)
-
-        if y and len(ys) > 0:
-            per_yaxes = axes.twinx()
-            per_yaxes.set_yticks(axes.get_yticks())
-            per_yaxes.set_ybound(axes.get_ybound())
-            per_yaxes.set_yticklabels(ys)
-            per_yaxes.set_ylabel("percentile buckets")
-            _axes_modify(per_yaxes, plot_style, right=True)
-            per_yaxes.grid(False)
-
-    return per_xaxes, per_yaxes

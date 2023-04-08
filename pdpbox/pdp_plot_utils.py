@@ -1,7 +1,6 @@
 from .utils import (
     _get_string,
     _to_rgba,
-    _display_percentile_inter,
 )
 from .styles import _prepare_plot_style
 from .pdp_calc_utils import (
