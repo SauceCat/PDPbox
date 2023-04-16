@@ -88,11 +88,7 @@ class _BaseInfoPlot:
         )
         plot_params.update(kwargs)
 
-        if which_classes is None:
-            which_classes = list(np.arange(len(self.target)))
-        else:
-            _check_classes(which_classes, self.n_classes)
-
+        which_classes = _check_classes(which_classes, self.n_classes)
         plot_engine = self.plot_engines[self.plot_type](
             self, which_classes, plot_params
         )
@@ -108,6 +104,7 @@ class _InfoPlot(_BaseInfoPlot):
         feature_name,
         target=None,
         model=None,
+        model_features=None,
         pred_func=None,
         n_classes=None,
         predict_kwds={},
@@ -116,7 +113,7 @@ class _InfoPlot(_BaseInfoPlot):
         **kwargs,
     ):
         super().__init__(plot_type)
-        _check_dataset(df)
+        _check_dataset(df, model_features)
         self.plot_type = plot_type
         self.feature_info = FeatureInfo(feature, feature_name, df, **kwargs)
         self.feature_cols = _make_list(self.feature_info.col_name)
@@ -124,7 +121,12 @@ class _InfoPlot(_BaseInfoPlot):
             self.prepare_target(df, target)
         else:
             self.prepare_predict(
-                model, df, pred_func, n_classes, predict_kwds, chunk_size
+                model,
+                df[model_features],
+                pred_func,
+                n_classes,
+                predict_kwds,
+                chunk_size,
             )
         self.prepare_feature()
         self.agg_target()
@@ -185,9 +187,33 @@ class _InfoPlot(_BaseInfoPlot):
 
 
 class TargetPlot(_InfoPlot):
-    def __init__(self, df, feature, feature_name, target, **kwargs):
+    def __init__(
+        self,
+        df,
+        feature,
+        feature_name,
+        target,
+        cust_grid_points=None,
+        grid_type="percentile",
+        num_grid_points=10,
+        percentile_range=None,
+        grid_range=None,
+        show_outliers=False,
+        endpoint=True,
+    ):
         super().__init__(
-            df, feature, feature_name, target=target, plot_type="target", **kwargs
+            df,
+            feature,
+            feature_name,
+            target,
+            plot_type="target",
+            cust_grid_points=cust_grid_points,
+            grid_type=grid_type,
+            num_grid_points=num_grid_points,
+            percentile_range=percentile_range,
+            grid_range=grid_range,
+            show_outliers=show_outliers,
+            endpoint=endpoint,
         )
 
 
@@ -198,23 +224,38 @@ class PredictPlot(_InfoPlot):
         feature,
         feature_name,
         model,
+        model_features,
         pred_func=None,
         n_classes=None,
         predict_kwds={},
         chunk_size=-1,
-        **kwargs,
+        cust_grid_points=None,
+        grid_type="percentile",
+        num_grid_points=10,
+        percentile_range=None,
+        grid_range=None,
+        show_outliers=False,
+        endpoint=True,
     ):
         super().__init__(
             df,
             feature,
             feature_name,
-            model=model,
-            pred_func=pred_func,
-            n_classes=n_classes,
-            predict_kwds=predict_kwds,
-            chunk_size=chunk_size,
+            None,
+            model,
+            model_features,
+            pred_func,
+            n_classes,
+            predict_kwds,
+            chunk_size,
             plot_type="predict",
-            **kwargs,
+            cust_grid_points=cust_grid_points,
+            grid_type=grid_type,
+            num_grid_points=num_grid_points,
+            percentile_range=percentile_range,
+            grid_range=grid_range,
+            show_outliers=show_outliers,
+            endpoint=endpoint,
         )
 
 
@@ -226,6 +267,7 @@ class _InteractInfoPlot(_BaseInfoPlot):
         feature_names,
         target=None,
         model=None,
+        model_features=None,
         pred_func=None,
         n_classes=None,
         predict_kwds={},
@@ -234,7 +276,7 @@ class _InteractInfoPlot(_BaseInfoPlot):
         **kwargs,
     ):
         super().__init__(plot_type)
-        _check_dataset(df)
+        _check_dataset(df, model_features)
         params = _expand_params_for_interact(kwargs)
         self.plot_type = plot_type
         self.feature_infos = [
@@ -259,7 +301,12 @@ class _InteractInfoPlot(_BaseInfoPlot):
             self.prepare_target(df, target)
         else:
             self.prepare_predict(
-                model, df, pred_func, n_classes, predict_kwds, chunk_size
+                model,
+                df[model_features],
+                pred_func,
+                n_classes,
+                predict_kwds,
+                chunk_size,
             )
         self.prepare_feature()
         self.agg_target()
@@ -328,40 +375,67 @@ class InterectTargetPlot(_InteractInfoPlot):
         features,
         feature_names,
         target,
-        **kwargs,
+        num_grid_points=10,
+        grid_types="percentile",
+        percentile_ranges=None,
+        grid_ranges=None,
+        cust_grid_points=None,
+        show_outliers=False,
+        endpoints=True,
     ):
         super().__init__(
             df,
             features,
             feature_names,
-            target=target,
+            target,
             plot_type="interact_target",
-            **kwargs,
+            num_grid_points=num_grid_points,
+            grid_types=grid_types,
+            percentile_ranges=percentile_ranges,
+            grid_ranges=grid_ranges,
+            cust_grid_points=cust_grid_points,
+            show_outliers=show_outliers,
+            endpoints=endpoints,
         )
 
 
 class InterectPredictPlot(_InteractInfoPlot):
     def __init__(
         self,
-        model,
         df,
         features,
         feature_names,
+        model,
+        model_features,
         pred_func=None,
         n_classes=None,
         predict_kwds={},
         chunk_size=-1,
-        **kwargs,
+        num_grid_points=10,
+        grid_types="percentile",
+        percentile_ranges=None,
+        grid_ranges=None,
+        cust_grid_points=None,
+        show_outliers=False,
+        endpoints=True,
     ):
         super().__init__(
             df,
             features,
             feature_names,
-            model=model,
-            pred_func=pred_func,
-            n_classes=n_classes,
-            predict_kwds=predict_kwds,
-            chunk_size=chunk_size,
+            None,
+            model,
+            model_features,
+            pred_func,
+            n_classes,
+            predict_kwds,
+            chunk_size,
             plot_type="interact_predict",
-            **kwargs,
+            num_grid_points=num_grid_points,
+            grid_types=grid_types,
+            percentile_ranges=percentile_ranges,
+            grid_ranges=grid_ranges,
+            cust_grid_points=cust_grid_points,
+            show_outliers=show_outliers,
+            endpoints=endpoints,
         )

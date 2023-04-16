@@ -2,11 +2,6 @@ import numpy as np
 import pandas as pd
 import psutil
 
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
 
 class FeatureInfo:
     def __init__(
@@ -68,6 +63,7 @@ class FeatureInfo:
         count_df = (
             df.groupby("x", as_index=False).agg({"count": "count"}).sort_values("x")
         )
+        count_df["count_norm"] = count_df["count"] * 1.0 / count_df["count"].sum()
 
         summary_df = pd.DataFrame(
             np.arange(df["x"].min(), df["x"].max() + 1), columns=["x"]
@@ -261,9 +257,16 @@ def _check_target(target, df):
     return _check_col(target, df)
 
 
-def _check_dataset(df):
+def _check_dataset(df, features=None):
     """Make sure input dataset is pandas DataFrame"""
     assert isinstance(df, pd.DataFrame), "only accept pandas DataFrame"
+    if features is not None:
+        features = set(features)
+        cols = set(df.columns.values)
+        if len(features - cols):
+            raise ValueError(
+                f"df doesn't contain all model features, missing: {features - cols}"
+            )
 
 
 def _make_list(x):
@@ -271,19 +274,6 @@ def _make_list(x):
     if isinstance(x, list):
         return x
     return [x]
-
-
-def _expand_default(x, default):
-    """Create a list of default values"""
-    if x is None:
-        return [default] * 2
-    return x
-
-
-def _expand_values(name, value, num):
-    if isinstance(value, (list, tuple)):
-        assert len(value) == num, f"{name}: length should be {num}."
-    return [value] * num
 
 
 def _check_model(model, n_classes, pred_func):
@@ -320,7 +310,7 @@ def _check_model(model, n_classes, pred_func):
     return n_classes, pred_func, from_model
 
 
-def _check_classes(classes_list, n_classes):
+def _check_classes(which_classes, n_classes):
     """Makre sure classes list is valid
 
     Notes
@@ -328,11 +318,17 @@ def _check_classes(classes_list, n_classes):
     class index starts from 0
 
     """
-    if len(classes_list) > 0 and n_classes > 2:
-        if np.min(classes_list) < 0:
-            raise ValueError("class index should be >= 0.")
-        if np.max(classes_list) > n_classes - 1:
-            raise ValueError("class index should be < n_classes.")
+    if which_classes is None or len(which_classes) == 0:
+        which_classes = list(np.arange(n_classes))
+    else:
+        if n_classes > 0:
+            if np.min(which_classes) < 0:
+                raise ValueError("class index should be >= 0.")
+            if np.max(which_classes) > n_classes - 1:
+                raise ValueError("class index should be < n_classes.")
+    if n_classes <= 2:
+        which_classes = [0]
+    return which_classes
 
 
 def _check_memory_limit(memory_limit):
@@ -376,59 +372,6 @@ def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
     return true_n_jobs
 
 
-def _get_grid_combos(feature_grids, feature_types):
-    """Calculate grid combinations of two grid lists"""
-
-    # create grid combination
-    grids1, grids2 = feature_grids
-    feat_type1, feat_type2 = feature_types
-    if feat_type1 == "onehot":
-        grids1 = np.eye(len(grids1)).astype(int).tolist()
-    if feat_type2 == "onehot":
-        grids2 = np.eye(len(grids2)).astype(int).tolist()
-
-    grid_combos = []
-    for g1 in grids1:
-        for g2 in grids2:
-            grid_combos.append(_make_list(g1) + _make_list(g2))
-
-    return np.array(grid_combos)
-
-
-def _find_onehot_actual(x):
-    """Map one-hot value to one-hot name"""
-    try:
-        value = list(x).index(1)
-    except:
-        value = np.nan
-    return value
-
-
-def _find_bucket(x, grids, endpoint):
-    """Find bucket that x falls in"""
-
-    # grids:   ...1...2...3...4...
-    # buckets:  1 . 2 . 3 . 4 . 5
-    # number of buckets: len(grids) + 1
-    # index of ranges: 0 ~ len(grids)
-
-    num_buckets = len(grids) + 1
-    if x < grids[0]:
-        bucket = 1
-    elif x >= grids[-1]:
-        if endpoint and x == grids[-1]:
-            bucket = num_buckets - 1
-        else:
-            bucket = num_buckets
-    else:
-        # 2 ~ (num_buckets - 1)
-        for i in range(2, num_buckets):
-            if grids[i - 2] <= x < grids[i - 1]:
-                bucket = i
-    # index from 0
-    return bucket - 1
-
-
 def _get_string(x):
     if int(x) == x:
         x = int(x)
@@ -437,87 +380,6 @@ def _get_string(x):
     else:
         x = round(x, 2)
     return str(x)
-
-
-def _make_bucket_column_names(grids, endpoint, ranges):
-    """Create bucket names based on grids"""
-    names = []
-    lowers = [np.nan]
-    uppers = [grids[0]]
-
-    grids_str = []
-    for g in grids:
-        grids_str.append(_get_string(g))
-
-    # number of inner buckets: len(grids_str) - 1
-    for i in range(len(grids_str) - 1):
-        lower, upper = i, i + 1
-        name = f"[{grids_str[lower]}, {grids_str[upper]})"
-        lowers.append(grids[lower])
-        uppers.append(grids[upper])
-
-        if (i == len(grids_str) - 2) and endpoint:
-            name = name.replace(")", "]")
-        names.append(name)
-
-    end_sign = ">" if endpoint else ">="
-    names = [f"< {grids_str[0]}"] + names + [f"{end_sign} {grids_str[-1]}"]
-    lowers.append(grids[-1])
-    uppers.append(np.nan)
-    return [np.array(lst)[ranges] for lst in [names, lowers, uppers]]
-
-
-def _make_bucket_column_names_percentile(percentiles, endpoint, ranges):
-    """Create bucket names based on percentile info"""
-    total = len(percentiles)
-    names, p_numerics = [], []
-
-    # p is a tuple
-    for i, p in enumerate(percentiles):
-        p_array = np.array(p).astype(np.float64)
-        p_numerics.append(np.min(p_array))
-
-    lowers = [0]
-    uppers = [p_numerics[0]]
-    for i in range(total - 1):
-        # for each grid point, percentile information is in tuple format
-        # (percentile1, percentile2, ...)
-        # some grid points belong to multiple percentiles
-        lower, upper = p_numerics[i], p_numerics[i + 1]
-        lower_str, upper_str = _get_string(lower), _get_string(upper)
-        name = f"[{lower_str}, {upper_str})"
-        lowers.append(lower)
-        uppers.append(upper)
-
-        if i == total - 2 and endpoint:
-            name = name.replace(")", "]")
-        names.append(name)
-
-    lower, upper = p_numerics[0], p_numerics[-1]
-    lower_str, upper_str = _get_string(lower), _get_string(upper)
-    end_sign = ">" if endpoint else ">="
-    names = [f"< {lower_str}"] + names + [f"{end_sign} {upper_str}"]
-    lowers.append(upper)
-    uppers.append(100)
-    return [np.array(lst)[ranges] for lst in [names, lowers, uppers]]
-
-
-def _calc_figsize(num_charts, ncols, title_height, unit_figsize):
-    """Calculate figure size"""
-    if num_charts > 1:
-        nrows = int(np.ceil(num_charts * 1.0 / ncols))
-        ncols = np.min([num_charts, ncols])
-        width = np.min([unit_figsize[0] * ncols, 15])
-        height = np.min([width * 1.0 / ncols, unit_figsize[1]]) * nrows + title_height
-    else:
-        width, height, nrows, ncols = (
-            unit_figsize[0],
-            unit_figsize[1] + title_height,
-            1,
-            1,
-        )
-
-    return width, height, nrows, ncols
 
 
 def _q1(x):
@@ -530,6 +392,12 @@ def _q2(x):
 
 def _q3(x):
     return x.quantile(0.75)
+
+
+def _expand_values(name, value, num):
+    if isinstance(value, (list, tuple)):
+        assert len(value) == num, f"{name}: length should be {num}."
+    return [value] * num
 
 
 def _expand_params_for_interact(params):
@@ -567,32 +435,3 @@ def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
         preds = np.concatenate(preds)
 
     return preds
-
-
-def _prepare_plot_params(
-    plot_params,
-    ncols,
-    display_columns,
-    percentile_columns,
-    figsize,
-    dpi,
-    template,
-    engine,
-):
-    if plot_params is None:
-        plot_params = {}
-    if figsize is not None:
-        plot_params["figsize"] = figsize
-    if template is not None:
-        plot_params["template"] = template
-
-    plot_params.update(
-        {
-            "ncols": ncols,
-            "display_columns": display_columns,
-            "percentile_columns": percentile_columns,
-            "dpi": dpi,
-            "engine": engine,
-        }
-    )
-    return plot_params

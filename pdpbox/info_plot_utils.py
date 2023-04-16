@@ -127,6 +127,7 @@ class InfoPlotEngine(BaseInfoPlotEngine):
                     color=bar_style["color"],
                     opacity=0.5,
                 ),
+                hovertemplate="%{text}",
             ),
             secondary_y=False,
             **grids,
@@ -169,9 +170,10 @@ class InfoPlotEngine(BaseInfoPlotEngine):
                 textposition="top center",
                 mode="lines+markers+text",
                 yaxis="y2",
-                name=target,
+                name=f"Average {target}",
                 line=dict(color=line_color),
                 marker=dict(color=line_color),
+                hovertemplate="%{text}",
             ),
             secondary_y=y2,
             **grids,
@@ -224,6 +226,7 @@ class InfoPlotEngine(BaseInfoPlotEngine):
                     ),
                     boxpoints=False,
                     name=target,
+                    hoverinfo="none",
                 ),
                 **grids,
             )
@@ -327,7 +330,9 @@ class TargetPlotEngine(InfoPlotEngine):
             target, line_df, line_color = self.prepare_subplot(class_idx)
             grids = {"col": i % ncols + 1, "row": i // ncols + 1}
             nr, nc = grids["row"], grids["col"]
-            title = self.plot_style.update_plot_domains(fig, nr, nc, grids, target)
+            title = self.plot_style.update_plot_domains(
+                fig, nr, nc, (None, grids), target
+            )
             subplot_titles.append(title)
 
             self._draw_barplot_plotly(fig, grids)
@@ -394,9 +399,9 @@ class PredictPlotEngine(InfoPlotEngine):
         plot_args = {
             "rows": nrows * 2,
             "cols": ncols,
-            "shared_xaxes": True,
             "horizontal_spacing": 0,
             "vertical_spacing": 0,
+            "shared_xaxes": True,
         }
         fig = self.plot_style.make_subplots_plotly(plot_args)
         subplot_titles = []
@@ -538,8 +543,6 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                     axes,
                     self.percentile_columns[0],
                     self.plot_style,
-                    is_x=True,
-                    is_y=False,
                 )
                 xlabel += " + percentile"
             if len(self.percentile_columns[1]) > 0:
@@ -547,16 +550,15 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                     axes,
                     self.percentile_columns[1],
                     self.plot_style,
-                    is_x=False,
                     is_y=True,
                 )
                 ylabel += " + percentile"
         axes.set_xlabel(
-            self.feat_names[0] + f"({xlabel})",
+            self.feat_names[0] + f" ({xlabel})",
             fontdict=self.plot_style.label["fontdict"],
         )
         axes.set_ylabel(
-            self.feat_names[1] + f"({ylabel})",
+            self.feat_names[1] + f" ({ylabel})",
             fontdict=self.plot_style.label["fontdict"],
         )
         _axes_modify(axes, self.plot_style)
@@ -578,6 +580,7 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                 y=df["x2"].values,
                 text=texts,
                 textposition="middle center",
+                hovertemplate="%{text}",
                 mode="markers+text" if self.plot_style.annotate else "markers",
                 name="count+" + name,
                 marker=dict(
@@ -650,7 +653,9 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
         self, value_min, value_max, cb_domain_x, cb_domain_y, cmap, fig, grids
     ):
         colorbar = go.Figure(
-            data=go.Heatmap(z=[np.arange(1000)], showscale=False, colorscale=cmap)
+            data=go.Heatmap(
+                z=[np.arange(1000)], showscale=False, colorscale=cmap, hoverinfo="none"
+            )
         )
         fig.add_trace(colorbar.data[0], **grids)
         fig.update_yaxes(showticklabels=False, **grids)
@@ -722,6 +727,7 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                     size=[15, 30],
                     color=color,
                 ),
+                hoverinfo="none",
             ),
             **grids,
         )
@@ -779,7 +785,7 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
             cb_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2 - 1}
             size_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2}
 
-            cb_domain_x, cb_domain_y, title = self.plot_style.update_plot_domains(
+            (cb_domain_x, cb_domain_y), title = self.plot_style.update_plot_domains(
                 fig,
                 grids["col"],
                 grids["row"],

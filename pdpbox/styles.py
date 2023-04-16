@@ -133,7 +133,6 @@ class PlotStyle:
             "colors": defaultColors.lightGray,
             "labelrotation": 0,
         }
-        _update_style(self.tick, self.plot_params.get("tick", {}))
 
     def set_label_style(self):
         self.label = {
@@ -142,7 +141,6 @@ class PlotStyle:
                 "fontsize": 10,
             }
         }
-        _update_style(self.label, self.plot_params.get("label", {}))
 
     def set_title_style(self):
         self.title = {
@@ -266,6 +264,30 @@ class PlotStyle:
             font=dict(size=self.title["subplot_title"]["fontsize"]),
         )
 
+    def update_plot_domains(self, fig, nr, nc, grids, title_text, plot_domain_func):
+        subplot_w, subplot_h = (
+            self.plot_sizes["subplot_w"],
+            self.plot_sizes["subplot_h"],
+        )
+        x0, y0 = subplot_w * (nc - 1), subplot_h * (nr - 1) + self.gaps["top"]
+
+        tx, ty, domains = plot_domain_func(x0, y0)
+        for (domain_x, domain_y), grid in zip(domains, grids):
+            if grid is not None:
+                fig.update_xaxes(domain=[np.clip(v, 0, 1) for v in domain_x], **grid)
+                fig.update_yaxes(domain=[np.clip(v, 0, 1) for v in domain_y], **grid)
+
+        title = self.get_subplot_title(tx, ty, title_text)
+        return title, domains
+
+    def update_styles(self):
+        for style_name in self.plot_params:
+            if hasattr(self, style_name):
+                if isinstance(self.plot_params[style_name], dict):
+                    _update_style(
+                        getattr(self, style_name), self.plot_params[style_name]
+                    )
+
 
 class InfoPlotStyle(PlotStyle):
     def __init__(self, feat_name, target, plot_params, plot_type="target"):
@@ -279,7 +301,6 @@ class InfoPlotStyle(PlotStyle):
         self.set_subplot_ratio()
         self.set_gaps()
         self.update_styles()
-
         self.plot_sizes = self.get_plot_sizes()
         self.set_plot_sizes()
 
@@ -305,8 +326,6 @@ class InfoPlotStyle(PlotStyle):
             "width": 1,
             "fontdict": self.label["fontdict"],
         }
-        _update_style(self.line, self.plot_params.get("line", {}))
-        self.line["colors"] = _get_colors(self.line["colors"], self.engine)
 
     def set_bar_style(self):
         self.bar = {
@@ -315,9 +334,6 @@ class InfoPlotStyle(PlotStyle):
             "fontdict": self.label["fontdict"],
             "alpha": 0.5,
         }
-        _update_style(self.bar, self.plot_params.get("bar", {}))
-        if self.bar["width"] is None:
-            self.bar["width"] = np.min([0.4, 0.4 / (10.0 / self.num_bins)])
 
     def set_box_style(self):
         self.box = {
@@ -327,11 +343,6 @@ class InfoPlotStyle(PlotStyle):
             "fontdict": self.label["fontdict"],
             "alpha": 0.8,
         }
-        _update_style(self.box, self.plot_params.get("box", {}))
-        self.box["colors"] = _get_colors(
-            self.box["colors"],
-            self.engine,
-        )
 
     def set_subplot_ratio(self):
         self.subplot_ratio = {
@@ -371,45 +382,39 @@ class InfoPlotStyle(PlotStyle):
         )
 
     def update_styles(self):
-        styles = [
-            ("title", self.title),
-            ("subplot_ratio", self.subplot_ratio),
-            ("gaps", self.gaps),
-        ]
-        for style_name, style_dict in styles:
-            _update_style(style_dict, self.plot_params.get(style_name, {}))
+        super().update_styles()
+        self.line["colors"] = _get_colors(self.line["colors"], self.engine)
+        if self.bar["width"] is None:
+            self.box["width"] = self.bar["width"] = np.min(
+                [0.4, 0.4 / (10.0 / self.num_bins)]
+            )
+        self.box["colors"] = _get_colors(
+            self.box["colors"],
+            self.engine,
+        )
 
     def update_plot_domains(self, fig, nr, nc, grids, title_text):
-        subplot_w, subplot_h = (
-            self.plot_sizes["subplot_w"],
-            self.plot_sizes["subplot_h"],
+        title, domains = super().update_plot_domains(
+            fig, nr, nc, grids, title_text, self._info_plot_domain
         )
-        group_w, group_h = self.plot_sizes["group_w"], self.plot_sizes["group_h"]
-        x0, y0 = subplot_w * (nc - 1), subplot_h * (nr - 1) + self.gaps["top"]
+        return title
 
-        common_domain_x = [x0, x0 + group_w]
+    def _info_plot_domain(self, x0, y0):
+        domain_x = [x0, x0 + self.plot_sizes["group_w"]]
 
         if self.plot_type == "target":
-            box_grids, box_domain_y = None, None
-            bar_grids, bar_domain_y = grids, [1.0 - (y0 + group_h), 1.0 - y0]
+            box_domain_y = None
+            bar_domain_y = [1.0 - (y0 + self.plot_sizes["group_h"]), 1.0 - y0]
         else:
-            box_grids, bar_grids = grids
             box_domain_y = [1.0 - (y0 + self.plot_sizes["box_h"]), 1.0 - y0]
             bar_y0 = y0 + self.plot_sizes["box_h"] + self.gaps["inner_y"]
             bar_domain_y = [1.0 - (bar_y0 + self.plot_sizes["bar_h"]), 1.0 - bar_y0]
 
-        common_domain_x = [np.clip(v, 0, 1) for v in common_domain_x]
-        bar_domain_y = [np.clip(v, 0, 1) for v in bar_domain_y]
-        fig.update_xaxes(domain=common_domain_x, **bar_grids)
-        fig.update_yaxes(domain=bar_domain_y, **bar_grids)
+        # girds: box_grids, bar_grids
+        domains = [(domain_x, box_domain_y), (domain_x, bar_domain_y)]
 
-        if box_grids is not None:
-            box_domain_y = [np.clip(v, 0, 1) for v in box_domain_y]
-            fig.update_xaxes(domain=common_domain_x, **box_grids)
-            fig.update_yaxes(domain=box_domain_y, **box_grids)
-
-        tx, ty = sum(common_domain_x) / 2, 1.0 - y0
-        return self.get_subplot_title(tx, ty, title_text)
+        tx, ty = sum(domain_x) / 2, 1.0 - y0
+        return tx, ty, domains
 
 
 class InteractInfoPlotStyle(PlotStyle):
@@ -455,7 +460,7 @@ class InteractInfoPlotStyle(PlotStyle):
     def set_legend_style(self):
         self.legend = {
             "colorbar": {
-                "height": "50%",
+                "height": "70%",
                 "width": "100%",
                 "fontsize": 10,
                 "fontfamily": self.font_family,
@@ -467,7 +472,7 @@ class InteractInfoPlotStyle(PlotStyle):
         }
 
     def set_subplot_ratio(self):
-        self.subplot_ratio = {"y": [7, 1], "x": [1, 1]}
+        self.subplot_ratio = {"y": [7, 0.5], "x": [1, 1]}
 
     def set_gaps(self):
         self.gaps = {
@@ -505,58 +510,36 @@ class InteractInfoPlotStyle(PlotStyle):
             }
         )
 
-    def update_styles(self):
-        styles = [
-            ("title", self.title),
-            ("marker", self.marker),
-            ("legend", self.legend),
-            ("subplot_ratio", self.subplot_ratio),
-            ("gaps", self.gaps),
-        ]
-        for style_name, style_dict in styles:
-            _update_style(style_dict, self.plot_params.get(style_name, {}))
-
-    def update_plot_domains(self, fig, nc, nr, grids, title_text):
-        plot_sizes, gaps = self.plot_sizes, self.gaps
-        subplot_w, subplot_h = plot_sizes["subplot_w"], plot_sizes["subplot_h"]
-        x0, y0 = subplot_w * (nc - 1), subplot_h * (nr - 1) + gaps["top"]
-        scatter_grids, cb_grids, size_grids = grids
-
-        def update_axes(x0, y0, width_key, height_key, grids, w_mul=1, h_mul=1):
-            x_domain = [x0, x0 + plot_sizes[width_key] * w_mul]
-            y_domain = [1.0 - (y0 + plot_sizes[height_key] * h_mul), 1.0 - y0]
-            x_domain = [np.clip(v, 0, 1) for v in x_domain]
-            y_domain = [np.clip(v, 0, 1) for v in y_domain]
-            fig.update_xaxes(domain=x_domain, **grids)
-            fig.update_yaxes(domain=y_domain, **grids)
-            return x_domain, y_domain
-
-        scatter_domain_x, scatter_domain_y = update_axes(
-            x0, y0, "scatter_w", "scatter_h", scatter_grids
+    def update_plot_domains(self, fig, nr, nc, grids, title_text):
+        title, domains = super().update_plot_domains(
+            fig, nr, nc, grids, title_text, self._interact_info_plot_domain
         )
+        return domains[1], title
 
-        cb_height = 0.5
-        legend_y0 = y0 + plot_sizes["scatter_h"] + gaps["inner_y"]
-        cb_x0, cb_y0 = (
-            x0,
-            legend_y0 + plot_sizes["cb_h"] * (1 - cb_height) / 2,
-        )
-        cb_domain_x, cb_domain_y = update_axes(
-            cb_x0, cb_y0, "cb_w", "cb_h", cb_grids, h_mul=cb_height
-        )
+    def _interact_info_plot_domain(self, x0, y0):
+        scatter_domain_x = [x0, x0 + self.plot_sizes["scatter_w"]]
+        scatter_domain_y = [1.0 - (y0 + self.plot_sizes["scatter_h"]), 1.0 - y0]
+
+        legend_y0 = y0 + self.plot_sizes["scatter_h"] + self.gaps["inner_y"]
+        cb_x0, cb_y0 = x0, legend_y0
+        cb_domain_x = [cb_x0, cb_x0 + self.plot_sizes["cb_w"]]
+        cb_domain_y = [1.0 - (cb_y0 + self.plot_sizes["cb_h"]), 1.0 - cb_y0]
 
         size_x0, size_y0 = (
-            cb_x0 + plot_sizes["cb_w"] + gaps["inner_x"],
-            legend_y0,
+            cb_x0 + self.plot_sizes["cb_w"] + self.gaps["inner_x"],
+            cb_y0,
         )
-        size_domain_x, size_domain_y = update_axes(
-            size_x0, size_y0, "size_w", "size_h", size_grids
-        )
+        size_domain_x = [size_x0, size_x0 + self.plot_sizes["size_w"]]
+        size_domain_y = [1.0 - (size_y0 + self.plot_sizes["size_h"]), 1.0 - size_y0]
 
         tx, ty = sum(scatter_domain_x) / 2, 1.0 - y0
-        title = self.get_subplot_title(tx, ty, title_text)
-
-        return cb_domain_x, cb_domain_y, title
+        # grids: scatter_grids, cb_grids, size_grids
+        domains = [
+            (scatter_domain_x, scatter_domain_y),
+            (cb_domain_x, cb_domain_y),
+            (size_domain_x, size_domain_y),
+        ]
+        return tx, ty, domains
 
 
 class PDPIsolatePlotStyle(PlotStyle):
@@ -582,7 +565,7 @@ class PDPIsolatePlotStyle(PlotStyle):
             "center",
             "clustering",
             "plot_pts_dist",
-            "x_quantile",
+            "to_bins",
         ]
         for attr in attributes:
             setattr(self, attr, self.plot_params[attr])
@@ -671,16 +654,26 @@ class PDPIsolatePlotStyle(PlotStyle):
                 }
             )
 
-    def update_styles(self):
-        styles = [
-            ("title", self.title),
-            ("line", self.line),
-            ("dist", self.dist),
-            ("subplot_ratio", self.subplot_ratio),
-            ("gaps", self.gaps),
-        ]
-        for style_name, style_dict in styles:
-            _update_style(style_dict, self.plot_params.get(style_name, {}))
+    def update_plot_domains(self, fig, nc, nr, grids, title_text):
+        title, domains = super().update_plot_domains(
+            fig, nr, nc, grids, title_text, self._pdp_isolate_plot_domain
+        )
+        return title
+
+    def _pdp_isolate_plot_domain(self, x0, y0):
+        domain_x = [x0, x0 + self.plot_sizes["line_w"]]
+        line_domain_y = [1.0 - (y0 + self.plot_sizes["line_h"]), 1.0 - y0]
+
+        if self.plot_pts_dist:
+            dist_y0 = y0 + self.plot_sizes["line_h"] + self.gaps["inner_y"]
+            dist_domain_y = [1.0 - (dist_y0 + self.plot_sizes["dist_h"]), 1.0 - dist_y0]
+        else:
+            dist_domain_y = None
+
+        tx, ty = sum(domain_x) / 2, 1.0 - y0
+        # grids: line_grids, dist_grids
+        domains = [(domain_x, line_domain_y), (domain_x, dist_domain_y)]
+        return tx, ty, domains
 
 
 class PDPInteractPlotStyle(PlotStyle):
@@ -700,8 +693,12 @@ class PDPInteractPlotStyle(PlotStyle):
         self.set_plot_sizes()
 
     def set_plot_attributes(self):
-        self.plot_pdp = self.plot_params["plot_pdp"]
-        self.x_quantile = self.plot_params["x_quantile"]
+        attributes = [
+            "plot_pdp",
+            "to_bins",
+        ]
+        for attr in attributes:
+            setattr(self, attr, self.plot_params[attr])
 
     def set_plot_title(self, feat_names):
         feat1, feat2 = [_get_bold_text(v, self.engine) for v in feat_names]
@@ -720,7 +717,7 @@ class PDPInteractPlotStyle(PlotStyle):
 
     def set_interact_style(self):
         self.interact = {
-            "cmap": defaultColors.cmap_inter,
+            "cmaps": defaultColors.cmaps,
             "fill_alpha": 0.8,
             "type": self.plot_params["plot_type"],
             "font_size": 10,
@@ -764,12 +761,12 @@ class PDPInteractPlotStyle(PlotStyle):
         if self.plot_pdp:
             self.plot_sizes.update(
                 {
-                    "inter_w": unit_w * x2,
-                    "inter_h": unit_h * y2,
-                    "iso_y_w": unit_w * x1,
-                    "iso_y_h": unit_h * y2,
-                    "iso_x_w": unit_w * x2,
-                    "iso_x_h": unit_h * y1,
+                    "xy_w": unit_w * x2,
+                    "xy_h": unit_h * y2,
+                    "y_w": unit_w * x1,
+                    "y_h": unit_h * y2,
+                    "x_w": unit_w * x2,
+                    "x_h": unit_h * y1,
                 }
             )
         else:
@@ -778,21 +775,48 @@ class PDPInteractPlotStyle(PlotStyle):
 
             self.plot_sizes.update(
                 {
-                    "inter_w": group_w,
-                    "inter_h": group_h,
+                    "xy_w": group_w,
+                    "xy_h": group_h,
                 }
             )
 
-    def update_styles(self):
-        styles = [
-            ("title", self.title),
-            ("interact", self.interact),
-            ("isolate", self.isolate),
-            ("subplot_ratio", self.subplot_ratio),
-            ("gaps", self.gaps),
+    def update_plot_domains(self, fig, nc, nr, grids, title_text):
+        title, domains = super().update_plot_domains(
+            fig, nr, nc, grids, title_text, self._pdp_interact_plot_domain
+        )
+
+        xy_domain_x, xy_domain_y = domains[-1]
+        cb_xyz = (
+            xy_domain_x[1] + self.gaps["inner_x"] / 2,
+            xy_domain_y[0],
+            self.plot_sizes["xy_h"],
+        )
+        return title, cb_xyz
+
+    def _pdp_interact_plot_domain(self, x0, y0):
+        if self.plot_pdp:
+            xy_x0 = x0 + self.plot_sizes["y_w"] + self.gaps["inner_x"]
+            xy_y0 = y0 + self.plot_sizes["x_h"] + self.gaps["inner_y"]
+        else:
+            xy_x0, xy_y0 = x0, y0
+        xy_domain_x = [xy_x0, xy_x0 + self.plot_sizes["xy_w"]]
+        xy_domain_y = [1.0 - (xy_y0 + self.plot_sizes["xy_h"]), 1.0 - xy_y0]
+
+        if self.plot_pdp:
+            x_y0, y_x0 = y0, x0
+            x_domain_y = [1.0 - (x_y0 + self.plot_sizes["x_h"]), 1.0 - x_y0]
+            y_domain_x = [y_x0, y_x0 + self.plot_sizes["y_w"]]
+        else:
+            x_domain_y, y_domain_x = None, None
+
+        tx, ty = sum(xy_domain_x) / 2, xy_domain_y[0] - self.gaps["inner_y"]
+        # grids: x_grids, y_grids, xy_grids
+        domains = [
+            (xy_domain_x, x_domain_y),
+            (y_domain_x, xy_domain_y),
+            (xy_domain_x, xy_domain_y),
         ]
-        for style_name, style_dict in styles:
-            _update_style(style_dict, self.plot_params.get(style_name, {}))
+        return tx, ty, domains
 
 
 def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
@@ -812,6 +836,8 @@ def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
     axes.set_frame_on(False)
     axes.xaxis.set_ticks_position("top" if top else "bottom")
     axes.yaxis.set_ticks_position("right" if right else "left")
+    axes.xaxis.set_label_position("top" if top else "bottom")
+    axes.yaxis.set_label_position("right" if right else "left")
 
     if grid:
         axes.grid(True, "major", "both", ls="--", lw=0.5, c="k", alpha=0.3)
@@ -830,22 +856,29 @@ def _modify_legend_axes(axes, font_family):
     axes.set_yticks([])
 
 
-def _display_percentile(axes, percentile_columns, plot_style, is_x=True, is_y=False):
-    if is_x:
+def _display_percentile(
+    axes, percentile_columns, plot_style, is_y=False, right=True, top=True
+):
+    if is_y:
+        per_axes = axes.twinx()
+        ticks = axes.get_yticks()
+        if len(ticks) > len(percentile_columns):
+            per_axes.set_yticks(ticks[:-1] + 0.5, labels=percentile_columns)
+        else:
+            per_axes.set_yticks(axes.get_yticks(), labels=percentile_columns)
+        per_axes.set_ybound(axes.get_ybound())
+        per_axes.set_ylabel("percentile buckets", fontdict=plot_style.label["fontdict"])
+        _axes_modify(per_axes, plot_style, right=right, grid=False)
+    else:
         per_axes = axes.twiny()
-        per_axes.set_xticks(axes.get_xticks(), labels=percentile_columns)
+        ticks = axes.get_xticks()
+        if len(ticks) > len(percentile_columns):
+            per_axes.set_xticks(ticks[:-1] + 0.5, labels=percentile_columns)
+        else:
+            per_axes.set_xticks(axes.get_xticks(), labels=percentile_columns)
         per_axes.set_xbound(axes.get_xbound())
         per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
-        _axes_modify(per_axes, plot_style, top=True)
-
-    if is_y:
-        per_yaxes = axes.twinx()
-        per_yaxes.set_yticks(axes.get_yticks(), labels=percentile_columns)
-        per_yaxes.set_ybound(axes.get_ybound())
-        per_yaxes.set_ylabel(
-            "percentile buckets", fontdict=plot_style.label["fontdict"]
-        )
-        _axes_modify(per_yaxes, plot_style, right=True)
+        _axes_modify(per_axes, plot_style, top=top, grid=False)
 
 
 def _display_ticks_plotly(display_columns, percentile_columns, fig, grids, is_y=False):
