@@ -17,7 +17,6 @@ from .utils import (
 import pandas as pd
 import numpy as np
 from pqdm.processes import pqdm
-import copy
 from tqdm.auto import tqdm
 
 import warnings
@@ -60,11 +59,11 @@ class _PDPBase:
         self.predict_kwds = predict_kwds
         self.data_transformer = data_transformer
 
-    def prepare_calculate(self):
+    def _prepare_calculate(self):
         self.n_classes, self.pred_func, self.from_model = _check_model(
             self.model, self.n_classes, self.pred_func
         )
-        self.target = np.arange(self.n_classes) if self.n_classes > 2 else [0]
+        self.target = list(np.arange(self.n_classes)) if self.n_classes > 2 else [0]
 
     def _calc_ice_lines(
         self,
@@ -73,9 +72,7 @@ class _PDPBase:
         grids,
         grid_idx,
     ):
-        for i, feat in enumerate(feats):
-            df[feat] = grids[i]
-
+        df[feats] = grids
         if self.data_transformer is not None:
             df = self.data_transformer(df)
         preds = _calc_preds(
@@ -99,7 +96,7 @@ class _PDPBase:
 
         return grid_results
 
-    def collect_pdp_results(self, features, grids):
+    def _collect_pdp_results(self, features, grids):
         self.n_jobs = _calc_n_jobs(
             self.df, self.n_grids, self.memory_limit, self.n_jobs
         )
@@ -189,11 +186,11 @@ class PDPIsolate(_PDPBase):
         )
         self.df = df
         self.model_features = model_features
-        self.prepare_feature()
-        self.prepare_calculate()
-        self.calculate()
+        self._prepare_feature()
+        self._prepare_calculate()
+        self._calculate()
 
-    def prepare_feature(self):
+    def _prepare_feature(self):
         _, self.count_df, _ = self.feature_info.prepare(self.df)
         self.n_grids = len(self.feature_info.grids)
         dist_df = self.df[self.feature_info.col_name]
@@ -202,7 +199,7 @@ class PDPIsolate(_PDPBase):
             dist_df = dist_df.sample(num_samples, replace=False)
         self.dist_df = dist_df
 
-    def calculate(self):
+    def _calculate(self):
         features = _make_list(self.feature_info.col_name)
         feature_grids = []
         for i, grid in enumerate(self.feature_info.grids):
@@ -212,7 +209,7 @@ class PDPIsolate(_PDPBase):
             else:
                 grids = [grid]
             feature_grids.append(grids)
-        self.collect_pdp_results(features, feature_grids)
+        self._collect_pdp_results(features, feature_grids)
 
     def plot(
         self,
@@ -309,17 +306,14 @@ class PDPInteract(_PDPBase):
             "grid_ranges": grid_ranges,
             "cust_grid_points": cust_grid_points,
         }
-        self.prepare_feature(kwargs)
-        self.prepare_calculate()
-        self.calculate()
+        self._prepare_feature(kwargs)
+        self._prepare_calculate()
+        self._calculate()
 
-    def prepare_feature(self, kwargs):
+    def _prepare_feature(self, kwargs):
         params = _expand_params_for_interact(kwargs)
-        self.pdp_isolate_objs = []
-        self.n_grids = 1
-
-        for i in range(2):
-            obj = PDPIsolate(
+        self.pdp_isolate_objs = [
+            PDPIsolate(
                 self.model,
                 self.df,
                 self.model_features,
@@ -338,18 +332,19 @@ class PDPInteract(_PDPBase):
                 grid_range=params["grid_ranges"][i],
                 cust_grid_points=params["cust_grid_points"][i],
             )
+            for i in range(2)
+        ]
+        for obj in self.pdp_isolate_objs:
             obj.df = None
-            self.n_grids *= obj.n_grids
-            self.pdp_isolate_objs.append(obj)
-
+        self.n_grids = np.prod([obj.n_grids for obj in self.pdp_isolate_objs])
         self.feature_grid_combos = self._get_grid_combos()
 
     def _get_grid_combos(self):
-        grids = [self.pdp_isolate_objs[i].feature_info.grids for i in range(2)]
-        types = [self.pdp_isolate_objs[i].feature_info.type for i in range(2)]
-        for i in range(2):
+        grids = [obj.feature_info.grids for obj in self.pdp_isolate_objs]
+        types = [obj.feature_info.type for obj in self.pdp_isolate_objs]
+        for i, grid in enumerate(grids):
             if types[i] == "onehot":
-                grids[i] = np.eye(len(grids[i])).astype(int).tolist()
+                grids[i] = np.eye(len(grid)).astype(int).tolist()
 
         grid_combos = []
         for g1 in grids[0]:
@@ -358,11 +353,11 @@ class PDPInteract(_PDPBase):
 
         return np.array(grid_combos)
 
-    def calculate(self):
+    def _calculate(self):
         features = []
-        for i in range(2):
-            features += _make_list(self.pdp_isolate_objs[i].feature_info.col_name)
-        self.collect_pdp_results(features, self.feature_grid_combos)
+        for obj in self.pdp_isolate_objs:
+            features += _make_list(obj.feature_info.col_name)
+        self._collect_pdp_results(features, self.feature_grid_combos)
 
     def plot(
         self,
@@ -382,7 +377,7 @@ class PDPInteract(_PDPBase):
         if plot_params is None:
             plot_params = {}
 
-        feature_types = [self.pdp_isolate_objs[i].feature_info.type for i in range(2)]
+        feature_types = [obj.feature_info.type for obj in self.pdp_isolate_objs]
 
         if (
             not all(v == "numeric" for v in feature_types)
@@ -401,7 +396,7 @@ class PDPInteract(_PDPBase):
                 "dpi": dpi,
                 "template": template,
                 "engine": engine,
-                "n_grids": [self.pdp_isolate_objs[i].n_grids for i in range(2)],
+                "n_grids": [obj.n_grids for obj in self.pdp_isolate_objs],
                 "plot_pdp": plot_pdp,
                 "to_bins": to_bins,
                 "plot_type": plot_type,
