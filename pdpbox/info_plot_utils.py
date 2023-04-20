@@ -2,7 +2,6 @@ from .styles import (
     _prepare_plot_style,
     _axes_modify,
     _display_percentile,
-    _display_ticks_plotly,
     _modify_legend_axes,
 )
 
@@ -109,7 +108,6 @@ class InfoPlotEngine(BaseInfoPlotEngine):
         axes.set_ylabel("count", fontdict=self.plot_style.label["fontdict"])
         axes.set_xticks(range(len(self.display_columns)), labels=self.display_columns)
         axes.set_xlim(-0.5, len(self.display_columns) - 0.5)
-        _axes_modify(axes, self.plot_style)
 
     def _draw_barplot_plotly(self, fig, grids):
         df = self.plot_obj.count_df
@@ -209,7 +207,6 @@ class InfoPlotEngine(BaseInfoPlotEngine):
         )
 
         self._draw_lineplot("", line_df, axes, box_color)
-        _axes_modify(axes, self.plot_style, right=False, grid=True)
 
     def _draw_boxplot_plotly(self, target, box_df, line_df, box_color, fig, grids):
         box_style = self.plot_style.box
@@ -232,9 +229,15 @@ class InfoPlotEngine(BaseInfoPlotEngine):
             )
         self._draw_lineplot_plotly(target, line_df, box_color, fig, grids, y2=False)
 
-    def wrapup_subplot(self, title, bar_axes, box_axes=None):
+    def wrapup_subplot(self, title, bar_axes, line_axes=None, box_axes=None):
         title_axes = box_axes or bar_axes
         self.set_subplot_title(title_axes, title)
+
+        _axes_modify(bar_axes, self.plot_style)
+        if line_axes is not None:
+            _axes_modify(line_axes, self.plot_style, right=True, grid=False)
+        if box_axes is not None:
+            _axes_modify(box_axes, self.plot_style)
 
         xlabel = "value"
         if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
@@ -245,13 +248,17 @@ class InfoPlotEngine(BaseInfoPlotEngine):
     def wrapup_subplot_plotly(
         self, target, fig, bar_grids, box_grids=None, yrange=None
     ):
-        _display_ticks_plotly(
-            self.display_columns,
-            self.percentile_columns,
-            fig,
-            bar_grids,
-            is_y=False,
+        ticktext = self.display_columns.copy()
+        xlabel = "value"
+        if len(self.percentile_columns) > 0:
+            xlabel += " + percentile"
+            for i, p in enumerate(self.percentile_columns):
+                ticktext[i] += f"<br><sup><b>{p}</b></sup>"
+
+        tick_params = dict(
+            ticktext=ticktext, tickvals=np.arange(len(ticktext)), **bar_grids
         )
+        fig.update_xaxes(title_text=xlabel, **tick_params)
         fig.update_yaxes(title_text="count", secondary_y=False, **bar_grids)
         if box_grids is None:
             fig.update_yaxes(
@@ -304,9 +311,8 @@ class TargetPlotEngine(InfoPlotEngine):
                 line_axes,
                 line_color,
             )
-            _axes_modify(line_axes, self.plot_style, right=True, grid=False)
 
-            self.wrapup_subplot(target, bar_axes, box_axes=None)
+            self.wrapup_subplot(target, bar_axes, line_axes)
             axes["bar_axes"].append(bar_axes)
             axes["line_axes"].append(line_axes)
 
@@ -388,7 +394,7 @@ class PredictPlotEngine(InfoPlotEngine):
             box_axes.set(ylabel=f"{target} dist", xticklabels=[])
             self._draw_barplot(bar_axes)
 
-            self.wrapup_subplot(target, bar_axes, box_axes)
+            self.wrapup_subplot(target, bar_axes, None, box_axes)
             axes["bar_axes"].append(bar_axes)
             axes["box_axes"].append(box_axes)
 

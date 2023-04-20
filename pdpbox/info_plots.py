@@ -17,7 +17,6 @@ from .utils import (
     _expand_params_for_interact,
 )
 
-import numpy as np
 import pandas as pd
 from itertools import product
 

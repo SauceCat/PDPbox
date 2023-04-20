@@ -55,33 +55,6 @@ class PDPIsolatePlotEngine:
             else self.plot_plotly()
         )
 
-    def prepare_subplot(self, class_idx):
-        target = self.plot_obj.target[class_idx]
-        cmap = next(self.cmaps)
-        colors = [cmap, plt.get_cmap(cmap)(0.1), plt.get_cmap(cmap)(1.0)]
-        return target, cmap, colors
-
-    def wrapup_subplot(self, title, line_axes, dist_axes=None):
-        if len(self.plot_obj.target) > 1:
-            line_axes.set_title(
-                title,
-                **self.plot_style.title["subplot_title"],
-            )
-
-        xlabel = "value"
-        if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
-            _display_percentile(line_axes, self.percentile_columns, self.plot_style)
-            xlabel += " + percentile"
-        label_axes = dist_axes or line_axes
-        label_axes.set_xlabel(xlabel, fontdict=self.plot_style.label["fontdict"])
-
-    def wrapup_subplot_plotly(self, fig, line_grids, dist_grids=None):
-        xlabel = "value"
-        if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
-            xlabel += " + percentile"
-        label_grids = dist_grids or line_grids
-        fig.update_xaxes(title_text=xlabel, **label_grids)
-
     def _cluster_ice_lines(self, ice_lines, feature_grids):
         method = self.plot_style.clustering["method"]
         n_centers = self.plot_style.clustering["n_centers"]
@@ -267,56 +240,73 @@ class PDPIsolatePlotEngine:
         }
         if self.plot_style.engine == "matplotlib":
             self._pdp_std_plot(axes=axes, **std_params)
-            _axes_modify(axes, self.plot_style)
         else:
             std_traces = self._pdp_std_plot_plotly(**std_params)
             for trace in ice_line_traces + std_traces:
                 if trace is not None:
                     fig.add_trace(trace, **grids)
 
-    def _get_pdp_xticks(self):
-        dist_xticklabels = line_xticklabels = copy.deepcopy(self.display_columns)
+    def _get_pdp_xticks(self, is_line=False):
+        ticklabels = self.display_columns[:]
+        per_ticklabels = self.percentile_columns
         is_numeric = self.plot_obj.feature_info.type == "numeric"
-        if is_numeric:
-            if self.plot_style.to_bins:
-                line_xticklabels = self.grids
-            else:
-                dist_xticklabels = line_xticklabels = None
-                self.plot_style.show_percentile = False
+        set_ticks = True
+        ticks = np.arange(len(ticklabels))
+        v_range = [ticks[0] - 0.5, ticks[-1] + 0.5]
 
-        if self.plot_style.show_percentile and self.plot_style.engine == "plotly":
-            for j, p in enumerate(self.percentile_columns):
-                dist_xticklabels[j] += f"<br><sup><b>{p}</b></sup>"
-            if self.plot_style.to_bins:
-                for j, p in enumerate(self.percentiles):
-                    line_xticklabels[j] += f"<br><sup><b>{p}</b></sup>"
+        if is_numeric and is_line and self.plot_style.to_bins:
+            ticklabels = self.grids[:]
+            per_ticklabels = self.percentiles
+            ticks = np.arange(len(ticklabels))
+            v_range = [ticks[0], ticks[-1]]
 
-        if self.plot_style.plot_pts_dist and line_xticklabels is not None:
-            line_xticklabels = [""] * len(line_xticklabels)
+        if is_numeric and not self.plot_style.to_bins:
+            set_ticks = False
 
-        return is_numeric, line_xticklabels, dist_xticklabels
+        if (
+            set_ticks
+            and self.plot_style.show_percentile
+            and self.plot_style.engine == "plotly"
+        ):
+            for j, p in enumerate(per_ticklabels):
+                ticklabels[j] += f"<br><sup><b>{p}</b></sup>"
 
-    def _set_pdp_xticks(
-        self, xticklabels, axes=None, fig=None, grids=None, is_numeric_line=False
-    ):
-        if xticklabels is not None:
-            xticks = np.arange(len(xticklabels))
-            x_range = (
-                [xticks[0], xticks[-1]]
-                if is_numeric_line
-                else [xticks[0] - 0.5, xticks[-1] + 0.5]
-            )
+        if is_line and self.plot_style.plot_pts_dist:
+            ticklabels = [""] * len(ticklabels)
 
-            if self.plot_style.engine == "matplotlib":
-                axes.set_xlim(x_range)
-                axes.set_xticks(xticks, labels=xticklabels)
-            else:
-                fig.update_xaxes(
-                    ticktext=xticklabels,
-                    tickvals=xticks,
-                    range=x_range,
-                    **grids,
+        return ticks, v_range, ticklabels, per_ticklabels, set_ticks
+
+    def _set_pdp_xticks(self, axes, is_line=True):
+        ticks, v_range, ticklabels, per_ticklabels, set_ticks = self._get_pdp_xticks(
+            is_line
+        )
+
+        if set_ticks:
+            axes.set_xlim(v_range)
+            axes.set_xticks(ticks, labels=ticklabels)
+
+            if is_line and self.plot_style.show_percentile and len(per_ticklabels) > 0:
+                _display_percentile(
+                    axes,
+                    self.plot_obj.feature_info.name,
+                    per_ticklabels,
+                    self.plot_style,
+                    is_y=False,
+                    top=True,
                 )
+
+    def _set_pdp_xticks_plotly(self, fig, grids, is_line=True):
+        ticks, v_range, ticklabels, per_ticklabels, set_ticks = self._get_pdp_xticks(
+            is_line
+        )
+
+        if set_ticks:
+            fig.update_xaxes(
+                ticktext=ticklabels,
+                tickvals=ticks,
+                range=v_range,
+                **grids,
+            )
 
     def _draw_pdp_distplot(self, data, color, axes):
         axes.plot(
@@ -430,39 +420,95 @@ class PDPIsolatePlotEngine:
 
         fig.add_trace(dist_trace, **grids)
 
+    def prepare_data(self, class_idx):
+        target = self.plot_obj.target[class_idx]
+        cmap = next(self.cmaps)
+        colors = [cmap, plt.get_cmap(cmap)(0.1), plt.get_cmap(cmap)(1.0)]
+        return target, cmap, colors
+
+    def prepare_axes(self, inner_grid):
+        if self.plot_style.plot_pts_dist:
+            inner = GridSpecFromSubplotSpec(
+                2,
+                1,
+                subplot_spec=inner_grid,
+                wspace=self.plot_style.gaps["inner_x"],
+                hspace=self.plot_style.gaps["inner_y"],
+                height_ratios=self.plot_style.subplot_ratio["y"],
+            )
+            line_axes = plt.subplot(inner[0])
+            dist_axes = plt.subplot(inner[1])
+        else:
+            line_axes = plt.subplot(inner_grid)
+            dist_axes = None
+
+        return line_axes, dist_axes
+
+    def prepare_grids(self, nc, nr):
+        if self.plot_style.plot_pts_dist:
+            line_grids = {"col": nc, "row": nr * 2 - 1}
+            dist_grids = {"col": nc, "row": nr * 2}
+        else:
+            line_grids = {"col": nc, "row": nr}
+            dist_grids = None
+
+        return line_grids, dist_grids
+
+    def wrapup(self, title, line_axes, dist_axes=None):
+        self._set_pdp_xticks(line_axes, is_line=True)
+        _axes_modify(line_axes, self.plot_style)
+
+        if self.plot_style.plot_pts_dist:
+            self._set_pdp_xticks(dist_axes, is_line=False)
+            _axes_modify(dist_axes, self.plot_style, grid=False)
+
+        label = (
+            _get_bold_text(self.plot_obj.feature_info.name, self.plot_style.engine)
+            + " (value)"
+        )
+        label_axes = dist_axes or line_axes
+        label_axes.set_xlabel(label, fontdict=self.plot_style.label["fontdict"])
+
+        if len(self.plot_obj.target) > 1:
+            line_axes.set_title(
+                title,
+                **self.plot_style.title["subplot_title"],
+            )
+
+    def wrapup_plotly(self, fig, line_grids, dist_grids=None):
+        self._set_pdp_xticks_plotly(fig, line_grids, is_line=True)
+
+        if self.plot_style.plot_pts_dist:
+            self._set_pdp_xticks_plotly(fig, dist_grids, is_line=False)
+            fig.update_yaxes(
+                showticklabels=False,
+                **dist_grids,
+            )
+
+        label = "value"
+        if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
+            label += " + percentile"
+        label_grids = dist_grids or line_grids
+        label = (
+            _get_bold_text(self.plot_obj.feature_info.name, self.plot_style.engine)
+            + f" ({label})"
+        )
+        fig.update_xaxes(title_text=label, **label_grids)
+
     def plot_matplotlib(self):
-        fig, inner_grid, title_axes = self.plot_style.make_subplots()
+        fig, inner_grids, title_axes = self.plot_style.make_subplots()
         axes = {"title_axes": title_axes, "line_axes": [], "dist_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap, colors = self.prepare_subplot(class_idx)
-            if self.plot_style.plot_pts_dist:
-                inner = GridSpecFromSubplotSpec(
-                    2,
-                    1,
-                    subplot_spec=inner_grid[i],
-                    wspace=self.plot_style.gaps["inner_x"],
-                    hspace=self.plot_style.gaps["inner_y"],
-                    height_ratios=self.plot_style.subplot_ratio["y"],
-                )
-                line_axes = plt.subplot(inner[0])
-                dist_axes = plt.subplot(inner[1])
-            else:
-                line_axes = plt.subplot(inner_grid[i])
-                dist_axes = None
+            target, cmap, colors = self.prepare_data(class_idx)
+            line_axes, dist_axes = self.prepare_axes(inner_grids[i])
 
             self._pdp_line_plot(class_idx, colors, line_axes)
-            is_numeric, line_xticklabels, dist_xticklabels = self._get_pdp_xticks()
-            self._set_pdp_xticks(
-                line_xticklabels, line_axes, is_numeric_line=is_numeric
-            )
-
             if self.plot_style.plot_pts_dist:
                 self._pdp_dist_plot(colors, dist_axes, line_axes)
-                self._set_pdp_xticks(dist_xticklabels, dist_axes)
                 axes["dist_axes"].append(dist_axes)
 
-            self.wrapup_subplot(f"pred_{target}", line_axes, dist_axes)
+            self.wrapup(f"pred_{target}", line_axes, dist_axes)
             axes["line_axes"].append(line_axes)
 
         return fig, axes
@@ -479,30 +525,18 @@ class PDPIsolatePlotEngine:
         subplot_titles = []
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap, colors = self.prepare_subplot(class_idx)
+            target, cmap, colors = self.prepare_data(class_idx)
             nc, nr = i % ncols + 1, i // ncols + 1
-            line_grids = {"col": nc, "row": nr * 2 - 1}
-            dist_grids = None
+            line_grids, dist_grids = self.prepare_grids(nc, nr)
 
             self._pdp_line_plot(class_idx, colors, None, fig, line_grids)
-            is_numeric, line_xticklabels, dist_xticklabels = self._get_pdp_xticks()
-            self._set_pdp_xticks(
-                line_xticklabels, None, fig, line_grids, is_numeric_line=is_numeric
-            )
-
             if self.plot_style.plot_pts_dist:
-                dist_grids = {"col": nc, "row": nr * 2}
                 self._pdp_dist_plot_plotly(colors, fig, dist_grids)
-                self._set_pdp_xticks(dist_xticklabels, None, fig, dist_grids)
-                fig.update_yaxes(
-                    showticklabels=False,
-                    **dist_grids,
-                )
             title = self.plot_style.update_plot_domains(
                 fig, nr, nc, (line_grids, dist_grids), f"pred_{target}"
             )
             subplot_titles.append(title)
-            self.wrapup_subplot_plotly(fig, line_grids, dist_grids)
+            self.wrapup_plotly(fig, line_grids, dist_grids)
 
         if len(self.plot_obj.target) > 1:
             fig.update_layout(annotations=subplot_titles)
@@ -548,30 +582,6 @@ class PDPInteractPlotEngine:
             if self.plot_style.engine == "matplotlib"
             else self.plot_plotly()
         )
-
-    def prepare_subplot(self, class_idx):
-        target = self.plot_obj.target[class_idx]
-        cmap = next(self.cmaps)
-        pdp_x, pdp_y = [
-            copy.deepcopy(obj.results[class_idx].pdp)
-            for obj in self.plot_obj.pdp_isolate_objs
-        ]
-        pdp_xy = copy.deepcopy(self.plot_obj.results[class_idx].pdp)
-        pdp_values = (
-            np.concatenate((pdp_x, pdp_y, pdp_xy))
-            if self.plot_style.plot_pdp
-            else pdp_xy
-        )
-        pdp_range = [np.min(pdp_values), np.max(pdp_values)]
-
-        return pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap
-
-    def wrapup_subplot(self, title, axes):
-        if len(self.plot_obj.target) > 1:
-            axes.set_title(
-                title,
-                **self.plot_style.title["subplot_title"],
-            )
 
     def _pdp_xy_grid(self, pdp_xy, norm, cmap, axes):
         im = axes.imshow(
@@ -663,11 +673,8 @@ class PDPInteractPlotEngine:
             im = self._pdp_contour_plot(X, Y, pdp_xy, norm, cmap, axes)
 
         axes.grid(False)
-        axes.set_xticklabels([])
-        axes.set_yticklabels([])
         axes.tick_params(which="both", bottom=False, left=False)
         axes.set_frame_on(False)
-        _axes_modify(axes, self.plot_style)
 
         return im
 
@@ -788,64 +795,50 @@ class PDPInteractPlotEngine:
         label = _get_bold_text(self.feature_names[i], self.plot_style.engine) + (
             f" ({label})" if label else ""
         )
+        set_ticks = False if is_xy and not self.plot_style.to_bins else True
 
-        return label, ticklabels, per_ticklabels
+        return label, ticklabels, per_ticklabels, set_ticks
 
-    def _set_pdp_ticks(self, axes, is_xy=False, is_y=False):
-        if is_xy and self.plot_style.plot_pdp:
-            return
-        label, ticklabels, per_ticklabels = self._get_pdp_xticks(is_xy, is_y)
+    def _set_pdp_ticks(self, axes, is_xy=True, is_y=False):
+        label, ticklabels, per_ticklabels, set_ticks = self._get_pdp_xticks(is_xy, is_y)
         if is_y:
             axes.set_ylabel(label, fontdict=self.plot_style.label["fontdict"])
+            if set_ticks:
+                axes.set_yticks(range(len(ticklabels)), ticklabels)
+                if self.plot_style.show_percentile and len(per_ticklabels) > 0:
+                    _display_percentile(
+                        axes,
+                        self.feature_names[1],
+                        per_ticklabels,
+                        self.plot_style,
+                        is_y=True,
+                    )
         else:
             axes.set_xlabel(label, fontdict=self.plot_style.label["fontdict"])
-            axes.xaxis.set_label_position("top")
-
-        if (
-            is_xy
-            and self.plot_style.interact["type"] == "contour"
-            and not self.plot_style.to_bins
-        ):
-            return
-
-        if is_y:
-            axes.set_yticks(range(len(ticklabels)), ticklabels)
-            if self.plot_style.show_percentile and len(per_ticklabels) > 0:
-                _display_percentile(axes, per_ticklabels, self.plot_style, is_y=True)
-            if not is_xy:
-                axes.get_xaxis().set_visible(False)
-        else:
-            axes.set_xticks(range(len(ticklabels)), ticklabels)
-            if self.plot_style.show_percentile and len(per_ticklabels) > 0:
-                _display_percentile(
-                    axes, per_ticklabels, self.plot_style, is_y=False, top=False
-                )
-            if not is_xy:
-                axes.get_yaxis().set_visible(False)
-
-        _axes_modify(axes, self.plot_style, grid=False, top=True)
+            if set_ticks:
+                axes.set_xticks(range(len(ticklabels)), ticklabels)
+                if self.plot_style.show_percentile and len(per_ticklabels) > 0:
+                    _display_percentile(
+                        axes,
+                        self.feature_names[0],
+                        per_ticklabels,
+                        self.plot_style,
+                        is_y=False,
+                        top=is_xy,
+                    )
         axes.tick_params(axis="both", which="minor", length=0)
         axes.grid(False)
 
     def _set_pdp_ticks_plotly(self, fig, grids, is_xy=False, is_y=False):
-        label, ticklabels, _ = self._get_pdp_xticks(is_xy, is_y)
-        show_labels = not (
-            is_xy
-            and self.plot_style.interact["type"] == "contour"
-            and not self.plot_style.to_bins
-        )
+        label, ticklabels, _, set_ticks = self._get_pdp_xticks(is_xy, is_y)
 
         tick_params = {
             "title_text": label,
             "title_standoff": 0,
-            "ticktext": ticklabels if show_labels else None,
-            "tickvals": np.arange(len(ticklabels)) if show_labels else None,
+            "ticktext": ticklabels if set_ticks else None,
+            "tickvals": np.arange(len(ticklabels)) if set_ticks else None,
             "side": "top" if not is_y else None,
         }
-
-        if not is_xy:
-            fig.update_xaxes(showgrid=False, showticklabels=False, **grids)
-            fig.update_yaxes(showgrid=False, showticklabels=False, **grids)
 
         if is_y:
             fig.update_yaxes(**tick_params, **grids)
@@ -878,55 +871,109 @@ class PDPInteractPlotEngine:
         cb.ax.tick_params(**self.plot_style.tick)
         cb.outline.set_visible(False)
 
+    def prepare_data(self, class_idx):
+        target = self.plot_obj.target[class_idx]
+        cmap = next(self.cmaps)
+        pdp_x, pdp_y = [
+            copy.deepcopy(obj.results[class_idx].pdp)
+            for obj in self.plot_obj.pdp_isolate_objs
+        ]
+        pdp_xy = copy.deepcopy(self.plot_obj.results[class_idx].pdp)
+        pdp_values = (
+            np.concatenate((pdp_x, pdp_y, pdp_xy))
+            if self.plot_style.plot_pdp
+            else pdp_xy
+        )
+        pdp_range = [np.min(pdp_values), np.max(pdp_values)]
+
+        return pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap
+
+    def prepare_axes(self, inner_grid):
+        if self.plot_style.plot_pdp:
+            inner = GridSpecFromSubplotSpec(
+                2,
+                2,
+                subplot_spec=inner_grid,
+                wspace=self.plot_style.gaps["inner_x"],
+                hspace=self.plot_style.gaps["inner_y"],
+                height_ratios=self.plot_style.subplot_ratio["y"],
+                width_ratios=self.plot_style.subplot_ratio["x"],
+            )
+            xy_axes, x_axes, y_axes = (
+                plt.subplot(inner[3]),
+                plt.subplot(inner[1]),
+                plt.subplot(inner[2]),
+            )
+
+            if self.plot_style.interact["type"] == "grid":
+                x_axes.get_shared_x_axes().join(x_axes, xy_axes)
+                y_axes.get_shared_y_axes().join(y_axes, xy_axes)
+        else:
+            xy_axes = plt.subplot(inner_grid)
+            x_axes, y_axes = None, None
+        return x_axes, y_axes, xy_axes
+
+    def prepare_grids(self, nc, nr):
+        if self.plot_style.plot_pdp:
+            xy_grids = {"col": nc * 2, "row": nr * 2}
+            x_grids = {"col": nc * 2, "row": nr * 2 - 1}
+            y_grids = {"col": nc * 2 - 1, "row": nr * 2}
+        else:
+            xy_grids = {"col": nc, "row": nr}
+            x_grids, y_grids = None, None
+
+        return x_grids, y_grids, xy_grids
+
+    def wrapup(self, title, xy_axes, x_axes=None, y_axes=None):
+        if self.plot_style.plot_pdp:
+            self._set_pdp_ticks(x_axes, is_xy=False, is_y=False)
+            x_axes.get_yaxis().set_visible(False)
+            _axes_modify(x_axes, self.plot_style, grid=False, top=True)
+
+            self._set_pdp_ticks(y_axes, is_xy=False, is_y=True)
+            y_axes.get_xaxis().set_visible(False)
+            _axes_modify(y_axes, self.plot_style, grid=False)
+
+            xy_axes.get_xaxis().set_visible(False)
+            xy_axes.get_yaxis().set_visible(False)
+        else:
+            self._set_pdp_ticks(xy_axes, is_xy=True, is_y=False)
+            self._set_pdp_ticks(xy_axes, is_xy=True, is_y=True)
+
+        _axes_modify(xy_axes, self.plot_style, grid=False)
+        if len(self.plot_obj.target) > 1:
+            xy_axes.set_xlabel(title, **self.plot_style.title["subplot_title"])
+
+    def wrapup_plotly(self, fig, xy_grids, x_grids=None, y_grids=None):
+        if self.plot_style.plot_pdp:
+            self._set_pdp_ticks_plotly(fig, x_grids, is_xy=False, is_y=False)
+            fig.update_yaxes(showgrid=False, showticklabels=False, **x_grids)
+            self._set_pdp_ticks_plotly(fig, y_grids, is_xy=False, is_y=True)
+            fig.update_xaxes(showgrid=False, showticklabels=False, **y_grids)
+            fig.update_xaxes(showgrid=False, showticklabels=False, **xy_grids)
+            fig.update_yaxes(showgrid=False, showticklabels=False, **xy_grids)
+        else:
+            self._set_pdp_ticks_plotly(fig, xy_grids, is_xy=True, is_y=False)
+            self._set_pdp_ticks_plotly(fig, xy_grids, is_xy=True, is_y=True)
+
     def plot_matplotlib(self):
-        fig, inner_grid, title_axes = self.plot_style.make_subplots()
+        fig, inner_grids, title_axes = self.plot_style.make_subplots()
         axes = {"title_axes": title_axes, "interact_axes": [], "isolate_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap = self.prepare_subplot(
-                class_idx
-            )
+            pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap = self.prepare_data(class_idx)
+            x_axes, y_axes, xy_axes = self.prepare_axes(inner_grids[i])
             norm = mpl.colors.Normalize(vmin=pdp_range[0], vmax=pdp_range[1])
             vmean = norm.vmin + (norm.vmax - norm.vmin) * 0.5
+            im = self._pdp_inter_plot(pdp_xy, norm, cmap, xy_axes)
 
             if self.plot_style.plot_pdp:
-                inner = GridSpecFromSubplotSpec(
-                    2,
-                    2,
-                    subplot_spec=inner_grid[i],
-                    wspace=self.plot_style.gaps["inner_x"],
-                    hspace=self.plot_style.gaps["inner_y"],
-                    height_ratios=self.plot_style.subplot_ratio["y"],
-                    width_ratios=self.plot_style.subplot_ratio["x"],
-                )
-                xy_axes, x_axes, y_axes = (
-                    plt.subplot(inner[3]),
-                    plt.subplot(inner[1]),
-                    plt.subplot(inner[2]),
-                )
-
-                if self.plot_style.interact["type"] == "grid":
-                    x_axes.get_shared_x_axes().join(x_axes, xy_axes)
-                    y_axes.get_shared_y_axes().join(y_axes, xy_axes)
-
                 plot_params = {"vmean": vmean, "norm": norm, "cmap": cmap}
                 self._pdp_iso_plot(pdp_x, axes=x_axes, is_y=False, **plot_params)
                 self._pdp_iso_plot(pdp_y, axes=y_axes, is_y=True, **plot_params)
-                self._set_pdp_ticks(x_axes, is_xy=False, is_y=False)
-                self._set_pdp_ticks(y_axes, is_xy=False, is_y=True)
-                xy_axes.get_xaxis().set_visible(False)
-                xy_axes.get_yaxis().set_visible(False)
-            else:
-                xy_axes = plt.subplot(inner_grid[i])
-                x_axes, y_axes = None, None
-                self._set_pdp_ticks(xy_axes, is_xy=True, is_y=False)
-                self._set_pdp_ticks(xy_axes, is_xy=True, is_y=True)
 
-            im = self._pdp_inter_plot(pdp_xy, norm, cmap, xy_axes)
-            self.wrapup_subplot(
-                f"pred_{target}", x_axes if self.plot_style.plot_pdp else xy_axes
-            )
             self._insert_colorbar(im, norm, xy_axes)
+            self.wrapup(f"pred_{target}", xy_axes, x_axes, y_axes)
             axes["interact_axes"].append(xy_axes)
             axes["isolate_axes"].append([x_axes, y_axes])
 
@@ -944,36 +991,23 @@ class PDPInteractPlotEngine:
         subplot_titles = []
 
         for i, class_idx in enumerate(self.which_classes):
-            pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap = self.prepare_subplot(
-                class_idx
-            )
+            pdp_x, pdp_y, pdp_xy, pdp_range, target, cmap = self.prepare_data(class_idx)
             nc, nr = i % ncols + 1, i // ncols + 1
+            x_grids, y_grids, xy_grids = self.prepare_grids(nc, nr)
+            title, cb_xyz = self.plot_style.update_plot_domains(
+                fig, nc, nr, (x_grids, y_grids, xy_grids), f"pred_{target}"
+            )
+            subplot_titles.append(title)
+            self._pdp_inter_plot_plotly(pdp_xy, cmap, cb_xyz, pdp_range, fig, xy_grids)
 
             if self.plot_style.plot_pdp:
-                xy_grids = {"col": nc * 2, "row": nr * 2}
-                x_grids = {"col": nc * 2, "row": nr * 2 - 1}
-                y_grids = {"col": nc * 2 - 1, "row": nr * 2}
                 self._pdp_iso_plot_plotly(
                     pdp_x, cmap, pdp_range, fig, x_grids, is_y=False
                 )
                 self._pdp_iso_plot_plotly(
                     pdp_y, cmap, pdp_range, fig, y_grids, is_y=True
                 )
-                self._set_pdp_ticks_plotly(fig, x_grids, is_xy=False, is_y=False)
-                self._set_pdp_ticks_plotly(fig, y_grids, is_xy=False, is_y=True)
-                fig.update_xaxes(showgrid=False, showticklabels=False, **xy_grids)
-                fig.update_yaxes(showgrid=False, showticklabels=False, **xy_grids)
-            else:
-                xy_grids = {"col": nc, "row": nr}
-                x_grids, y_grids = None, None
-                self._set_pdp_ticks_plotly(fig, xy_grids, is_xy=True, is_y=False)
-                self._set_pdp_ticks_plotly(fig, xy_grids, is_xy=True, is_y=True)
-
-            title, cb_xyz = self.plot_style.update_plot_domains(
-                fig, nc, nr, (x_grids, y_grids, xy_grids), f"pred_{target}"
-            )
-            subplot_titles.append(title)
-            self._pdp_inter_plot_plotly(pdp_xy, cmap, cb_xyz, pdp_range, fig, xy_grids)
+            self.wrapup_plotly(fig, xy_grids, x_grids, y_grids)
 
         if len(self.plot_obj.target) > 1:
             fig.update_layout(annotations=subplot_titles)

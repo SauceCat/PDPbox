@@ -44,9 +44,10 @@ class FeatureInfo:
         }, "grid_type should be either 'percentile' or 'equal'"
 
     def _check_range(self):
-        for name, range_value in zip(
-            ["grid_range", "percentile_range"], [self.grid_range, self.percentile_range]
-        ):
+        for name, range_value in [
+            ("grid_range", self.grid_range),
+            ("percentile_range", self.percentile_range),
+        ]:
             if range_value is not None:
                 assert isinstance(range_value, tuple), f"{name} should be a tuple"
                 assert len(range_value) == 2, f"{name} should contain 2 elements"
@@ -63,7 +64,7 @@ class FeatureInfo:
         count_df = (
             df.groupby("x", as_index=False).agg({"count": "count"}).sort_values("x")
         )
-        count_df["count_norm"] = count_df["count"] * 1.0 / count_df["count"].sum()
+        count_df["count_norm"] = count_df["count"] / count_df["count"].sum()
 
         summary_df = pd.DataFrame(
             np.arange(df["x"].min(), df["x"].max() + 1), columns=["x"]
@@ -311,13 +312,7 @@ def _check_model(model, n_classes, pred_func):
 
 
 def _check_classes(which_classes, n_classes):
-    """Makre sure classes list is valid
-
-    Notes
-    -----
-    class index starts from 0
-
-    """
+    """Makre sure classes list is valid"""
     if which_classes is None or len(which_classes) == 0:
         which_classes = list(np.arange(n_classes))
     else:

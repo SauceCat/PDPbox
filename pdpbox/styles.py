@@ -79,9 +79,7 @@ def _prepare_plot_style(feat_name, num_plots, plot_params, plot_type):
 
 class PlotStyle:
     def __init__(self, num_plots, plot_params):
-        if plot_params is None:
-            plot_params = {}
-        self.plot_params = plot_params
+        self.plot_params = plot_params or {}
 
         self.set_default_attributes()
         self.set_figsize(num_plots)
@@ -98,31 +96,18 @@ class PlotStyle:
             "num_bins",
         ]
         for attr in attributes:
-            if attr in self.plot_params:
-                setattr(self, attr, self.plot_params[attr])
+            setattr(self, attr, self.plot_params.get(attr))
         self.font_family = self.plot_params.get("font_family", default_font_family)
 
     def set_figsize(self, num_plots):
-        if self.plot_params["figsize"] is None:
-            figsize = (
-                default_figsize
-                if self.engine == "matplotlib"
-                else default_figsize_plotly
-            )
-        else:
-            figsize = self.plot_params["figsize"]
-        nrows, ncols = 1, self.plot_params.get("ncols", 1)
+        figsize = self.plot_params.get("figsize") or (
+            default_figsize if self.engine == "matplotlib" else default_figsize_plotly
+        )
         width, height = figsize
-
-        if num_plots > 1:
-            ncols = np.min([num_plots, ncols])
-            nrows = int(np.ceil(num_plots * 1.0 / ncols))
-            height = height * nrows
-        else:
-            ncols = 1
-
-        self.figsize = (width, height)
-        self.nrows, self.ncols = int(nrows), int(ncols)
+        ncols = int(min(num_plots, self.plot_params.get("ncols", 1)))
+        nrows = int(np.ceil(num_plots / ncols))
+        self.figsize = (width, height * nrows)
+        self.nrows, self.ncols = nrows, ncols
 
     def set_tick_style(self):
         self.tick = {
@@ -163,7 +148,6 @@ class PlotStyle:
 
     def make_subplots(self):
         def _plot_title(axes):
-            """Add plot title."""
             title_params = {
                 "x": 0,
                 "va": "top",
@@ -178,25 +162,25 @@ class PlotStyle:
 
         fig = plt.figure(figsize=self.figsize, dpi=self.dpi)
         title_ratio = 2
-        outer_grid = GridSpec(
+        outer_grids = GridSpec(
             nrows=2,
             ncols=1,
             wspace=0.0,
             hspace=self.gaps["top"],
             height_ratios=[title_ratio, self.figsize[1] - title_ratio],
         )
-        title_axes = plt.subplot(outer_grid[0])
+        title_axes = plt.subplot(outer_grids[0])
         _plot_title(title_axes)
 
-        inner_grid = GridSpecFromSubplotSpec(
+        inner_grids = GridSpecFromSubplotSpec(
             self.nrows,
             self.ncols,
-            subplot_spec=outer_grid[1],
+            subplot_spec=outer_grids[1],
             wspace=self.gaps["outer_x"],
             hspace=self.gaps["outer_y"],
         )
 
-        return fig, inner_grid, title_axes
+        return fig, inner_grids, title_axes
 
     def make_subplots_plotly(self, plot_args):
         fig = make_subplots(**plot_args)
@@ -301,7 +285,6 @@ class InfoPlotStyle(PlotStyle):
         self.set_subplot_ratio()
         self.set_gaps()
         self.update_styles()
-        self.plot_sizes = self.get_plot_sizes()
         self.set_plot_sizes()
 
     def set_plot_title(self, feat_name):
@@ -367,6 +350,7 @@ class InfoPlotStyle(PlotStyle):
             }
 
     def set_plot_sizes(self):
+        self.plot_sizes = self.get_plot_sizes()
         group_w = self.plot_sizes["group_w"]
         group_h = self.plot_sizes["group_h"]
         unit_h = self.plot_sizes["unit_h"]
@@ -429,8 +413,6 @@ class InteractInfoPlotStyle(PlotStyle):
         self.set_subplot_ratio()
         self.set_gaps()
         self.update_styles()
-
-        self.plot_sizes = self.get_plot_sizes()
         self.set_plot_sizes()
 
     def set_plot_title(self, feat_names):
@@ -492,6 +474,7 @@ class InteractInfoPlotStyle(PlotStyle):
             }
 
     def set_plot_sizes(self):
+        self.plot_sizes = self.get_plot_sizes()
         group_w = self.plot_sizes["group_w"]
         unit_h = self.plot_sizes["unit_h"]
         unit_w = self.plot_sizes["unit_w"]
@@ -554,8 +537,6 @@ class PDPIsolatePlotStyle(PlotStyle):
         self.set_subplot_ratio()
         self.set_gaps()
         self.update_styles()
-
-        self.plot_sizes = self.get_plot_sizes()
         self.set_plot_sizes()
 
     def set_plot_attributes(self):
@@ -632,6 +613,7 @@ class PDPIsolatePlotStyle(PlotStyle):
             }
 
     def set_plot_sizes(self):
+        self.plot_sizes = self.get_plot_sizes()
         group_w = self.plot_sizes["group_w"]
         group_h = self.plot_sizes["group_h"]
         unit_h = self.plot_sizes["unit_h"]
@@ -688,8 +670,6 @@ class PDPInteractPlotStyle(PlotStyle):
         self.set_subplot_ratio()
         self.set_gaps()
         self.update_styles()
-
-        self.plot_sizes = self.get_plot_sizes()
         self.set_plot_sizes()
 
     def set_plot_attributes(self):
@@ -753,6 +733,7 @@ class PDPInteractPlotStyle(PlotStyle):
             }
 
     def set_plot_sizes(self):
+        self.plot_sizes = self.get_plot_sizes()
         unit_w = self.plot_sizes["unit_w"]
         unit_h = self.plot_sizes["unit_h"]
         x1, x2 = self.subplot_ratio["x"]
@@ -820,19 +801,8 @@ class PDPInteractPlotStyle(PlotStyle):
 
 
 def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
-    """Modify matplotlib Axes"""
     axes.set_facecolor("white")
     axes.tick_params(**plot_style.tick)
-    axes.set_xticks(
-        axes.get_xticks(),
-        labels=[tick.get_text() for tick in axes.get_xticklabels()],
-        fontname=plot_style.font_family,
-    )
-    axes.set_yticks(
-        axes.get_yticks(),
-        labels=[tick.get_text() for tick in axes.get_yticklabels()],
-        fontname=plot_style.font_family,
-    )
     axes.set_frame_on(False)
     axes.xaxis.set_ticks_position("top" if top else "bottom")
     axes.yaxis.set_ticks_position("right" if right else "left")
@@ -857,8 +827,9 @@ def _modify_legend_axes(axes, font_family):
 
 
 def _display_percentile(
-    axes, percentile_columns, plot_style, is_y=False, right=True, top=True
+    axes, label, percentile_columns, plot_style, is_y=False, right=True, top=True
 ):
+    label = _get_bold_text(label, plot_style.engine)
     if is_y:
         per_axes = axes.twinx()
         ticks = axes.get_yticks()
@@ -867,7 +838,9 @@ def _display_percentile(
         else:
             per_axes.set_yticks(axes.get_yticks(), labels=percentile_columns)
         per_axes.set_ybound(axes.get_ybound())
-        per_axes.set_ylabel("percentile buckets", fontdict=plot_style.label["fontdict"])
+        per_axes.set_ylabel(
+            f"{label} (percentile)", fontdict=plot_style.label["fontdict"]
+        )
         _axes_modify(per_axes, plot_style, right=right, grid=False)
     else:
         per_axes = axes.twiny()
@@ -877,25 +850,7 @@ def _display_percentile(
         else:
             per_axes.set_xticks(axes.get_xticks(), labels=percentile_columns)
         per_axes.set_xbound(axes.get_xbound())
-        per_axes.set_xlabel("percentile buckets", fontdict=plot_style.label["fontdict"])
+        per_axes.set_xlabel(
+            f"{label} (percentile)", fontdict=plot_style.label["fontdict"]
+        )
         _axes_modify(per_axes, plot_style, top=top, grid=False)
-
-
-def _display_ticks_plotly(display_columns, percentile_columns, fig, grids, is_y=False):
-    ticktext = display_columns.copy()
-    xlabel = "value"
-    if len(percentile_columns) > 0:
-        xlabel += " + percentile"
-        for i, p in enumerate(percentile_columns):
-            ticktext[i] += f"<br><sup><b>{p}</b></sup>"
-
-    tick_params = dict(
-        ticktext=ticktext,
-        tickvals=np.arange(len(ticktext)),
-        col=grids["col"],
-        row=grids["row"],
-    )
-    if is_y:
-        fig.update_yaxes(**tick_params)
-    else:
-        fig.update_xaxes(title_text=xlabel, **tick_params)
