@@ -151,7 +151,7 @@ class FeatureInfo:
                 )
                 display_columns[-1] = display_columns[-1].replace(")", "]")
 
-            if self.grid_type == "percentile":
+            if self.cust_grid_points is None and self.grid_type == "percentile":
                 for i, col in enumerate(display_columns):
                     per_vals = self.percentiles[i] + self.percentiles[i + 1]
                     per_min, per_max = str(min(per_vals)), str(max(per_vals))
