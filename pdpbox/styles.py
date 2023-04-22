@@ -62,6 +62,15 @@ def _get_bold_text(text, engine, is_inter=False):
     return bold_text
 
 
+def _get_axes_label(feat_name, feat_type, show_percentile, engine):
+    label = "value" if feat_type == "numeric" else ""
+    if show_percentile and engine == "plotly":
+        label += "+percentile"
+
+    label = _get_bold_text(feat_name, engine) + (f" ({label})" if label else "")
+    return label
+
+
 def _prepare_plot_style(feat_name, num_plots, plot_params, plot_type):
     plot_style_classes = {
         "target": InfoPlotStyle,
@@ -833,6 +842,7 @@ def _display_percentile(
     if is_y:
         per_axes = axes.twinx()
         ticks = axes.get_yticks()
+
         if len(ticks) > len(percentile_columns):
             per_axes.set_yticks(ticks[:-1] + 0.5, labels=percentile_columns)
         else:
@@ -845,6 +855,7 @@ def _display_percentile(
     else:
         per_axes = axes.twiny()
         ticks = axes.get_xticks()
+
         if len(ticks) > len(percentile_columns):
             per_axes.set_xticks(ticks[:-1] + 0.5, labels=percentile_columns)
         else:

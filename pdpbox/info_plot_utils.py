@@ -3,6 +3,7 @@ from .styles import (
     _axes_modify,
     _display_percentile,
     _modify_legend_axes,
+    _get_axes_label,
 )
 
 import numpy as np
@@ -26,9 +27,13 @@ class BaseInfoPlotEngine:
         plot_params,
     ):
         if plot_obj.plot_type in ["target", "predict"]:
-            feat_name = plot_obj.feature_info.name
+            self.feat_name = plot_obj.feature_info.name
+            self.feat_type = plot_obj.feature_info.type
+            feat_name = self.feat_name
         else:
-            feat_name = [plot_obj.feature_infos[i].name for i in range(2)]
+            self.feat_names = [info.name for info in plot_obj.feature_infos]
+            self.feat_types = [info.type for info in plot_obj.feature_infos]
+            feat_name = self.feat_names
 
         self.plot_style = _prepare_plot_style(
             feat_name,
@@ -39,7 +44,7 @@ class BaseInfoPlotEngine:
         self.which_classes = which_classes
         self.plot_obj = plot_obj
 
-    def set_subplot_title(self, axes, title):
+    def set_subplot_title(self, title, axes):
         if len(self.plot_obj.target) > 1:
             axes.set_title(
                 title,
@@ -130,7 +135,12 @@ class InfoPlotEngine(BaseInfoPlotEngine):
             secondary_y=False,
             **grids,
         )
-        fig.update_yaxes(range=[0, df["count"].max() * 1.2], secondary_y=False, **grids)
+        fig.update_yaxes(
+            title_text="count",
+            range=[0, df["count"].max() * 1.2],
+            secondary_y=False,
+            **grids,
+        )
 
     def _draw_lineplot(self, ylabel, df, axes, line_color):
         line_style = self.plot_style.line
@@ -229,37 +239,48 @@ class InfoPlotEngine(BaseInfoPlotEngine):
             )
         self._draw_lineplot_plotly(target, line_df, box_color, fig, grids, y2=False)
 
-    def wrapup_subplot(self, title, bar_axes, line_axes=None, box_axes=None):
+    def get_axes_label(self):
+        show_percentile = (
+            self.plot_style.show_percentile and len(self.percentile_columns) > 0
+        )
+        label = _get_axes_label(
+            self.feat_name, self.feat_type, show_percentile, self.plot_style.engine
+        )
+        return label, show_percentile
+
+    def wrapup(self, title, bar_axes, line_axes=None, box_axes=None):
         title_axes = box_axes or bar_axes
-        self.set_subplot_title(title_axes, title)
 
         _axes_modify(bar_axes, self.plot_style)
         if line_axes is not None:
             _axes_modify(line_axes, self.plot_style, right=True, grid=False)
         if box_axes is not None:
+            box_axes.set(ylabel=f"{title} dist", xticklabels=[])
             _axes_modify(box_axes, self.plot_style)
 
-        xlabel = "value"
-        if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
-            _display_percentile(title_axes, self.percentile_columns, self.plot_style)
-            xlabel += " + percentile"
-        bar_axes.set_xlabel(xlabel, fontdict=self.plot_style.label["fontdict"])
+        label, show_percentile = self.get_axes_label()
+        if show_percentile:
+            _display_percentile(
+                title_axes,
+                self.feat_name,
+                self.percentile_columns,
+                self.plot_style,
+            )
+        bar_axes.set_xlabel(label, fontdict=self.plot_style.label["fontdict"])
 
-    def wrapup_subplot_plotly(
-        self, target, fig, bar_grids, box_grids=None, yrange=None
-    ):
+        self.set_subplot_title(title, title_axes)
+
+    def wrapup_plotly(self, target, fig, bar_grids, box_grids=None, yrange=None):
         ticktext = self.display_columns.copy()
-        xlabel = "value"
-        if len(self.percentile_columns) > 0:
-            xlabel += " + percentile"
+        label, show_percentile = self.get_axes_label()
+        if show_percentile:
             for i, p in enumerate(self.percentile_columns):
                 ticktext[i] += f"<br><sup><b>{p}</b></sup>"
 
         tick_params = dict(
             ticktext=ticktext, tickvals=np.arange(len(ticktext)), **bar_grids
         )
-        fig.update_xaxes(title_text=xlabel, **tick_params)
-        fig.update_yaxes(title_text="count", secondary_y=False, **bar_grids)
+        fig.update_xaxes(title_text=label, **tick_params)
         if box_grids is None:
             fig.update_yaxes(
                 title_text=f"Average {target}",
@@ -285,7 +306,7 @@ class TargetPlotEngine(InfoPlotEngine):
         )
         self.line_colors = cycle(self.plot_style.line["colors"])
 
-    def prepare_subplot(self, class_idx):
+    def prepare_data(self, class_idx):
         target = self.plot_obj.target[class_idx]
         line_color = next(self.line_colors)
         line_df = (
@@ -295,14 +316,24 @@ class TargetPlotEngine(InfoPlotEngine):
         )
         return target, line_df, line_color
 
+    def prepare_axes(self, inner_grid):
+        bar_axes = plt.subplot(inner_grid)
+        line_axes = bar_axes.twinx()
+        return bar_axes, line_axes
+
+    def prepare_grids(self, i):
+        ncols = self.plot_style.ncols
+        nc, nr = i % ncols + 1, i // ncols + 1
+        grids = {"col": nc, "row": nr}
+        return (nc, nr), grids
+
     def plot_matplotlib(self):
-        fig, inner_grid, title_axes = self.plot_style.make_subplots()
+        fig, inner_grids, title_axes = self.plot_style.make_subplots()
         axes = {"title_axes": title_axes, "bar_axes": [], "line_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            target, line_df, line_color = self.prepare_subplot(class_idx)
-            bar_axes = plt.subplot(inner_grid[i])
-            line_axes = bar_axes.twinx()
+            target, line_df, line_color = self.prepare_data(class_idx)
+            bar_axes, line_axes = self.prepare_axes(inner_grids[i])
 
             self._draw_barplot(bar_axes)
             self._draw_lineplot(
@@ -311,8 +342,7 @@ class TargetPlotEngine(InfoPlotEngine):
                 line_axes,
                 line_color,
             )
-
-            self.wrapup_subplot(target, bar_axes, line_axes)
+            self.wrapup(target, bar_axes, line_axes)
             axes["bar_axes"].append(bar_axes)
             axes["line_axes"].append(line_axes)
 
@@ -333,9 +363,8 @@ class TargetPlotEngine(InfoPlotEngine):
         subplot_titles = []
 
         for i, class_idx in enumerate(self.which_classes):
-            target, line_df, line_color = self.prepare_subplot(class_idx)
-            grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-            nr, nc = grids["row"], grids["col"]
+            target, line_df, line_color = self.prepare_data(class_idx)
+            (nc, nr), grids = self.prepare_grids(i)
             title = self.plot_style.update_plot_domains(
                 fig, nr, nc, (None, grids), target
             )
@@ -343,7 +372,7 @@ class TargetPlotEngine(InfoPlotEngine):
 
             self._draw_barplot_plotly(fig, grids)
             self._draw_lineplot_plotly(target, line_df, line_color, fig, grids)
-            self.wrapup_subplot_plotly(target, fig, grids, box_grids=None, yrange=None)
+            self.wrapup_plotly(target, fig, grids, box_grids=None, yrange=None)
 
         if len(self.plot_obj.target) > 1:
             fig.update_layout(annotations=subplot_titles)
@@ -365,7 +394,7 @@ class PredictPlotEngine(InfoPlotEngine):
         )
         self.box_colors = cycle(self.plot_style.box["colors"])
 
-    def prepare_subplot(self, class_idx):
+    def prepare_data(self, class_idx):
         target = self.plot_obj.target[class_idx]
         box_color = next(self.box_colors)
         box_df = self.plot_obj.df[["x", target]].rename(columns={target: "y"})
@@ -374,27 +403,38 @@ class PredictPlotEngine(InfoPlotEngine):
         )
         return target, box_df, line_df, box_color
 
+    def prepare_axes(self, inner_grid):
+        inner = GridSpecFromSubplotSpec(
+            2,
+            1,
+            subplot_spec=inner_grid,
+            wspace=self.plot_style.gaps["inner_x"],
+            hspace=self.plot_style.gaps["inner_y"],
+        )
+        box_axes = plt.subplot(inner[0])
+        bar_axes = plt.subplot(inner[1])
+
+        return box_axes, bar_axes
+
+    def prepare_grids(self, i):
+        ncols = self.plot_style.ncols
+        nc, nr = i % ncols + 1, i // ncols + 1
+        box_grids = {"col": nc, "row": nr * 2 - 1}
+        bar_grids = {"col": nc, "row": nr * 2}
+        return (nc, nr), box_grids, bar_grids
+
     def plot_matplotlib(self):
-        fig, inner_grid, title_axes = self.plot_style.make_subplots()
+        fig, inner_grids, title_axes = self.plot_style.make_subplots()
         axes = {"title_axes": title_axes, "bar_axes": [], "box_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            target, box_df, line_df, box_color = self.prepare_subplot(class_idx)
-            inner = GridSpecFromSubplotSpec(
-                2,
-                1,
-                subplot_spec=inner_grid[i],
-                wspace=self.plot_style.gaps["inner_x"],
-                hspace=self.plot_style.gaps["inner_y"],
-            )
-            box_axes = plt.subplot(inner[0])
-            bar_axes = plt.subplot(inner[1])
+            target, box_df, line_df, box_color = self.prepare_data(class_idx)
+            box_axes, bar_axes = self.prepare_axes(inner_grids[i])
 
             self._draw_boxplot(box_df, line_df, box_axes, box_color)
-            box_axes.set(ylabel=f"{target} dist", xticklabels=[])
             self._draw_barplot(bar_axes)
 
-            self.wrapup_subplot(target, bar_axes, None, box_axes)
+            self.wrapup(target, bar_axes, None, box_axes)
             axes["bar_axes"].append(bar_axes)
             axes["box_axes"].append(box_axes)
 
@@ -413,11 +453,8 @@ class PredictPlotEngine(InfoPlotEngine):
         subplot_titles = []
 
         for i, class_idx in enumerate(self.which_classes):
-            target, box_df, line_df, box_color = self.prepare_subplot(class_idx)
-            grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-            box_grids = {"col": grids["col"], "row": grids["row"] * 2 - 1}
-            bar_grids = {"col": grids["col"], "row": grids["row"] * 2}
-            nr, nc = grids["row"], grids["col"]
+            target, box_df, line_df, box_color = self.prepare_data(class_idx)
+            (nc, nr), box_grids, bar_grids = self.prepare_grids(i)
             title = self.plot_style.update_plot_domains(
                 fig, nr, nc, (box_grids, bar_grids), target
             )
@@ -429,9 +466,7 @@ class PredictPlotEngine(InfoPlotEngine):
             self._draw_barplot_plotly(fig, bar_grids)
 
             ymin, ymax = box_df["y"].min(), box_df["y"].max()
-            self.wrapup_subplot_plotly(
-                target, fig, bar_grids, box_grids, yrange=[ymin, ymax]
-            )
+            self.wrapup_plotly(target, fig, bar_grids, box_grids, yrange=[ymin, ymax])
 
         if len(self.plot_obj.target) > 1:
             fig.update_layout(annotations=subplot_titles)
@@ -451,12 +486,13 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
             which_classes,
             plot_params,
         )
-        self.feat_names = [self.plot_obj.feature_infos[i].name for i in range(2)]
+        self.feat_names = [info.name for info in self.plot_obj.feature_infos]
+        self.feat_types = [info.type for info in self.plot_obj.feature_infos]
         self.display_columns = [
-            self.plot_obj.feature_infos[i].display_columns for i in range(2)
+            info.display_columns for info in self.plot_obj.feature_infos
         ]
         self.percentile_columns = [
-            self.plot_obj.feature_infos[i].percentile_columns for i in range(2)
+            info.percentile_columns for info in self.plot_obj.feature_infos
         ]
         self.cmaps = cycle(self.plot_style.marker["cmaps"])
         (
@@ -485,10 +521,39 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
 
         return count_min, count_max, marker_sizes
 
-    def prepare_subplot(self, class_idx):
-        target = self.plot_obj.target[class_idx]
-        cmap = next(self.cmaps)
-        return target, cmap
+    def get_axes_label(self, i):
+        show_percentile = (
+            self.plot_style.show_percentile and len(self.percentile_columns[i]) > 0
+        )
+        label = _get_axes_label(
+            self.feat_names[i],
+            self.feat_types[i],
+            show_percentile,
+            self.plot_style.engine,
+        )
+        return label, show_percentile
+
+    def _set_ticks(self, axes, is_y=False):
+        i = int(is_y)
+        label, show_percentile = self.get_axes_label(i)
+        if show_percentile:
+            _display_percentile(
+                axes,
+                self.feat_names[i],
+                self.percentile_columns[i],
+                self.plot_style,
+                is_y=is_y,
+            )
+        if is_y:
+            axes.set_ylabel(
+                label,
+                fontdict=self.plot_style.label["fontdict"],
+            )
+        else:
+            axes.set_xlabel(
+                label,
+                fontdict=self.plot_style.label["fontdict"],
+            )
 
     def _draw_interact(self, target, axes, cmap):
         xs, ys = self.display_columns
@@ -542,34 +607,29 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                     [PathEffects.withStroke(linewidth=3, foreground="w")]
                 )
 
-        xlabel, ylabel = "value", "value"
-        if self.plot_style.show_percentile:
-            if len(self.percentile_columns[0]) > 0:
-                _display_percentile(
-                    axes,
-                    self.percentile_columns[0],
-                    self.plot_style,
-                )
-                xlabel += " + percentile"
-            if len(self.percentile_columns[1]) > 0:
-                _display_percentile(
-                    axes,
-                    self.percentile_columns[1],
-                    self.plot_style,
-                    is_y=True,
-                )
-                ylabel += " + percentile"
-        axes.set_xlabel(
-            self.feat_names[0] + f" ({xlabel})",
-            fontdict=self.plot_style.label["fontdict"],
-        )
-        axes.set_ylabel(
-            self.feat_names[1] + f" ({ylabel})",
-            fontdict=self.plot_style.label["fontdict"],
-        )
+        [self._set_ticks(axes, is_y) for is_y in [False, True]]
         _axes_modify(axes, self.plot_style)
 
         return value_min, value_max
+
+    def _set_ticks_plotly(self, fig, grids, is_y=False):
+        i = int(is_y)
+        ticktext = self.display_columns[i].copy()
+        percentile_columns = self.percentile_columns[i]
+        label, show_percentile = self.get_axes_label(i)
+
+        if show_percentile:
+            ticktext = [
+                f"{text}<br><sup><b>{p}</b></sup>"
+                for text, p in zip(ticktext, percentile_columns)
+            ]
+        kwargs = dict(
+            title_text=label,
+            ticktext=ticktext,
+            tickvals=np.arange(len(ticktext)),
+            **grids,
+        )
+        (fig.update_yaxes if is_y else fig.update_xaxes)(**kwargs)
 
     def _draw_interact_plotly(self, target, cmap, fig, grids):
         df = self.plot_obj.plot_df
@@ -600,26 +660,7 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
             ),
             **grids,
         )
-
-        for i, feat_name in enumerate(self.feat_names):
-            title_text = f"<b>{feat_name}</b> (value)"
-            ticktext = self.display_columns[i].copy()
-            percentile_columns = self.percentile_columns[i]
-
-            if self.plot_style.show_percentile and len(percentile_columns) > 0:
-                ticktext = [
-                    f"{text}<br><sup><b>{p}</b></sup>"
-                    for text, p in zip(ticktext, percentile_columns)
-                ]
-                title_text = f"<b>{feat_name}</b> (value+percentile)"
-
-            kwargs = dict(
-                title_text=title_text,
-                ticktext=ticktext,
-                tickvals=np.arange(len(ticktext)),
-                **grids,
-            )
-            (fig.update_xaxes if i == 0 else fig.update_yaxes)(**kwargs)
+        [self._set_ticks_plotly(fig, grids, is_y) for is_y in [False, True]]
 
         return value_min, value_max
 
@@ -740,33 +781,51 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
         fig.update_yaxes(visible=False, **grids)
         fig.update_xaxes(visible=False, range=[0, 1], **grids)
 
+    def prepare_data(self, class_idx):
+        target = self.plot_obj.target[class_idx]
+        cmap = next(self.cmaps)
+        return target, cmap
+
+    def prepare_axes(self, inner_grid):
+        inner = GridSpecFromSubplotSpec(
+            2,
+            1,
+            subplot_spec=inner_grid,
+            wspace=self.plot_style.gaps["inner_x"],
+            hspace=self.plot_style.gaps["inner_y"],
+            height_ratios=self.plot_style.subplot_ratio["y"],
+        )
+        value_axes = plt.subplot(inner[0])
+
+        n = 2 if self.plot_style.ncols > 1 else 4
+        legend_grid = GridSpecFromSubplotSpec(
+            1, n, subplot_spec=inner[1], wspace=0, width_ratios=[1] * n
+        )
+        legend_axes = [plt.subplot(legend_grid[j]) for j in range(2)]
+
+        return value_axes, legend_axes
+
+    def prepare_grids(self, i):
+        ncols = self.plot_style.ncols
+        nc, nr = i % ncols + 1, i // ncols + 1
+        scatter_grids = {"row": nr * 2 - 1, "col": nc * 2 - 1}
+        cb_grids = {"row": nr * 2, "col": nc * 2 - 1}
+        size_grids = {"row": nr * 2, "col": nc * 2}
+
+        return (nc, nr), scatter_grids, cb_grids, size_grids
+
     def plot_matplotlib(self):
-        fig, inner_grid, title_axes = self.plot_style.make_subplots()
+        fig, inner_grids, title_axes = self.plot_style.make_subplots()
         axes = {"title_axes": title_axes, "value_axes": [], "legend_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap = self.prepare_subplot(class_idx)
-            inner = GridSpecFromSubplotSpec(
-                2,
-                1,
-                subplot_spec=inner_grid[i],
-                wspace=self.plot_style.gaps["inner_x"],
-                hspace=self.plot_style.gaps["inner_y"],
-                height_ratios=self.plot_style.subplot_ratio["y"],
-            )
-            value_axes = plt.subplot(inner[0])
+            target, cmap = self.prepare_data(class_idx)
+            value_axes, legend_axes = self.prepare_axes(inner_grids[i])
             value_min, value_max = self._draw_interact(target, value_axes, cmap)
 
-            n = 2 if self.plot_style.ncols > 1 else 4
-            legend_grid = GridSpecFromSubplotSpec(
-                1, n, subplot_spec=inner[1], wspace=0, width_ratios=[1] * n
-            )
-
-            legend_axes = [plt.subplot(legend_grid[j]) for j in range(2)]
             self._draw_legend_colorbar(value_min, value_max, legend_axes[0], cmap)
             self._draw_legend_sizes(legend_axes[1], cmap)
-
-            self.set_subplot_title(value_axes, target)
+            self.set_subplot_title(target, value_axes)
             axes["value_axes"].append(value_axes)
             axes["legend_axes"].append(legend_axes)
 
@@ -785,16 +844,12 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
         cb_texts = []
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap = self.prepare_subplot(class_idx)
-            grids = {"col": i % ncols + 1, "row": i // ncols + 1}
-            scatter_grids = {"row": grids["row"] * 2 - 1, "col": grids["col"] * 2 - 1}
-            cb_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2 - 1}
-            size_grids = {"row": grids["row"] * 2, "col": grids["col"] * 2}
-
+            target, cmap = self.prepare_data(class_idx)
+            (nc, nr), scatter_grids, cb_grids, size_grids = self.prepare_grids(i)
             (cb_domain_x, cb_domain_y), title = self.plot_style.update_plot_domains(
                 fig,
-                grids["col"],
-                grids["row"],
+                nc,
+                nr,
                 (scatter_grids, cb_grids, size_grids),
                 target,
             )

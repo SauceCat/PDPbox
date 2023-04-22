@@ -7,7 +7,7 @@ from .styles import (
     _axes_modify,
     _display_percentile,
     _modify_legend_axes,
-    _get_bold_text,
+    _get_axes_label,
 )
 
 import pandas as pd
@@ -32,8 +32,20 @@ class PDPIsolatePlotEngine:
         which_classes,
         plot_params,
     ):
+
+        feature_info = plot_obj.feature_info
+        self.feat_name = feature_info.name
+        self.feat_type = feature_info.type
+        self.is_numeric = self.feat_type == "numeric"
+        self.display_columns = feature_info.display_columns
+        self.percentile_columns = feature_info.percentile_columns
+        self.grids, self.percentiles = [], []
+        if self.is_numeric:
+            self.grids = [_get_string(v) for v in feature_info.grids]
+            self.percentiles = feature_info.percentiles
+
         self.plot_style = _prepare_plot_style(
-            plot_obj.feature_info.name,
+            self.feat_name,
             len(which_classes),
             plot_params,
             plot_obj.plot_type,
@@ -41,12 +53,6 @@ class PDPIsolatePlotEngine:
         self.which_classes = which_classes
         self.plot_obj = plot_obj
         self.cmaps = cycle(self.plot_style.line["cmaps"])
-        self.display_columns = self.plot_obj.feature_info.display_columns
-        self.percentile_columns = self.plot_obj.feature_info.percentile_columns
-        self.grids, self.percentiles = [], []
-        if self.plot_obj.feature_info.type == "numeric":
-            self.grids = [_get_string(v) for v in self.plot_obj.feature_info.grids]
-            self.percentiles = self.plot_obj.feature_info.percentiles
 
     def plot(self):
         return (
@@ -55,7 +61,7 @@ class PDPIsolatePlotEngine:
             else self.plot_plotly()
         )
 
-    def _cluster_ice_lines(self, ice_lines, feature_grids):
+    def _cluster_ice_lines(self, ice_lines, feat_grids):
         method = self.plot_style.clustering["method"]
         n_centers = self.plot_style.clustering["n_centers"]
 
@@ -65,8 +71,8 @@ class PDPIsolatePlotEngine:
         kmeans = (MiniBatchKMeans if method == "approx" else KMeans)(
             n_clusters=n_centers, random_state=0
         )
-        kmeans.fit(ice_lines[np.arange(len(feature_grids))])
-        return pd.DataFrame(kmeans.cluster_centers_, columns=feature_grids)
+        kmeans.fit(ice_lines[np.arange(len(feat_grids))])
+        return pd.DataFrame(kmeans.cluster_centers_, columns=feat_grids)
 
     def _sample_ice_lines(self, ice_lines):
         num_samples = self.plot_style.frac_to_plot
@@ -82,26 +88,25 @@ class PDPIsolatePlotEngine:
     def _prepare_pdp_line_data(self, class_idx):
         pdp_result = self.plot_obj.results[class_idx]
         pdp, ice_lines = pdp_result.pdp.copy(), pdp_result.ice_lines.copy()
-        feature_grids = self.plot_obj.feature_info.grids
-        grid_indices = np.arange(len(feature_grids))
+        feat_grids = self.plot_obj.feature_info.grids
+        grid_indices = np.arange(len(feat_grids))
 
         x = (
-            feature_grids
-            if self.plot_obj.feature_info.type == "numeric"
-            and not self.plot_style.to_bins
+            feat_grids
+            if self.is_numeric and not self.plot_style.to_bins
             else grid_indices
         )
 
         if self.plot_style.center:
             pdp -= pdp[0]
-            for i in np.arange(1, len(feature_grids)):
+            for i in np.arange(1, len(feat_grids)):
                 ice_lines[i] -= ice_lines[0]
             ice_lines[0] = 0
 
         line_data = None
         if self.plot_style.plot_lines:
             line_data = (
-                self._cluster_ice_lines(ice_lines, feature_grids)
+                self._cluster_ice_lines(ice_lines, feat_grids)
                 if self.plot_style.clustering["on"]
                 else self._sample_ice_lines(ice_lines)
             )
@@ -238,29 +243,32 @@ class PDPIsolatePlotEngine:
             "std": line_std,
             "colors": (light_color, dark_color),
         }
+
+        ylabel = "centered" if self.plot_style.center else "raw"
         if self.plot_style.engine == "matplotlib":
             self._pdp_std_plot(axes=axes, **std_params)
+            axes.set_ylabel(ylabel, fontdict=self.plot_style.label["fontdict"])
         else:
             std_traces = self._pdp_std_plot_plotly(**std_params)
             for trace in ice_line_traces + std_traces:
                 if trace is not None:
                     fig.add_trace(trace, **grids)
+            fig.update_yaxes(title_text=ylabel, **grids)
 
     def _get_pdp_xticks(self, is_line=False):
         ticklabels = self.display_columns[:]
         per_ticklabels = self.percentile_columns
-        is_numeric = self.plot_obj.feature_info.type == "numeric"
         set_ticks = True
         ticks = np.arange(len(ticklabels))
         v_range = [ticks[0] - 0.5, ticks[-1] + 0.5]
 
-        if is_numeric and is_line and self.plot_style.to_bins:
+        if self.is_numeric and is_line and self.plot_style.to_bins:
             ticklabels = self.grids[:]
             per_ticklabels = self.percentiles
             ticks = np.arange(len(ticklabels))
             v_range = [ticks[0], ticks[-1]]
 
-        if is_numeric and not self.plot_style.to_bins:
+        if self.is_numeric and not self.plot_style.to_bins:
             set_ticks = False
 
         if (
@@ -288,7 +296,7 @@ class PDPIsolatePlotEngine:
             if is_line and self.plot_style.show_percentile and len(per_ticklabels) > 0:
                 _display_percentile(
                     axes,
-                    self.plot_obj.feature_info.name,
+                    self.feat_name,
                     per_ticklabels,
                     self.plot_style,
                     is_y=False,
@@ -357,7 +365,7 @@ class PDPIsolatePlotEngine:
     def _pdp_dist_plot(self, colors, axes, line_axes):
         cmap, light_color, dark_color = colors
 
-        if self.plot_obj.feature_info.type == "numeric" and not self.plot_style.to_bins:
+        if self.is_numeric and not self.plot_style.to_bins:
             dist_df = self.plot_obj.dist_df
             self._draw_pdp_distplot(dist_df, dark_color, axes)
             vmin, vmax = dist_df.min(), dist_df.max()
@@ -398,7 +406,7 @@ class PDPIsolatePlotEngine:
     def _pdp_dist_plot_plotly(self, colors, fig, grids):
         cmap, _, dark_color = colors
 
-        if self.plot_obj.feature_info.type == "numeric" and not self.plot_style.to_bins:
+        if self.is_numeric and not self.plot_style.to_bins:
             dist_df = self.plot_obj.dist_df
             dist_trace = go.Scatter(
                 x=dist_df,
@@ -454,6 +462,15 @@ class PDPIsolatePlotEngine:
 
         return line_grids, dist_grids
 
+    def get_axes_label(self):
+        show_percentile = (
+            self.plot_style.show_percentile and len(self.percentile_columns) > 0
+        )
+        label = _get_axes_label(
+            self.feat_name, self.feat_type, show_percentile, self.plot_style.engine
+        )
+        return label, show_percentile
+
     def wrapup(self, title, line_axes, dist_axes=None):
         self._set_pdp_xticks(line_axes, is_line=True)
         _axes_modify(line_axes, self.plot_style)
@@ -462,10 +479,7 @@ class PDPIsolatePlotEngine:
             self._set_pdp_xticks(dist_axes, is_line=False)
             _axes_modify(dist_axes, self.plot_style, grid=False)
 
-        label = (
-            _get_bold_text(self.plot_obj.feature_info.name, self.plot_style.engine)
-            + " (value)"
-        )
+        label, _ = self.get_axes_label()
         label_axes = dist_axes or line_axes
         label_axes.set_xlabel(label, fontdict=self.plot_style.label["fontdict"])
 
@@ -485,14 +499,8 @@ class PDPIsolatePlotEngine:
                 **dist_grids,
             )
 
-        label = "value"
-        if self.plot_style.show_percentile and len(self.percentile_columns) > 0:
-            label += " + percentile"
         label_grids = dist_grids or line_grids
-        label = (
-            _get_bold_text(self.plot_obj.feature_info.name, self.plot_style.engine)
-            + f" ({label})"
-        )
+        label, _ = self.get_axes_label()
         fig.update_xaxes(title_text=label, **label_grids)
 
     def plot_matplotlib(self):
@@ -553,26 +561,23 @@ class PDPInteractPlotEngine:
     ):
         self.which_classes = which_classes
         self.plot_obj = plot_obj
-        self.feature_infos = [
-            obj.feature_info for obj in self.plot_obj.pdp_isolate_objs
-        ]
-        self.display_columns = [info.display_columns for info in self.feature_infos]
-        self.percentile_columns = [
-            info.percentile_columns for info in self.feature_infos
-        ]
+        feature_infos = [obj.feature_info for obj in self.plot_obj.pdp_isolate_objs]
+        self.display_columns = [info.display_columns for info in feature_infos]
+        self.percentile_columns = [info.percentile_columns for info in feature_infos]
 
         self.grids = []
-        for info in self.feature_infos:
+        for info in feature_infos:
             if info.type == "onehot":
                 self.grids.append(info.grids)
             else:
                 self.grids.append([_get_string(v) for v in info.grids])
 
-        self.percentiles = [info.percentiles for info in self.feature_infos]
-        self.feature_grids = [info.grids for info in self.feature_infos]
-        self.feature_names = [info.name for info in self.feature_infos]
+        self.percentiles = [info.percentiles for info in feature_infos]
+        self.feat_grids = [info.grids for info in feature_infos]
+        self.feat_types = [info.type for info in feature_infos]
+        self.feat_names = [info.name for info in feature_infos]
         self.plot_style = _prepare_plot_style(
-            self.feature_names, len(which_classes), plot_params, plot_obj.plot_type
+            self.feat_names, len(which_classes), plot_params, plot_obj.plot_type
         )
         self.cmaps = cycle(self.plot_style.interact["cmaps"])
 
@@ -617,7 +622,7 @@ class PDPInteractPlotEngine:
         return im
 
     def _pdp_xy_grid_plotly(self, pdp_xy, plot_params, fig, grids):
-        grids_x, grids_y = self.feature_grids
+        grids_x, grids_y = self.feat_grids
         fig.add_trace(
             go.Heatmap(
                 x=np.arange(len(grids_x)),
@@ -648,7 +653,7 @@ class PDPInteractPlotEngine:
         return c1
 
     def _pdp_contour_plot_plotly(self, plot_params, fig, grids):
-        grids_x, grids_y = self.feature_grids
+        grids_x, grids_y = self.feat_grids
         plot_params.update(
             {
                 "line": {"width": 1, "color": "white"},
@@ -660,7 +665,7 @@ class PDPInteractPlotEngine:
         fig.add_trace(go.Contour(**plot_params), **grids)
 
     def _pdp_inter_plot(self, pdp_xy, norm, cmap, axes):
-        grids_x, grids_y = self.feature_grids
+        grids_x, grids_y = self.feat_grids
         pdp_xy = pdp_xy.reshape((len(grids_x), len(grids_y))).T
 
         if self.plot_style.interact["type"] == "grid":
@@ -687,7 +692,7 @@ class PDPInteractPlotEngine:
         fig,
         grids,
     ):
-        grids_x, grids_y = self.feature_grids
+        grids_x, grids_y = self.feat_grids
         pdp_xy = pdp_xy.reshape((len(grids_x), len(grids_y))).T
         cb_x, cb_y, cb_z = cb_xyz
 
@@ -779,22 +784,30 @@ class PDPInteractPlotEngine:
             **grids,
         )
 
+    def get_axes_label(self, i):
+        show_percentile = (
+            self.plot_style.show_percentile and len(self.percentile_columns[i]) > 0
+        )
+        label = _get_axes_label(
+            self.feat_names[i],
+            self.feat_types[i],
+            show_percentile,
+            self.plot_style.engine,
+        )
+        return label, show_percentile
+
     def _get_pdp_xticks(self, is_xy=False, is_y=False):
         i = int(is_y)
         label = ""
-        ticklabels = self.display_columns[i]
+        ticklabels = self.display_columns[i][:]
         per_ticklabels = self.percentile_columns[i]
-        if self.feature_infos[i].type == "numeric":
-            label = "value"
-            ticklabels = self.grids[i]
+        if self.feat_types[i] == "numeric":
+            ticklabels = self.grids[i][:]
             per_ticklabels = self.percentiles[i]
             if self.plot_style.show_percentile and self.plot_style.engine == "plotly":
                 for j, p in enumerate(per_ticklabels):
                     ticklabels[j] += f"<br><sup><b>{p}</b></sup>"
-                label = "value+percentile"
-        label = _get_bold_text(self.feature_names[i], self.plot_style.engine) + (
-            f" ({label})" if label else ""
-        )
+        label, _ = self.get_axes_label(i)
         set_ticks = False if is_xy and not self.plot_style.to_bins else True
 
         return label, ticklabels, per_ticklabels, set_ticks
@@ -808,7 +821,7 @@ class PDPInteractPlotEngine:
                 if self.plot_style.show_percentile and len(per_ticklabels) > 0:
                     _display_percentile(
                         axes,
-                        self.feature_names[1],
+                        self.feat_names[1],
                         per_ticklabels,
                         self.plot_style,
                         is_y=True,
@@ -820,7 +833,7 @@ class PDPInteractPlotEngine:
                 if self.plot_style.show_percentile and len(per_ticklabels) > 0:
                     _display_percentile(
                         axes,
-                        self.feature_names[0],
+                        self.feat_names[0],
                         per_ticklabels,
                         self.plot_style,
                         is_y=False,
@@ -862,7 +875,7 @@ class PDPInteractPlotEngine:
             bbox_transform=axes.transAxes,
             borderpad=0,
         )
-        grids_x, grids_y = self.feature_grids
+        grids_x, grids_y = self.feat_grids
         cb_num_grids = np.max([np.min([len(grids_x), len(grids_y), 8]), 8])
         boundaries = [
             round(v, 3) for v in np.linspace(norm.vmin, norm.vmax, cb_num_grids)
