@@ -4,6 +4,73 @@ import psutil
 
 
 class FeatureInfo:
+    """
+    A class to store information about a feature, preprocess the data, and
+    prepare summary statistics.
+
+    Parameters
+    ----------
+    feature : str
+        The name of the feature column in the input DataFrame.
+    feature_name : str
+        A human-readable name for the feature.
+    df : pd.DataFrame
+        The input DataFrame containing the feature column.
+    cust_grid_points : array-like, optional
+        Custom grid points for the feature. Defaults to None.
+    grid_type : str, optional
+        The type of grid to use, either 'percentile' or 'equal'. Defaults to 'percentile'.
+    num_grid_points : int, optional
+        The number of grid points to use. Defaults to 10.
+    percentile_range : tuple, optional
+        A tuple of two values indicating the range of percentiles to use. Defaults to None.
+    grid_range : tuple, optional
+        A tuple of two values indicating the range of grid values to use. Defaults to None.
+    show_outliers : bool, optional
+        Whether to show outliers in the output. Defaults to False.
+    endpoint : bool, optional
+        Whether to include the endpoint of the range. Defaults to True.
+
+    Attributes
+    ----------
+    col_name : str or list of str
+        The column name(s) of the feature in the input DataFrame.
+    name : str
+        A user-friendly name for the feature.
+    type : str
+        The type of the feature, as determined by the _check_col function.
+    cust_grid_points : array-like, optional
+        Custom grid points to be used for bucketing the feature values.
+    grid_type : {'percentile', 'equal', 'custom'}, default='percentile'
+        The type of grid to use for bucketing the feature values.
+    num_grid_points : int, default=10
+        The number of grid points to use for bucketing the feature values.
+    percentile_range : tuple of float, optional
+        The range of percentiles to consider for the feature values.
+    grid_range : tuple of float, optional
+        The range of values to consider for the feature values.
+    show_outliers : bool, default=False
+        Whether to include outliers in the analysis.
+    endpoint : bool, default=True
+        Whether to treat the last grid point as an endpoint.
+    grids : np.array
+        The grid points for the feature.
+    num_bins : int
+        The number of bins created by the grid points.
+    percentiles : np.array or None
+        The percentiles corresponding to each grid point, if applicable.
+    display_columns : list of str
+        The display labels for each bucket.
+    percentile_columns : list of str
+        The percentile labels for each bucket, if applicable.
+
+    Methods
+    -------
+    prepare(df)
+        Prepares the input DataFrame, calculates summary statistics,
+        and returns the results as three separate DataFrames.
+    """
+
     def __init__(
         self,
         feature,
@@ -38,12 +105,23 @@ class FeatureInfo:
             self.show_outliers = False
 
     def _check_grid_type(self):
+        """
+        Validates the grid_type attribute and sets it to 'custom' if custom
+        grid points are provided.
+        """
         assert self.grid_type in {
             "percentile",
             "equal",
         }, "grid_type should be either 'percentile' or 'equal'"
+        if self.cust_grid_points is not None:
+            self.grid_type = "custom"
 
     def _check_range(self):
+        """
+        Validates the grid_range and percentile_range attributes, ensuring
+        they are tuples with two elements in ascending order. If percentile_range
+        is used, it also checks that both values are between 0 and 100.
+        """
         for name, range_value in [
             ("grid_range", self.grid_range),
             ("percentile_range", self.percentile_range),
@@ -58,6 +136,24 @@ class FeatureInfo:
                     ), f"{name} should be between 0 and 100"
 
     def prepare(self, df):
+        """
+        Prepares the input DataFrame, calculates summary statistics, and returns
+        the results as three separate DataFrames.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame containing the feature column.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            The processed input DataFrame.
+        count_df : pd.DataFrame
+            A DataFrame containing the count of each bucket.
+        summary_df : pd.DataFrame
+            A DataFrame containing the summary statistics for each bucket.
+        """
         self._get_grids(df)
         df = self._map_values_to_buckets(df).reset_index(drop=True)
         df["count"] = 1
@@ -85,6 +181,15 @@ class FeatureInfo:
         return df, count_df, summary_df
 
     def _get_grids(self, df):
+        """
+        Determines the appropriate grid points for the feature based on its
+        type and other class attributes.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame containing the feature column.
+        """
         self.percentiles = None
         if self.type == "binary":
             self.grids = np.array([0, 1])
@@ -102,6 +207,22 @@ class FeatureInfo:
             self.num_bins = len(self.grids) - 1
 
     def _get_numeric_grids(self, values):
+        """
+        Calculates the grid points for numeric features based on the grid_type
+        attribute and other class attributes.
+
+        Parameters
+        ----------
+        values : array-like
+            The values of the feature column.
+
+        Returns
+        -------
+        grids : np.array
+            The grid points for the feature.
+        percentiles : np.array or None
+            The percentiles corresponding to each grid point, if applicable.
+        """
         if self.grid_type == "percentile":
             start, end = self.percentile_range or (0, 100)
             percentiles = np.linspace(start=start, stop=end, num=self.num_grid_points)
@@ -122,6 +243,21 @@ class FeatureInfo:
             return np.linspace(min_value, max_value, self.num_grid_points), None
 
     def _map_values_to_buckets(self, df):
+        """
+        Maps the values of the feature column to the appropriate bucket based
+        on the grids attribute.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame containing the feature column.
+
+        Returns
+        -------
+        df : pd.DataFrame
+            The processed DataFrame with an additional column 'x' representing
+            the bucket index for each value.
+        """
         col_name, grids = self.col_name, self.grids
         percentile_columns = []
 
@@ -151,7 +287,7 @@ class FeatureInfo:
                 )
                 display_columns[-1] = display_columns[-1].replace(")", "]")
 
-            if self.cust_grid_points is None and self.grid_type == "percentile":
+            if self.grid_type == "percentile":
                 for i, col in enumerate(display_columns):
                     per_vals = self.percentiles[i] + self.percentiles[i + 1]
                     per_min, per_max = str(min(per_vals)), str(max(per_vals))
@@ -173,17 +309,21 @@ class FeatureInfo:
                 df["x"] = df.apply(lambda row: _assign_x(row), axis=1)
                 if df["x"].min() == -1:
                     display_columns = ["<" + str(self.grids[0])] + display_columns
-                    percentile_columns = [
-                        "<" + str(min(self.percentiles[0]))
-                    ] + percentile_columns
+
+                    if self.grid_type == "percentile":
+                        percentile_columns = [
+                            "<" + str(min(self.percentiles[0]))
+                        ] + percentile_columns
+
                 if df["x"].max() == x_max + 1:
                     display_columns += [
                         (">" if self.endpoint else ">=") + str(self.grids[-1])
                     ]
-                    percentile_columns += [
-                        (">" if self.endpoint else ">=")
-                        + str(max(self.percentiles[-1]))
-                    ]
+                    if self.grid_type == "percentile":
+                        percentile_columns += [
+                            (">" if self.endpoint else ">=")
+                            + str(max(self.percentiles[-1]))
+                        ]
             else:
                 df = df[df["x"] != -1]
 
@@ -198,12 +338,49 @@ class FeatureInfo:
 
 
 def _to_rgba(color, opacity=1.0):
-    color = [str(int(v * 255)) for v in color[:3]] + [str(opacity)]
-    return "rgba({})".format(",".join(color))
+    """
+    Convert a color from tuple representation to an RGBA string representation.
+
+    Parameters
+    ----------
+    color : tuple
+        A tuple of 3 values representing RGB color in the range [0, 1].
+    opacity : float, optional
+        Opacity of the color in the range [0, 1]. Defaults to 1.0.
+
+    Returns
+    -------
+    str
+        The RGBA string representation of the input color.
+    """
+    return f"rgba({','.join(str(int(v * 255)) for v in color[:3])},{opacity})"
 
 
 def _check_col(col, df, is_target=True):
-    """Validate column and return type"""
+    """
+    Validate column and return its type.
+
+    Parameters
+    ----------
+    col : str or list of str
+        The column name(s) in the input DataFrame.
+    df : pandas.DataFrame
+        The input DataFrame containing the columns to validate.
+    is_target : bool, default=True
+        If True, the column is treated as a target column. Otherwise, it's treated as a feature column.
+
+    Returns
+    -------
+    col_type : str
+        The determined type of the column.
+        For target columns, possible values are: "binary", "multi-class", "regression".
+        For feature columns, possible values are: "binary", "onehot", "numeric".
+
+    Raises
+    ------
+    ValueError
+        If the provided column(s) is not found in the input DataFrame or does not meet the expected format.
+    """
 
     def _validate_cols(cols, df_cols, name):
         missing_cols = cols - df_cols
@@ -246,39 +423,90 @@ def _check_col(col, df, is_target=True):
 
 
 def _check_target(target, df):
-    """Check and return target type
-
-    target types
-    ------------
-    1. binary
-    2. multi-class
-    3. regression
-    """
-
     return _check_col(target, df)
 
 
 def _check_dataset(df, features=None):
-    """Make sure input dataset is pandas DataFrame"""
-    assert isinstance(df, pd.DataFrame), "only accept pandas DataFrame"
+    """
+    Validate input dataset and ensure it is a pandas DataFrame with the specified features.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input dataset to be validated.
+    features : list, optional
+        A list of feature column names that should be present in the input dataset, by default None.
+
+    Raises
+    ------
+    AssertionError
+        If the input dataset is not a pandas DataFrame.
+    ValueError
+        If the input dataset does not contain all the specified features.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise AssertionError("only accept pandas DataFrame")
+
     if features is not None:
         features = set(features)
         cols = set(df.columns.values)
-        if len(features - cols):
+        missing_features = features - cols
+        if missing_features:
             raise ValueError(
-                f"df doesn't contain all model features, missing: {features - cols}"
+                f"df doesn't contain all model features, missing: {missing_features}"
             )
 
 
 def _make_list(x):
-    """Make list when it is necessary"""
+    """
+    Make list when it is necessary.
+
+    Parameters
+    ----------
+    x : object
+        The input object to be converted into a list.
+
+    Returns
+    -------
+    list
+        If the input is already a list, it is returned unchanged.
+        If the input is not a list, a new list containing the input object is returned.
+    """
     if isinstance(x, list):
         return x
     return [x]
 
 
 def _check_model(model, n_classes, pred_func):
-    """Check model input, return class information and predict function"""
+    """
+    Check input model, return class information and predict function.
+
+    Parameters
+    ----------
+    model : object
+        The input model object.
+        It should have either `predict_proba` or `predict` method if pred_func is not provided.
+        It should have `n_classes_` attribute if n_classes is not provided or it's a regression model.
+    n_classes : int, optional
+        The number of classes in the target variable. If not provided, it will try to obtain the value from the model.
+    pred_func : callable, optional
+        The prediction function to be used. If not provided, it will try to obtain the function from the model.
+
+    Returns
+    -------
+    n_classes : int
+        The number of classes in the target variable.
+    pred_func : callable
+        The prediction function to be used.
+    from_model : bool
+        Flag indicating if the prediction function was obtained from the model or was provided as input.
+
+    Raises
+    ------
+    AssertionError
+        If n_classes is not provided and cannot be accessed through model.n_classes_,
+        or if pred_func is not provided and neither model.predict_proba nor model.predict exist.
+    """
 
     n_classes_ = None
     if hasattr(model, "n_classes_"):
@@ -291,14 +519,13 @@ def _check_model(model, n_classes, pred_func):
     else:
         n_classes = n_classes_
 
-    pred_func_ = None
-    from_model = True
-    if hasattr(model, "predict_proba"):
-        pred_func_ = model.predict_proba
-    elif hasattr(model, "predict"):
-        pred_func_ = model.predict
-
     if pred_func is None:
+        pred_func_ = None
+        from_model = True
+        if hasattr(model, "predict_proba"):
+            pred_func_ = model.predict_proba
+        elif hasattr(model, "predict"):
+            pred_func_ = model.predict
         assert (
             pred_func_ is not None
         ), "pred_func is required when model.predict_proba or model.predict doesn't exist."
@@ -312,7 +539,26 @@ def _check_model(model, n_classes, pred_func):
 
 
 def _check_classes(which_classes, n_classes):
-    """Makre sure classes list is valid"""
+    """
+    Make sure classes list is valid.
+
+    Parameters
+    ----------
+    which_classes : list, optional
+        List of class indices to check. Defaults to None.
+    n_classes : int
+        Total number of classes.
+
+    Returns
+    -------
+    which_classes : list
+        List of valid class indices.
+
+    Raises
+    ------
+    ValueError
+        If class index is less than 0 or greater than or equal to the number of classes.
+    """
     if which_classes is None or len(which_classes) == 0:
         which_classes = list(np.arange(n_classes))
     else:
@@ -327,13 +573,38 @@ def _check_classes(which_classes, n_classes):
 
 
 def _check_memory_limit(memory_limit):
-    """Make sure memory limit is between 0 and 1"""
+    """
+    Make sure memory limit is between 0 and 1.
+
+    Parameters
+    ----------
+    memory_limit : float
+        Memory limit value to be checked.
+
+    Raises
+    ------
+    ValueError
+        If memory_limit is not between 0 and 1 (exclusive).
+    """
     if memory_limit <= 0 or memory_limit >= 1:
         raise ValueError("memory_limit: should be (0, 1)")
 
 
 def _check_frac_to_plot(frac_to_plot):
-    """Make sure frac_to_plot is between 0 and 1 if it is float"""
+    """
+    Make sure frac_to_plot is between 0 and 1 if it is float, and greater than 0 if it is int.
+
+    Parameters
+    ----------
+    frac_to_plot : float or int
+        Fraction or number of instances to be plotted.
+
+    Raises
+    ------
+    ValueError
+        If frac_to_plot is not within the valid range for the given type (float or int).
+    """
+
     if type(frac_to_plot) == float:
         if (frac_to_plot <= 0.0) or (frac_to_plot > 1.0):
             raise ValueError("frac_to_plot: should in range(0, 1) when it is a float")
@@ -344,30 +615,48 @@ def _check_frac_to_plot(frac_to_plot):
         raise ValueError("frac_to_plot: should be float or integer")
 
 
-def _calc_memory_usage(df, total_units, n_jobs, memory_limit):
-    """Calculate n_jobs to use"""
-    unit_memory = df.memory_usage(deep=True).sum()
-    free_memory = psutil.virtual_memory()[1] * memory_limit
-    num_units = int(np.floor(free_memory / unit_memory))
-    true_n_jobs = np.min([num_units, n_jobs, total_units])
-    if true_n_jobs < 1:
-        true_n_jobs = 1
-
-    return true_n_jobs
-
-
 def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
+    """
+    Calculate the number of jobs to be executed in parallel based on memory constraints.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame.
+    n_grids : int
+        Number of grid points.
+    memory_limit : float
+        Fraction of available memory to use.
+    n_jobs : int
+        Number of jobs specified.
+
+    Returns
+    -------
+    true_n_jobs : int
+        The calculated number of jobs to be executed in parallel.
+    """
     _check_memory_limit(memory_limit)
-    true_n_jobs = _calc_memory_usage(
-        df,
-        n_grids,
-        n_jobs,
-        memory_limit,
-    )
+    unit_memory = df.memory_usage(deep=True).sum()
+    free_memory = psutil.virtual_memory().available * memory_limit
+    num_units = int(free_memory // unit_memory)
+    true_n_jobs = max(1, min(num_units, n_jobs, n_grids))
     return true_n_jobs
 
 
 def _get_string(x):
+    """
+    Convert a numeric value to a string with proper formatting.
+
+    Parameters
+    ----------
+    x : float or int
+        Numeric value to be converted to a string.
+
+    Returns
+    -------
+    str
+        Formatted string representation of the input value.
+    """
     if int(x) == x:
         x = int(x)
     elif round(x, 1) == x:
@@ -396,11 +685,25 @@ def _expand_values(name, value, num):
 
 
 def _expand_params_for_interact(params):
+    """
+    Expand parameter values for interactive usage.
+
+    Parameters
+    ----------
+    params : dict
+        Dictionary containing parameter names and their corresponding values.
+
+    Returns
+    -------
+    dict
+        Dictionary with expanded parameter values, ensuring each value is a list of length 2.
+    """
     for name, value in params.items():
-        if isinstance(value, list):
-            assert len(value) == 2, f"{name}: length should be 2."
-        else:
+        if not isinstance(value, list):
             params[name] = _expand_values(name, value, 2)
+        else:
+            assert len(value) == 2, f"{name}: length should be 2."
+
     return params
 
 
@@ -413,20 +716,41 @@ def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
 
 
 def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
-    total = len(X)
-    if chunk_size > 0 and chunk_size >= total:
-        chunk_size = -1
+    """
+    Calculate model predictions with an optional chunk size.
 
-    if chunk_size == -1:
-        preds = _calc_preds_each(model, X, pred_func, from_model, predict_kwds)
-    else:
-        preds = []
-        for i in range(0, total, chunk_size):
-            preds.append(
+    Parameters
+    ----------
+    model : object
+        Trained model object.
+    X : array-like
+        Input data to make predictions on.
+    pred_func : callable
+        Function to make predictions using the model.
+    from_model : bool
+        Whether the pred_func is obtained from the model or provided by the user.
+    predict_kwds : dict
+        Additional keyword arguments to pass to pred_func.
+    chunk_size : int, optional, default=-1
+        Number of samples to predict at a time. If -1, predict all samples at once.
+
+    Returns
+    -------
+    preds : array
+        Predictions made by the model.
+    """
+    total = len(X)
+
+    if 0 < chunk_size < total:
+        preds = np.concatenate(
+            [
                 _calc_preds_each(
                     model, X[i : i + chunk_size], pred_func, from_model, predict_kwds
                 )
-            )
-        preds = np.concatenate(preds)
+                for i in range(0, total, chunk_size)
+            ]
+        )
+    else:
+        preds = _calc_preds_each(model, X, pred_func, from_model, predict_kwds)
 
     return preds
