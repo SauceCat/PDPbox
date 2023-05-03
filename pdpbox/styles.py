@@ -87,6 +87,46 @@ def _prepare_plot_style(feat_name, num_plots, plot_params, plot_type):
 
 
 class PlotStyle:
+    """
+    A class for managing the basic style of a plot including figure size, tick style, label style, title style, and subplots.
+
+    Parameters
+    ----------
+    num_plots : int
+        The number of plots.
+    plot_params : dict, optional
+        A dictionary containing custom plot parameters, by default None.
+
+    Attributes
+    ----------
+    plot_params : dict
+        Custom plot parameters.
+    dpi : int
+        The resolution of the plot in dots per inch.
+    engine : str
+        The plotting engine used, either 'matplotlib' or 'plotly'.
+    template : str
+        The template for the plot style.
+    show_percentile : bool
+        Whether to show percentile information on the plot.
+    num_bins : int
+        The number of bins for histogram plots.
+    font_family : str
+        The font family used for text elements in the plot.
+    figsize : tuple
+        The size of the figure in inches (width, height).
+    nrows : int
+        The number of rows of subplots.
+    ncols : int
+        The number of columns of subplots.
+    tick : dict
+        Tick style settings for the plot.
+    label : dict
+        Label style settings for the plot.
+    title : dict
+        Title style settings for the plot.
+    """
+
     def __init__(self, num_plots, plot_params):
         self.plot_params = plot_params or {}
 
@@ -283,8 +323,42 @@ class PlotStyle:
 
 
 class InfoPlotStyle(PlotStyle):
-    def __init__(self, feat_name, target, plot_params, plot_type="target"):
-        super().__init__(target, plot_params)
+    """
+    A class for managing the style of an information plot, inheriting from the PlotStyle class.
+
+    Parameters
+    ----------
+    feat_name : str
+        The name of the feature for the plot.
+    num_plots : int
+        The number of plots.
+    plot_params : dict
+        A dictionary containing custom plot parameters.
+    plot_type : str, optional
+        The type of plot, either "target" or "predict", by default "target".
+
+    Attributes
+    ----------
+    plot_type : str
+        The type of plot, either "target" or "predict".
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
+    line : dict
+        Line style settings for the plot.
+    bar : dict
+        Bar style settings for the plot.
+    box : dict
+        Box style settings for the plot.
+    subplot_ratio : dict
+        The ratio for the subplots.
+    gaps : dict
+        The gaps for the plot elements.
+    plot_sizes : dict
+        The sizes of plot elements.
+    """
+
+    def __init__(self, feat_name, num_plots, plot_params, plot_type="target"):
+        super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
         self.set_plot_title(feat_name)
@@ -411,8 +485,42 @@ class InfoPlotStyle(PlotStyle):
 
 
 class InteractInfoPlotStyle(PlotStyle):
-    def __init__(self, feat_names, target, plot_params, plot_type="target"):
-        super().__init__(target, plot_params)
+    """
+    A class for managing the style of an interactive information plot, inheriting from the PlotStyle class.
+
+    Parameters
+    ----------
+    feat_names : list
+        The names of the features for the plot.
+    num_plots : int
+        The number of plots.
+    plot_params : dict
+        A dictionary containing custom plot parameters.
+    plot_type : str, optional
+        The type of plot, either "interact_target" or "interact_predict", by default "interact_target".
+
+    Attributes
+    ----------
+    plot_type : str
+        The type of plot, either "interact_target" or "interact_predict".
+    annotate : bool
+        Flag indicating whether to annotate the plot.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
+    marker : dict
+        Marker style settings for the plot.
+    legend : dict
+        Legend style settings for the plot.
+    subplot_ratio : dict
+        The ratio for the subplots.
+    gaps : dict
+        The gaps for the plot elements.
+    plot_sizes : dict
+        The sizes of plot elements.
+    """
+
+    def __init__(self, feat_names, num_plots, plot_params, plot_type="interact_target"):
+        super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
         self.annotate = self.plot_params["annotate"]
 
@@ -535,8 +643,56 @@ class InteractInfoPlotStyle(PlotStyle):
 
 
 class PDPIsolatePlotStyle(PlotStyle):
-    def __init__(self, feat_name, target, plot_params, plot_type):
-        super().__init__(target, plot_params)
+    """
+    A class for managing the style of a PDPIsolatePlot, inheriting from the PlotStyle class.
+
+    Parameters
+    ----------
+    feat_name : str
+        The name of the feature for the plot.
+    num_plots : int
+        The number of plots.
+    plot_params : dict
+        A dictionary containing custom plot parameters.
+    plot_type : str, optional
+        The type of plot.
+
+    Attributes
+    ----------
+    plot_type : str
+        The type of plot.
+    plot_lines : bool
+        Whether or not to plot individual lines.
+    frac_to_plot : float
+        Fraction of lines to plot.
+    center : bool
+        Whether to center the plot.
+    clustering : bool
+        Whether to use clustering to plot the lines.
+    plot_pts_dist : bool
+        Whether or not to plot the distribution of points.
+    to_bins : bool
+        Whether or not to discretize continuous variables.
+    std_fill : bool
+        Whether or not to fill the standard deviation.
+    pdp_hl : bool
+        Whether or not to highlight the pdp curve.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
+    line : dict
+        Line style settings for the plot.
+    dist : dict
+        Distribution style settings for the plot.
+    subplot_ratio : dict
+        The ratio for the subplots.
+    gaps : dict
+        The gaps for the plot elements.
+    plot_sizes : dict
+        The sizes of plot elements.
+    """
+
+    def __init__(self, feat_name, num_plots, plot_params, plot_type):
+        super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
         self.set_plot_attributes()
@@ -668,8 +824,44 @@ class PDPIsolatePlotStyle(PlotStyle):
 
 
 class PDPInteractPlotStyle(PlotStyle):
-    def __init__(self, feat_names, target, plot_params, plot_type):
-        super().__init__(target, plot_params)
+    """
+    A class for managing the style of a PDPInteractPlot, inheriting from the PlotStyle class.
+
+    Parameters
+    ----------
+    feat_names : list
+        The names of the features for the plot.
+    num_plots : int
+        The number of plots.
+    plot_params : dict
+        A dictionary containing custom plot parameters.
+    plot_type : str, optional
+        The type of plot.
+
+    Attributes
+    ----------
+    plot_type : str
+        The type of plot.
+    plot_pdp : bool
+        Whether or not to include the pdp isolate plot for each feature.
+    to_bins : bool
+        Whether or not to discretize continuous variables.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
+    interact : dict
+        Style settings for the interactive plot.
+    isolate : dict
+        Style settings for the isolated plots.
+    subplot_ratio : dict
+        The ratio for the subplots.
+    gaps : dict
+        The gaps for the plot elements.
+    plot_sizes : dict
+        The sizes of plot elements.
+    """
+
+    def __init__(self, feat_names, num_plots, plot_params, plot_type):
+        super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
         self.set_plot_attributes()
@@ -810,6 +1002,22 @@ class PDPInteractPlotStyle(PlotStyle):
 
 
 def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
+    """
+    Modify axes settings according to the provided plot_style object.
+
+    Parameters
+    ----------
+    axes : matplotlib.axes.Axes
+        The axes object to modify.
+    plot_style : PlotStyle
+        The plot style object containing the style settings for the axes.
+    top : bool, optional, default=False
+        Whether to set the x-axis ticks position at the top of the plot.
+    right : bool, optional, default=False
+        Whether to set the y-axis ticks position at the right side of the plot.
+    grid : bool, optional, default=True
+        Whether to display the grid on the plot.
+    """
     axes.set_facecolor("white")
     axes.tick_params(**plot_style.tick)
     axes.set_frame_on(False)
@@ -823,6 +1031,16 @@ def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
 
 
 def _modify_legend_axes(axes, font_family):
+    """
+    Modify the legend axes settings according to the provided font family.
+
+    Parameters
+    ----------
+    axes : matplotlib.axes.Axes
+        The axes object to modify.
+    font_family : str
+        The font family to apply to the tick labels.
+    """
     axes.set_frame_on(False)
 
     for tick in axes.get_xticklabels():
@@ -838,6 +1056,26 @@ def _modify_legend_axes(axes, font_family):
 def _display_percentile(
     axes, label, percentile_columns, plot_style, is_y=False, right=True, top=True
 ):
+    """
+    Display percentile values on the axes.
+
+    Parameters
+    ----------
+    axes : matplotlib.axes.Axes
+        The axes object on which to display the percentile values.
+    label : str
+        The label for the percentile axis.
+    percentile_columns : array-like
+        The percentile values to be displayed on the axis.
+    plot_style : PlotStyle instance
+        An instance of the PlotStyle class containing the styling information.
+    is_y : bool, optional, default: False
+        If True, the percentile values will be displayed on the y-axis, otherwise they will be displayed on the x-axis.
+    right : bool, optional, default: True
+        If True, the percentile values will be displayed on the right side of the y-axis, otherwise they will be displayed on the left side.
+    top : bool, optional, default: True
+        If True, the percentile values will be displayed on the top side of the x-axis, otherwise they will be displayed on the bottom side.
+    """
     label = _get_bold_text(label, plot_style.engine)
     if is_y:
         per_axes = axes.twinx()
