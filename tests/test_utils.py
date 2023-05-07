@@ -451,12 +451,23 @@ class TestFeatureInfo:
         params["percentile_range"] = percentile_range
         self.check_valid(titanic_data, params, is_valid)
 
+    def check_prepare_results(self, df, count_df, summary_df):
+        assert "x" in df.columns
+        assert set(count_df.columns) == set(["x", "count", "count_norm"])
+        summary_cols = ["x", "value", "count"]
+        assert (
+            set(summary_cols)
+            <= set(summary_df.columns)
+            <= set(summary_cols + ["percentile"])
+        )
+
     @pytest.mark.parametrize("params", FeatureInfoTestCases.binary_feature_info_params)
     def test_binary_feature(self, params, titanic_data):
         binary_feature_info = self.get_feature_info(titanic_data, **params)
         assert binary_feature_info.type == "binary"
 
-        binary_feature_info.prepare(titanic_data)
+        df, count_df, summary_df = binary_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
         assert np.array_equal(binary_feature_info.grids, [0, 1])
         assert binary_feature_info.percentiles is None
         assert binary_feature_info.num_bins == 2
@@ -466,7 +477,8 @@ class TestFeatureInfo:
         onehot_feature_info = self.get_feature_info(titanic_data, **params)
         assert onehot_feature_info.type == "onehot"
 
-        onehot_feature_info.prepare(titanic_data)
+        df, count_df, summary_df = onehot_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
         assert np.array_equal(onehot_feature_info.grids, onehot_feature_info.col_name)
         assert onehot_feature_info.percentiles is None
         assert onehot_feature_info.num_bins == len(onehot_feature_info.col_name)
@@ -476,7 +488,8 @@ class TestFeatureInfo:
         numeric_feature_info = self.get_feature_info(titanic_data, **params)
         assert numeric_feature_info.type == "numeric"
 
-        numeric_feature_info.prepare(titanic_data)
+        df, count_df, summary_df = numeric_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
         if params["cust_grid_points"] is not None:
             assert np.array_equal(
                 numeric_feature_info.grids, params["cust_grid_points"]
