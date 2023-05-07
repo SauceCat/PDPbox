@@ -15,6 +15,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import copy
+import matplotlib
 
 
 dummy_features = {
@@ -23,6 +24,54 @@ dummy_features = {
     "binary": np.random.randint(0, 2, 100),
 }
 feature_types = dummy_features.keys()
+
+plot_params = [
+    # Test default parameters
+    {},
+    # Test custom which_classes
+    {
+        "which_classes": [0],
+    },
+    {
+        "which_classes": [0, 2],
+    },
+    # Test show_percentile
+    {
+        "show_percentile": True,
+    },
+    # Test custom figsize
+    {
+        "figsize": (900, 500),
+    },
+    {
+        "figsize": (12, 8),
+        "engine": "matplotlib",
+    },
+    # Test custom ncols
+    {
+        "ncols": 1,
+    },
+    {
+        "ncols": 3,
+    },
+    # Test custom plot_params
+    {
+        "plot_params": {"line": {"width": 2, "colors": ["red", "green"]}},
+    },
+    # Test custom engine (matplotlib)
+    {
+        "engine": "matplotlib",
+    },
+    # Test custom dpi
+    {
+        "dpi": 100,
+        "engine": "matplotlib",
+    },
+    # Test custom template (plotly_dark)
+    {
+        "template": "plotly_dark",
+    },
+]
 
 
 def get_dummy_dfs(target_type=None):
@@ -73,20 +122,32 @@ def get_dummy_model(model_type):
 
 
 class TestInfoPlot:
-    def _test_regression(self):
+    def close_plt(self, params):
+        if params.get("engine", "plotly") == "matplotlib":
+            matplotlib.pyplot.close()
+
+    def _test_regression(self, params):
         for info_plot in self.get_plot_objs("regression"):
             assert info_plot.n_classes == 0
             self.check_common(info_plot, "regression")
+            if params.get("which_classes", None) is None:
+                info_plot.plot(**params)
+                self.close_plt(params)
 
-    def _test_binary(self):
+    def _test_binary(self, params):
         for info_plot in self.get_plot_objs("binary"):
             assert info_plot.n_classes == 2
             self.check_common(info_plot, "binary")
+            if params.get("which_classes", None) is None:
+                info_plot.plot(**params)
+                self.close_plt(params)
 
-    def _test_multi_class(self):
+    def _test_multi_class(self, params):
         for info_plot in self.get_plot_objs("multi-class"):
             assert info_plot.n_classes == 3
             self.check_common(info_plot, "multi-class")
+            info_plot.plot(**params)
+            self.close_plt(params)
 
 
 class TestTargetPlot(TestInfoPlot):
@@ -133,14 +194,17 @@ class TestTargetPlot(TestInfoPlot):
             summary_cols.append("percentile")
         assert set(info_plot.summary_df.columns) == set(summary_cols)
 
-    def test_regression(self):
-        self._test_regression()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_regression(self, params):
+        self._test_regression(params)
 
-    def test_binary(self):
-        self._test_binary()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_binary(self, params):
+        self._test_binary(params)
 
-    def test_multi_class(self):
-        self._test_multi_class()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_multi_class(self, params):
+        self._test_multi_class(params)
 
 
 class TestPredictPlot(TestInfoPlot):
@@ -189,14 +253,17 @@ class TestPredictPlot(TestInfoPlot):
             summary_cols.append("percentile")
         assert set(info_plot.summary_df.columns) == set(summary_cols)
 
-    def test_regression(self):
-        self._test_regression()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_regression(self, params):
+        self._test_regression(params)
 
-    def test_binary(self):
-        self._test_binary()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_binary(self, params):
+        self._test_binary(params)
 
-    def test_multi_class(self):
-        self._test_multi_class()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_multi_class(self, params):
+        self._test_multi_class(params)
 
 
 class TestInterectTargetPlot(TestInfoPlot):
@@ -239,14 +306,17 @@ class TestInterectTargetPlot(TestInfoPlot):
             ["x1", "x2", "count"] + info_plot.target
         )
 
-    def test_regression(self):
-        self._test_regression()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_regression(self, params):
+        self._test_regression(params)
 
-    def test_binary(self):
-        self._test_binary()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_binary(self, params):
+        self._test_binary(params)
 
-    def test_multi_class(self):
-        self._test_multi_class()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_multi_class(self, params):
+        self._test_multi_class(params)
 
 
 class TestInterectPredictPlot(TestInfoPlot):
@@ -288,11 +358,14 @@ class TestInterectPredictPlot(TestInfoPlot):
             ["x1", "x2", "count"] + info_plot.target
         )
 
-    def test_regression(self):
-        self._test_regression()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_regression(self, params):
+        self._test_regression(params)
 
-    def test_binary(self):
-        self._test_binary()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_binary(self, params):
+        self._test_binary(params)
 
-    def test_multi_class(self):
-        self._test_multi_class()
+    @pytest.mark.parametrize("params", plot_params)
+    def test_multi_class(self, params):
+        self._test_multi_class(params)
