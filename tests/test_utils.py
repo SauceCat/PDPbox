@@ -789,7 +789,9 @@ def test_check_frac_to_plot():
 
 def test_calc_n_jobs():
     # make a random big DataFrame
-    df = pd.DataFrame(np.random.random((np.power(10, 8), 4)), columns=["A", "B", "C", "D"])
+    df = pd.DataFrame(
+        np.random.random((np.power(10, 8), 4)), columns=["A", "B", "C", "D"]
+    )
     n_grids = 10
     n_jobs = 4
     prev_n_jobs = 4
@@ -853,8 +855,10 @@ def test_calc_preds():
 
     # Test from_model=False
     from_model = False
+
     def dummy_prec_func(model, X, **predict_kwds):
         return X * 3
+
     preds = _calc_preds(model, X, dummy_prec_func, from_model, predict_kwds)
     assert np.array_equal(preds, X * 3)
 
@@ -873,21 +877,23 @@ def test_check_cluster_params():
         _check_cluster_params(5.5, "approx")
 
     # Test invalid cluster_method
-    with pytest.raises(ValueError, match='Clustering method should be "approx" or "accurate".'):
+    with pytest.raises(
+        ValueError, match='Clustering method should be "approx" or "accurate".'
+    ):
         _check_cluster_params(5, "invalid")
 
 
 def test_check_plot_engine():
-    _check_plot_engine('plotly')  # should pass
-    _check_plot_engine('matplotlib')  # should pass
+    _check_plot_engine("plotly")  # should pass
+    _check_plot_engine("matplotlib")  # should pass
 
     with pytest.raises(ValueError):  # should fail
-        _check_plot_engine('invalid_engine')
+        _check_plot_engine("invalid_engine")
 
 
 def test_check_pdp_interact_plot_type():
-    _check_pdp_interact_plot_type('contour')  # should pass
-    _check_pdp_interact_plot_type('grid')  # should pass
+    _check_pdp_interact_plot_type("contour")  # should pass
+    _check_pdp_interact_plot_type("grid")  # should pass
 
     with pytest.raises(ValueError):  # should fail
-        _check_pdp_interact_plot_type('invalid_plot_type')
+        _check_pdp_interact_plot_type("invalid_plot_type")
