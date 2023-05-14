@@ -636,7 +636,9 @@ def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
         The calculated number of jobs to be executed in parallel.
     """
     _check_memory_limit(memory_limit)
+    # df memory in bytes
     unit_memory = df.memory_usage(deep=True).sum()
+    # free memory in bytes
     free_memory = psutil.virtual_memory().available * memory_limit
     num_units = int(free_memory // unit_memory)
     true_n_jobs = max(1, min(num_units, n_jobs, n_grids))
@@ -754,3 +756,68 @@ def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
         preds = _calc_preds_each(model, X, pred_func, from_model, predict_kwds)
 
     return preds
+
+
+def _check_cluster_params(n_cluster_centers, cluster_method):
+    """
+    Check the parameters for clustering.
+
+    Parameters
+    ----------
+    n_cluster_centers : int or None
+        The number of cluster centers to be used. If None, a ValueError is raised.
+    cluster_method : str
+        The method used for clustering. Should be either "approx" or "accurate".
+        If it's not, a ValueError is raised.
+
+    Raises
+    ------
+    ValueError
+        If `n_cluster_centers` is None or `cluster_method` is not "approx" or "accurate".
+    """
+    if n_cluster_centers is None:
+        raise ValueError("n_cluster_centers should be specified.")
+    if not isinstance(n_cluster_centers, int):
+        raise TypeError("n_cluster_centers should be int.")
+    if n_cluster_centers <= 0:
+        raise ValueError("n_cluster_centers should be larger than 0.")
+    if cluster_method not in ["approx", "accurate"]:
+        raise ValueError('Clustering method should be "approx" or "accurate".')
+
+
+def _check_plot_engine(engine):
+    """
+    Check the validity of the plot engine.
+
+    This function raises a ValueError if the provided engine is not 'plotly' or 'matplotlib'.
+
+    Parameters
+    ----------
+    engine : str
+        The name of the plot engine to check.
+
+    Raises
+    ------
+    ValueError
+        If `engine` is not 'plotly' or 'matplotlib'.
+    """
+    if engine not in ["plotly", "matplotlib"]:
+        raise ValueError("plot_engine should be either 'plotly' or 'matplotlib'.")
+
+
+def _check_pdp_interact_plot_type(plot_type):
+    """
+    Check the validity of the plot type for PDPInteract.
+
+    Parameters
+    ----------
+    plot_type : str
+        The name of the plot type to check.
+
+    Raises
+    ------
+    ValueError
+        If `plot_type` is not 'grid' or 'contour'.
+    """
+    if plot_type not in ["grid", "contour"]:
+        raise ValueError("plot_type should be either 'grid' or 'contour'.")

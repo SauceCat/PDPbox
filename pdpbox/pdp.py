@@ -12,6 +12,9 @@ from .utils import (
     _calc_preds,
     _expand_params_for_interact,
     _check_dataset,
+    _check_cluster_params,
+    _check_plot_engine,
+    _check_pdp_interact_plot_type,
 )
 
 import pandas as pd
@@ -58,6 +61,7 @@ class _PDPBase:
         self.n_jobs = n_jobs
         self.predict_kwds = predict_kwds
         self.data_transformer = data_transformer
+        self.dist_num_samples = 1000
 
     def _prepare_calculate(self):
         self.n_classes, self.pred_func, self.from_model = _check_model(
@@ -194,9 +198,8 @@ class PDPIsolate(_PDPBase):
         _, self.count_df, _ = self.feature_info.prepare(self.df)
         self.n_grids = len(self.feature_info.grids)
         dist_df = self.df[self.feature_info.col_name]
-        num_samples = 1000
-        if len(dist_df) > num_samples:
-            dist_df = dist_df.sample(num_samples, replace=False)
+        if len(dist_df) > self.dist_num_samples:
+            dist_df = dist_df.sample(self.dist_num_samples, replace=False)
         self.dist_df = dist_df
 
     def _calculate(self):
@@ -210,6 +213,8 @@ class PDPIsolate(_PDPBase):
                 grids = [grid]
             feature_grids.append(grids)
         self._collect_pdp_results(features, feature_grids)
+        # delete df to save memory
+        del self.df
 
     def plot(
         self,
@@ -234,6 +239,10 @@ class PDPIsolate(_PDPBase):
             plot_params = {}
 
         _check_frac_to_plot(frac_to_plot)
+        if cluster:
+            _check_cluster_params(n_cluster_centers, cluster_method)
+        _check_plot_engine(engine)
+
         plot_params.update(
             {
                 "ncols": ncols,
@@ -358,6 +367,8 @@ class PDPInteract(_PDPBase):
         for obj in self.pdp_isolate_objs:
             features += _make_list(obj.feature_info.col_name)
         self._collect_pdp_results(features, self.feature_grid_combos)
+        # delete df to save memory
+        del self.df
 
     def plot(
         self,
@@ -377,6 +388,8 @@ class PDPInteract(_PDPBase):
         if plot_params is None:
             plot_params = {}
 
+        _check_plot_engine(engine)
+        _check_pdp_interact_plot_type(plot_type)
         feature_types = [obj.feature_info.type for obj in self.pdp_isolate_objs]
 
         if (

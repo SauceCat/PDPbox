@@ -18,6 +18,9 @@ from pdpbox.utils import (
     _get_string,
     _expand_params_for_interact,
     _calc_preds,
+    _check_cluster_params,
+    _check_plot_engine,
+    _check_pdp_interact_plot_type,
 )
 import pytest
 import pandas as pd
@@ -785,15 +788,23 @@ def test_check_frac_to_plot():
 
 
 def test_calc_n_jobs():
-    df = pd.DataFrame(np.random.random((100, 4)), columns=["A", "B", "C", "D"])
+    # make a random big DataFrame
+    df = pd.DataFrame(np.random.random((np.power(10, 8), 4)), columns=["A", "B", "C", "D"])
     n_grids = 10
-    memory_limit = 0.5
     n_jobs = 4
+    prev_n_jobs = 4
 
-    true_n_jobs = _calc_n_jobs(df, n_grids, memory_limit, n_jobs)
-
-    assert isinstance(true_n_jobs, int)
-    assert true_n_jobs >= 1
+    # memory_limit = 0.5, true_n_jobs = 4
+    # memory_limit = 0.4, true_n_jobs = 4
+    # memory_limit = 0.3, true_n_jobs = 4
+    # memory_limit = 0.2, true_n_jobs = 3
+    # memory_limit = 0.1, true_n_jobs = 1
+    for memory_limit in [0.5, 0.4, 0.3, 0.2, 0.1]:
+        true_n_jobs = _calc_n_jobs(df, n_grids, memory_limit, n_jobs)
+        assert isinstance(true_n_jobs, int)
+        assert true_n_jobs >= 1
+        assert true_n_jobs <= prev_n_jobs
+        prev_n_jobs = true_n_jobs
 
 
 def test_get_string():
@@ -826,14 +837,57 @@ def test_calc_preds():
             return X * 2
 
     model = DummyModel()
-    X = np.array([1, 2, 3, 4, 5])
+    X = np.random.randn(100)
     pred_func = model.predict
     from_model = True
     predict_kwds = {}
 
+    # Test when chunk_size is not provided
     preds = _calc_preds(model, X, pred_func, from_model, predict_kwds)
     assert np.array_equal(preds, X * 2)
 
-    chunk_size = 2
-    preds = _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size)
-    assert np.array_equal(preds, X * 2)
+    # Test various chunk sizes
+    for chunk_size in [1, 10, 50, 100, 150]:
+        preds = _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size)
+        assert np.array_equal(preds, X * 2), f"Failed for chunk_size={chunk_size}"
+
+    # Test from_model=False
+    from_model = False
+    def dummy_prec_func(model, X, **predict_kwds):
+        return X * 3
+    preds = _calc_preds(model, X, dummy_prec_func, from_model, predict_kwds)
+    assert np.array_equal(preds, X * 3)
+
+
+def test_check_cluster_params():
+    # Test valid inputs
+    _check_cluster_params(5, "approx")
+    _check_cluster_params(10, "accurate")
+
+    # Test invalid n_cluster_centers
+    with pytest.raises(ValueError, match="n_cluster_centers should be specified."):
+        _check_cluster_params(None, "approx")
+    with pytest.raises(ValueError, match="n_cluster_centers should be larger than 0."):
+        _check_cluster_params(0, "approx")
+    with pytest.raises(TypeError, match="n_cluster_centers should be int."):
+        _check_cluster_params(5.5, "approx")
+
+    # Test invalid cluster_method
+    with pytest.raises(ValueError, match='Clustering method should be "approx" or "accurate".'):
+        _check_cluster_params(5, "invalid")
+
+
+def test_check_plot_engine():
+    _check_plot_engine('plotly')  # should pass
+    _check_plot_engine('matplotlib')  # should pass
+
+    with pytest.raises(ValueError):  # should fail
+        _check_plot_engine('invalid_engine')
+
+
+def test_check_pdp_interact_plot_type():
+    _check_pdp_interact_plot_type('contour')  # should pass
+    _check_pdp_interact_plot_type('grid')  # should pass
+
+    with pytest.raises(ValueError):  # should fail
+        _check_pdp_interact_plot_type('invalid_plot_type')

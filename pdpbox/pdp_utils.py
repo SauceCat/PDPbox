@@ -65,9 +65,6 @@ class PDPIsolatePlotEngine:
         method = self.plot_style.clustering["method"]
         n_centers = self.plot_style.clustering["n_centers"]
 
-        if method not in ["approx", "accurate"]:
-            raise ValueError('Clustering method should be "approx" or "accurate".')
-
         kmeans = (MiniBatchKMeans if method == "approx" else KMeans)(
             n_clusters=n_centers, random_state=0
         )
@@ -80,7 +77,7 @@ class PDPIsolatePlotEngine:
         if num_samples <= 1:
             num_samples *= total
         if num_samples < total:
-            ice_lines = ice_lines.sample(num_samples, replace=False).reset_index(
+            ice_lines = ice_lines.sample(int(num_samples), replace=False).reset_index(
                 drop=True
             )
         return ice_lines

@@ -154,6 +154,7 @@ class _InfoPlot(_BaseInfoPlot):
     target_lines : list
         List of aggregated target lines for each target.
     """
+
     def __init__(
         self,
         df,
@@ -304,6 +305,7 @@ class TargetPlot(_InfoPlot):
     ----------
     See attributes of the _InfoPlot class.
     """
+
     def __init__(
         self,
         df,
@@ -377,6 +379,7 @@ class PredictPlot(_InfoPlot):
     ----------
     See attributes of the _InfoPlot class.
     """
+
     def __init__(
         self,
         df,
@@ -439,6 +442,7 @@ class _InteractInfoPlot(_BaseInfoPlot):
     plot_df : pd.DataFrame
         Data frame containing the plot data.
     """
+
     def __init__(
         self,
         df,
@@ -610,6 +614,7 @@ class InterectTargetPlot(_InteractInfoPlot):
     ----------
     See attributes of the _InteractInfoPlot class.
     """
+
     def __init__(
         self,
         df,
@@ -683,6 +688,7 @@ class InterectPredictPlot(_InteractInfoPlot):
     ----------
     See attributes of the _InteractInfoPlot class.
     """
+
     def __init__(
         self,
         df,
