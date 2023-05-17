@@ -11,21 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pdpbox.pdp import PDPResult, PDPIsolate, PDPInteract
 from pdpbox.utils import FeatureInfo, _make_list
 
-DUMMY_ONEHOT_LENGTH = 4
-DUMMY_DF_LENGTH = 100
-DUMMY_MULTI_CLASSES = 3
-FEATURE_TYPES = ["numeric", "onehot", "binary"]
-
-dummy_features = {
-    "numeric": np.random.randn(DUMMY_DF_LENGTH),
-    "onehot": np.array(
-        [
-            np.eye(DUMMY_ONEHOT_LENGTH)[i]
-            for i in np.random.randint(0, DUMMY_ONEHOT_LENGTH, DUMMY_DF_LENGTH)
-        ]
-    ),
-    "binary": np.random.randint(0, 2, DUMMY_DF_LENGTH),
-}
+from conftest import DummyModel, PlotTestBase
 
 plot_params = [
     {"show_percentile": True},
@@ -65,111 +51,7 @@ pdp_interact_plot_params = [
 ] + plot_params
 
 
-def shuffle_array(array):
-    shuffled = np.array(array, copy=True)
-    np.random.shuffle(shuffled)
-    return shuffled
-
-
-def get_dummy_dfs():
-    feat_types_1 = shuffle_array(FEATURE_TYPES)
-    feat_types_2 = shuffle_array(FEATURE_TYPES)
-
-    for t1, t2 in product(feat_types_1, feat_types_2):
-        df = {}
-        features = []
-        for i, t in enumerate((t1, t2), start=1):
-            if t == "onehot":
-                for j in range(DUMMY_ONEHOT_LENGTH):
-                    df[f"feature_{i}_{j}"] = dummy_features[t][:, j]
-                features.append(
-                    [f"feature_{i}_{j}" for j in range(DUMMY_ONEHOT_LENGTH)]
-                )
-            else:
-                df[f"feature_{i}"] = dummy_features[t]
-                features.append(f"feature_{i}")
-        yield pd.DataFrame(df), features, (t1, t2)
-
-
-class DummyModel:
-    def __init__(self, model_type, feat, feat_type, interact=False):
-        self.feat = feat
-        self.feat_type = feat_type
-        self.interact = interact
-
-        if model_type == "regression":
-            self.predict = self.dummy_regression_predict
-        elif model_type == "binary":
-            self.predict_proba = self.dummy_binary_predict_proba
-            self.n_classes_ = 2
-        elif model_type == "multi-class":
-            self.predict_proba = self.dummy_multi_class_predict_proba
-            self.n_classes_ = DUMMY_MULTI_CLASSES
-
-    def _compute_feature(self, x, feat, feat_type):
-        if feat_type == "onehot":
-            return np.argmax(x[feat].to_numpy(), axis=1)
-        else:
-            return x[feat].values
-
-    def _compute_score(self, x, feat, feat_type):
-        if feat_type == "onehot":
-            return (np.argmax(x[feat].to_numpy(), axis=1) + 1) / len(feat)
-        else:
-            return (
-                np.ones(len(x))
-                if x[feat].max() == 0
-                else x[feat].values / x[feat].max()
-            )
-
-    def dummy_regression_predict(self, x):
-        if self.interact:
-            return sum(
-                self._compute_feature(x, f, t)
-                for f, t in zip(self.feat, self.feat_type)
-            )
-        else:
-            return self._compute_feature(x, self.feat, self.feat_type)
-
-    def predict_proba_func(self, x):
-        if self.interact:
-            values = [
-                self._compute_score(x, f, t) for f, t in zip(self.feat, self.feat_type)
-            ]
-            return values[0] * values[1]
-        else:
-            return self._compute_score(x, self.feat, self.feat_type)
-
-    def dummy_binary_predict_proba(self, x):
-        scores = self.predict_proba_func(x)
-        return np.stack((1 - scores, scores)).T
-
-    def dummy_multi_class_predict_proba(self, x):
-        scores = self.predict_proba_func(x)
-        each_scores = (1 - scores) / (self.n_classes_ - 1)
-        proba = np.zeros((len(x), self.n_classes_))
-        proba[:, 0] = scores
-        proba[:, 1:] = each_scores[:, np.newaxis]
-        return proba
-
-
-class _TestPDPBase(ABC):
-    def setup(self):
-        self.model_types = ["regression", "binary", "multi-class"]
-
-    @staticmethod
-    def close_plt(params):
-        if params.get("engine", "plotly") == "matplotlib":
-            matplotlib.pyplot.close()
-
-    @abstractmethod
-    def get_plot_objs(self, model_type):
-        pass
-
-    @abstractmethod
-    def check_common(self, plot_obj, model_type):
-        pass
-
+class _TestPDPBase(PlotTestBase):
     @abstractmethod
     def check_ice_pdp(self, plot_obj, model_type):
         pass
@@ -193,9 +75,8 @@ class _TestPDPBase(ABC):
 
 
 class TestPDPIsolate(_TestPDPBase):
-    @staticmethod
-    def get_plot_objs(model_type, n_jobs=1):
-        for df, features, feat_types in get_dummy_dfs():
+    def get_plot_objs(self, model_type, n_jobs=1):
+        for df, features, feat_types in self.data_gen.get_dummy_dfs():
             model = DummyModel(model_type, features[0], feat_types[0])
             for n_jobs_ in _make_list(n_jobs):
                 yield PDPIsolate(
@@ -208,8 +89,7 @@ class TestPDPIsolate(_TestPDPBase):
                     n_jobs=n_jobs_,
                 )
 
-    @staticmethod
-    def check_common(plot_obj, model_type):
+    def check_common(self, plot_obj, model_type):
         assert plot_obj.plot_type == "pdp_isolate"
         assert isinstance(plot_obj.feature_info, FeatureInfo)
         assert set(plot_obj.count_df.columns) == {"x", "count", "count_norm"}
@@ -226,22 +106,28 @@ class TestPDPIsolate(_TestPDPBase):
                 if model_type == "multi-class"
                 else res.class_id is None
             )
-            assert res.ice_lines.shape == (DUMMY_DF_LENGTH, plot_obj.n_grids)
+            assert res.ice_lines.shape == (
+                self.data_gen.DUMMY_DF_LENGTH,
+                plot_obj.n_grids,
+            )
             assert res.pdp.shape == (plot_obj.n_grids,)
 
-    @staticmethod
-    def calculate_target_value(model_type, i, grid, feat_type, cls_idx):
+    def calculate_target_value(self, model_type, i, grid, feat_type, cls_idx):
         if model_type == "regression":
             target_value = i if feat_type == "onehot" else grid
         elif model_type == "binary":
-            target_value = (i + 1) / DUMMY_ONEHOT_LENGTH if feat_type == "onehot" else 1
+            target_value = (
+                (i + 1) / self.data_gen.DUMMY_ONEHOT_LENGTH
+                if feat_type == "onehot"
+                else 1
+            )
         elif model_type == "multi-class":
             if feat_type == "onehot":
-                pos_value = (i + 1) / DUMMY_ONEHOT_LENGTH
+                pos_value = (i + 1) / self.data_gen.DUMMY_ONEHOT_LENGTH
                 target_value = (
                     pos_value
                     if cls_idx == 0
-                    else (1 - pos_value) / (DUMMY_MULTI_CLASSES - 1)
+                    else (1 - pos_value) / (self.data_gen.DUMMY_MULTI_CLASSES - 1)
                 )
             else:
                 target_value = 1 if cls_idx == 0 else 0
@@ -281,9 +167,8 @@ class TestPDPIsolate(_TestPDPBase):
 
 
 class TestPDPInteract(_TestPDPBase):
-    @staticmethod
-    def get_plot_objs(model_type, n_jobs=1):
-        for df, features, feat_types in get_dummy_dfs():
+    def get_plot_objs(self, model_type, n_jobs=1):
+        for df, features, feat_types in self.data_gen.get_dummy_dfs():
             model = DummyModel(model_type, features, feat_types, interact=True)
             for n_jobs_ in _make_list(n_jobs):
                 yield PDPInteract(
@@ -296,8 +181,7 @@ class TestPDPInteract(_TestPDPBase):
                     n_jobs=n_jobs_,
                 )
 
-    @staticmethod
-    def check_common(plot_obj, model_type):
+    def check_common(self, plot_obj, model_type):
         assert plot_obj.plot_type == "pdp_interact"
         n_grids = []
         for obj in plot_obj.pdp_isolate_objs:
@@ -318,14 +202,18 @@ class TestPDPInteract(_TestPDPBase):
                 if model_type == "multi-class"
                 else res.class_id is None
             )
-            assert res.ice_lines.shape == (DUMMY_DF_LENGTH, plot_obj.n_grids)
+            assert res.ice_lines.shape == (
+                self.data_gen.DUMMY_DF_LENGTH,
+                plot_obj.n_grids,
+            )
             assert res.pdp.shape == (plot_obj.n_grids,)
 
-    @staticmethod
-    def calculate_target_value(model_type, grid, feat_types, cls_idx):
+    def calculate_target_value(self, model_type, grid, feat_types, cls_idx):
         def get_onehot_value(j):
             return np.argmax(
-                grid[:DUMMY_ONEHOT_LENGTH] if j == 0 else grid[-DUMMY_ONEHOT_LENGTH:]
+                grid[: self.data_gen.DUMMY_ONEHOT_LENGTH]
+                if j == 0
+                else grid[-self.data_gen.DUMMY_ONEHOT_LENGTH :]
             )
 
         def get_value(j, feat_type, is_regression=True):
@@ -336,7 +224,7 @@ class TestPDPInteract(_TestPDPBase):
                     return grid[j] if j == 0 else grid[-j]
             else:
                 if feat_type == "onehot":
-                    return (get_onehot_value(j) + 1) / DUMMY_ONEHOT_LENGTH
+                    return (get_onehot_value(j) + 1) / self.data_gen.DUMMY_ONEHOT_LENGTH
                 else:
                     return 1
 
@@ -357,7 +245,7 @@ class TestPDPInteract(_TestPDPBase):
                 target_value = (
                     pos_value
                     if cls_idx == 0
-                    else (1 - pos_value) / (DUMMY_MULTI_CLASSES - 1)
+                    else (1 - pos_value) / (self.data_gen.DUMMY_MULTI_CLASSES - 1)
                 )
 
         return target_value
@@ -389,9 +277,7 @@ class TestPDPInteract(_TestPDPBase):
 
     @pytest.mark.parametrize("model_type", ["regression", "binary", "multi-class"])
     def test_plot_obj(self, model_type):
-        if model_type == "binary":
-
-            self._test_plot_obj(model_type)
+        self._test_plot_obj(model_type)
 
     @pytest.mark.parametrize("params", pdp_interact_plot_params)
     def test_plot(self, params):
