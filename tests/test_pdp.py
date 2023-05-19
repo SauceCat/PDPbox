@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import matplotlib
+import copy
 from abc import ABC, abstractmethod
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -50,6 +51,255 @@ pdp_interact_plot_params = [
     {"plot_type": "grid", "plot_pdp": True, "to_bins": False},
 ] + plot_params
 
+pdp_binary_params = [
+    # binary feature
+    [
+        {"feature": "Sex", "feature_name": "gender"},
+        {
+            "center": False,
+            "plot_lines": True,
+            "frac_to_plot": 100,
+            "plot_pts_dist": True,
+            "plot_params": {"pdp_hl": True},
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib", "dpi": 100},
+        ],
+    ],
+    # onehot feature
+    [
+        {
+            "feature": ["Embarked_C", "Embarked_S", "Embarked_Q"],
+            "feature_name": "embarked",
+        },
+        {
+            "plot_lines": True,
+            "cluster": True,
+            "n_cluster_centers": 50,
+            "plot_pts_dist": True,
+            "plot_params": {"pdp_hl": True, "line": {"hl_color": "#f46d43"}},
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+    # numeric feature
+    [
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+        },
+        {
+            "plot_lines": True,
+            "frac_to_plot": 0.1,
+            "plot_pts_dist": True,
+            "to_bins": True,
+            "show_percentile": True,
+            "plot_params": {"pdp_hl": True},
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+pdp_multiclass_params = [
+    # numeric feature
+    [
+        {
+            "feature": "feat_67",
+            "feature_name": "feat_67",
+            "chunk_size": 10000,
+        },
+        {
+            "plot_lines": True,
+            "frac_to_plot": 0.1,
+            "plot_pts_dist": True,
+            "show_percentile": True,
+            "plot_params": {
+                "pdp_hl": True,
+                "gaps": {"outer_x": 0.06, "inner_y": 0.02, "outer_y": 0.1},
+            },
+        },
+        [
+            {"engine": "plotly", "figsize": (1200, 400), "ncols": 3},
+            {"engine": "plotly", "which_classes": [1, 2]},
+            {"engine": "matplotlib", "figsize": (16, 6.5), "which_classes": [0, 2]},
+        ],
+    ]
+]
+
+pdp_regression_params = [
+    # binary feature
+    [
+        {
+            "feature": "SchoolHoliday",
+            "feature_name": "SchoolHoliday",
+            "n_classes": 0,
+        },
+        {
+            "plot_lines": True,
+            "frac_to_plot": 100,
+            "show_percentile": True,
+            "show_percentile": True,
+            "plot_params": {
+                "title": {
+                    "title": {"text": "I am a title"},
+                    "subtitle": {"text": "I am a subtitle"},
+                }
+            },
+        },
+        [
+            {"engine": "plotly", "template": "plotly_dark"},
+            {"engine": "matplotlib", "figsize": (12, 8)},
+        ],
+    ],
+    # onehot feature
+    [
+        {
+            "feature": ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
+            "feature_name": "StoreType",
+            "n_classes": 0,
+        },
+        {
+            "plot_lines": True,
+            "frac_to_plot": 500,
+            "plot_params": {"pdp_hl": True},
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+    # numeric feature
+    [
+        {
+            "feature": "weekofyear",
+            "feature_name": "weekofyear",
+            "n_classes": 0,
+        },
+        {
+            "plot_lines": True,
+            "frac_to_plot": 100,
+            "plot_pts_dist": True,
+            "to_bins": True,
+            "show_percentile": True,
+            "plot_params": {"pdp_hl": True},
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+pdp_interact_binary_params = [
+    # numeric, numeric
+    [
+        {
+            "features": ["Age", "Fare"],
+            "feature_names": ["Age", "Fare"],
+        },
+        {"plot_pdp": True, "show_percentile": True},
+        [
+            {"engine": "plotly"},
+            {"engine": "plotly", "plot_type": "grid"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+    # numeric, binary
+    [
+        {"features": ["Age", "Sex"], "feature_names": ["age", "gender"]},
+        {"plot_pdp": True, "show_percentile": True},
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+            {"engine": "matplotlib", "plot_type": "grid"},
+        ],
+    ],
+    # numeric, onehot
+    [
+        {
+            "features": ["Age", ["Embarked_C", "Embarked_S", "Embarked_Q"]],
+            "feature_names": ["age", "embarked"],
+        },
+        {
+            "plot_pdp": True,
+            "show_percentile": True,
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+            {"engine": "matplotlib", "plot_type": "grid"},
+        ],
+    ],
+    # binary, onehot
+    [
+        {
+            "features": ["Sex", ["Embarked_C", "Embarked_S", "Embarked_Q"]],
+            "feature_names": ["gender", "embarked"],
+        },
+        {
+            "plot_pdp": True,
+            "plot_type": "grid",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "plotly", "plot_type": "contour"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+pdp_interact_multiclass_params = [
+    # numeric, numeric
+    [
+        {
+            "features": ["feat_67", "feat_25"],
+            "feature_names": ["feat_67", "feat_25"],
+        },
+        {
+            "plot_pdp": False,
+            "show_percentile": True,
+        },
+        [
+            {"engine": "plotly", "plot_type": "contour"},
+            {"engine": "plotly", "plot_type": "contour", "which_classes": [2]},
+            {
+                "engine": "matplotlib",
+                "which_classes": [2, 4, 6, 8],
+                "plot_params": {"gaps": {"outer_y": 0.2}},
+                "plot_type": "grid",
+            },
+        ],
+    ],
+]
+
+pdp_interact_regression_params = [
+    # numeric, onehot
+    [
+        {
+            "features": [
+                "weekofyear",
+                ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
+            ],
+            "feature_names": ["weekofyear", "storetype"],
+            "n_classes": 0,
+        },
+        {
+            "plot_type": "contour",
+            "plot_pdp": True,
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
 
 class _TestPDPBase(PlotTestBase):
     @abstractmethod
@@ -72,6 +322,18 @@ class _TestPDPBase(PlotTestBase):
             plot_obj.plot(**params)
             self.close_plt(params)
             break
+
+    def _test_real_plot(self, plot_obj, plot_params, extra_plot_settings):
+        for extra_params in extra_plot_settings:
+            curr_plot_params = copy.deepcopy(plot_params)
+            curr_plot_params.update(extra_params)
+            fig, axes = plot_obj.plot(**curr_plot_params)
+            self.close_plt(curr_plot_params)
+            assert fig is not None
+            if curr_plot_params.get("engine", "plotly") == "matplotlib":
+                assert axes is not None
+            else:
+                assert axes is None
 
 
 class TestPDPIsolate(_TestPDPBase):
@@ -164,6 +426,46 @@ class TestPDPIsolate(_TestPDPBase):
     @pytest.mark.parametrize("params", pdp_plot_params)
     def test_plot(self, params):
         self._test_plot(params)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_binary_params
+    )
+    def test_real_binary_model(self, params, plot_params, extra_plot_settings, titanic):
+        plot_obj = PDPIsolate(
+            model=titanic["model"],
+            df=titanic["data"],
+            model_features=titanic["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_multiclass_params
+    )
+    def test_real_multiclass_model(
+        self, params, plot_params, extra_plot_settings, otto
+    ):
+        plot_obj = PDPIsolate(
+            model=otto["model"],
+            df=otto["data"],
+            model_features=otto["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_regression_params
+    )
+    def test_real_regression_model(
+        self, params, plot_params, extra_plot_settings, ross
+    ):
+        plot_obj = PDPIsolate(
+            model=ross["model"],
+            df=ross["data"],
+            model_features=ross["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
 
 
 class TestPDPInteract(_TestPDPBase):
@@ -282,3 +584,43 @@ class TestPDPInteract(_TestPDPBase):
     @pytest.mark.parametrize("params", pdp_interact_plot_params)
     def test_plot(self, params):
         self._test_plot(params)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_interact_binary_params
+    )
+    def test_real_binary_model(self, params, plot_params, extra_plot_settings, titanic):
+        plot_obj = PDPInteract(
+            model=titanic["model"],
+            df=titanic["data"],
+            model_features=titanic["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_interact_multiclass_params
+    )
+    def test_real_multiclass_model(
+        self, params, plot_params, extra_plot_settings, otto
+    ):
+        plot_obj = PDPInteract(
+            model=otto["model"],
+            df=otto["data"],
+            model_features=otto["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
+
+    @pytest.mark.parametrize(
+        "params, plot_params, extra_plot_settings", pdp_interact_regression_params
+    )
+    def test_real_regression_model(
+        self, params, plot_params, extra_plot_settings, ross
+    ):
+        plot_obj = PDPInteract(
+            model=ross["model"],
+            df=ross["data"],
+            model_features=ross["features"],
+            **params
+        )
+        self._test_real_plot(plot_obj, plot_params, extra_plot_settings)

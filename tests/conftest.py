@@ -162,17 +162,24 @@ def root_path():
     )
 
 
-@pytest.fixture(scope="session")
-def titanic(root_path):
-    DIR = os.path.join(root_path, "pdpbox")
-    with open(os.path.join(DIR, "examples/titanic/titanic_info.json"), "r") as fin:
+def get_dataset_info(name, root_path):
+    DIR = os.path.join(root_path, "pdpbox", "examples", name)
+    with open(os.path.join(DIR, f"{name}_info.json"), "r") as fin:
         info = json.load(fin)
 
+    df = pd.read_csv(os.path.join(DIR, f"{name}_data.csv"))
+    if name == "otto":
+        df = (
+            df.groupby("target", as_index=False)
+            .apply(lambda x: x.sample(min(len(x), 1000), replace=False))
+            .reset_index(drop=True)
+        )
+    elif name == "ross":
+        df = df.sample(10000, replace=False).reset_index(drop=True)
+
     dataset = {
-        "data": pd.read_csv(os.path.join(DIR, "examples/titanic/titanic_data.csv")),
-        "xgb_model": joblib.load(
-            os.path.join(DIR, "examples/titanic/titanic_model.pkl")
-        ),
+        "data": df,
+        "model": joblib.load(os.path.join(DIR, f"{name}_model.pkl")),
         "features": info["features"],
         "target": info["target"],
     }
@@ -180,21 +187,16 @@ def titanic(root_path):
     return dataset
 
 
-@pytest.fixture(scope="module")
-def titanic_data(titanic):
-    return titanic["data"]
+@pytest.fixture(scope="session")
+def titanic(root_path):
+    return get_dataset_info("titanic", root_path)
 
 
-@pytest.fixture(scope="module")
-def titanic_features(titanic):
-    return titanic["features"]
+@pytest.fixture(scope="session")
+def otto(root_path):
+    return get_dataset_info("otto", root_path)
 
 
-@pytest.fixture(scope="module")
-def titanic_target(titanic):
-    return titanic["target"]
-
-
-@pytest.fixture(scope="module")
-def titanic_model(titanic):
-    return titanic["xgb_model"]
+@pytest.fixture(scope="session")
+def ross(root_path):
+    return get_dataset_info("ross", root_path)
