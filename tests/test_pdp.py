@@ -1,17 +1,13 @@
 import os
 import sys
-from itertools import product
 import numpy as np
-import pandas as pd
 import pytest
-import matplotlib
 import copy
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pdpbox.pdp import PDPResult, PDPIsolate, PDPInteract
 from pdpbox.utils import FeatureInfo, _make_list
-
 from conftest import DummyModel, PlotTestBase
 
 plot_params = [
@@ -138,7 +134,6 @@ pdp_regression_params = [
         {
             "feature": "SchoolHoliday",
             "feature_name": "SchoolHoliday",
-            "n_classes": 0,
         },
         {
             "plot_lines": True,
@@ -162,7 +157,6 @@ pdp_regression_params = [
         {
             "feature": ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
             "feature_name": "StoreType",
-            "n_classes": 0,
         },
         {
             "plot_lines": True,
@@ -179,7 +173,6 @@ pdp_regression_params = [
         {
             "feature": "weekofyear",
             "feature_name": "weekofyear",
-            "n_classes": 0,
         },
         {
             "plot_lines": True,
@@ -201,7 +194,7 @@ pdp_interact_binary_params = [
     [
         {
             "features": ["Age", "Fare"],
-            "feature_names": ["Age", "Fare"],
+            "feature_names": ["age", "fare"],
         },
         {"plot_pdp": True, "show_percentile": True},
         [
@@ -287,7 +280,6 @@ pdp_interact_regression_params = [
                 ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
             ],
             "feature_names": ["weekofyear", "storetype"],
-            "n_classes": 0,
         },
         {
             "plot_type": "contour",
@@ -463,6 +455,7 @@ class TestPDPIsolate(_TestPDPBase):
             model=ross["model"],
             df=ross["data"],
             model_features=ross["features"],
+            n_classes=0,
             **params
         )
         self._test_real_plot(plot_obj, plot_params, extra_plot_settings)
@@ -621,6 +614,7 @@ class TestPDPInteract(_TestPDPBase):
             model=ross["model"],
             df=ross["data"],
             model_features=ross["features"],
+            n_classes=0,
             **params
         )
         self._test_real_plot(plot_obj, plot_params, extra_plot_settings)

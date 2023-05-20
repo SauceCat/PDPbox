@@ -1,6 +1,8 @@
 # for local debug use
 import sys
 import os
+import pytest
+import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -11,11 +13,8 @@ from pdpbox.info_plots import (
     InterectPredictPlot,
 )
 from pdpbox.utils import FeatureInfo, _make_list
-import pytest
-import pandas as pd
-import numpy as np
-import copy
 from conftest import DummyModel, PlotTestBase
+
 
 plot_params = [
     # Test default parameters
@@ -42,6 +41,241 @@ plot_params = [
 ]
 
 
+def titanic_predict_proba(model, X, predict_kwds={}):
+    return model.predict_proba(X, **predict_kwds) + 0.05
+
+
+info_binary_params = [
+    # binary feature
+    [
+        {"feature": "Sex", "feature_name": "gender"},
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+            {"engine": "matplotlib", "dpi": 200},
+        ],
+    ],
+    # onehot feature
+    [
+        {
+            "feature": ["Embarked_C", "Embarked_S", "Embarked_Q"],
+            "feature_name": "embarked",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+    # numeric feature
+    [
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+predict_binary_params = [
+    [
+        {
+            "feature": "Sex",
+            "feature_name": "gender",
+            "pred_func": titanic_predict_proba,
+        },
+        [
+            {"engine": "plotly"},
+        ],
+    ],
+]
+
+info_multiclass_params = [
+    # numeric feature
+    [
+        {
+            "feature": "feat_67",
+            "feature_name": "feat_67",
+        },
+        [
+            {
+                "figsize": (1200, 400),
+                "plot_params": {"gaps": {"outer_y": 0.05}},
+            },
+            {
+                "which_classes": [1, 2],
+                "show_percentile": True,
+                "figsize": (1200, 400),
+                "plot_params": {"gaps": {"outer_y": 0.05, "top": 0.1}},
+            },
+            {
+                "show_percentile": True,
+                "figsize": (16, 6),
+                "plot_params": {
+                    "gaps": {"outer_y": 0.4},
+                    "title": {"subplot_title": {"fontsize": 11}},
+                },
+                "engine": "matplotlib",
+            },
+            {
+                "which_classes": [1, 3, 5, 8],
+                "show_percentile": True,
+                "plot_params": {
+                    "title": {"subplot_title": {"fontsize": 10}},
+                    "gaps": {"outer_y": 0.25},
+                },
+                "engine": "matplotlib",
+            },
+        ],
+    ]
+]
+
+info_regression_params = [
+    # binary feature
+    [
+        {
+            "feature": "SchoolHoliday",
+            "feature_name": "school holiday",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+            {"engine": "plotly", "plot_params": {"gaps": {"inner_y": 0.05}}},
+        ],
+    ],
+    # onehot feature
+    [
+        {
+            "feature": ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
+            "feature_name": "store type",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+    # numeric feature
+    [
+        {
+            "feature": "weekofyear",
+            "feature_name": "week of year",
+        },
+        [
+            {"engine": "plotly"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+info_interact_binary_params = [
+    # numeric, numeric
+    [
+        {
+            "features": ["Age", "Fare"],
+            "feature_names": ["age", "fare"],
+        },
+        [
+            {
+                "engine": "plotly",
+                "figsize": (1200, 800),
+                "plot_params": {"subplot_ratio": {"y": [10, 1]}},
+                "annotate": True,
+            },
+            {"engine": "matplotlib", "figsize": (16, 10)},
+        ],
+    ],
+    # numeric, binary
+    [
+        {"features": ["Age", "Sex"], "feature_names": ["age", "gender"]},
+        [
+            {"engine": "plotly", "figsize": (1200, 700)},
+            {"engine": "matplotlib", "annotate": True},
+        ],
+    ],
+    # numeric, onehot
+    [
+        {
+            "features": ["Age", ["Embarked_C", "Embarked_S", "Embarked_Q"]],
+            "feature_names": ["age", "embarked"],
+        },
+        [
+            {"engine": "plotly", "annotate": True},
+            {"engine": "matplotlib", "annotate": True},
+        ],
+    ],
+    # binary, onehot
+    [
+        {
+            "features": ["Sex", ["Embarked_C", "Embarked_S", "Embarked_Q"]],
+            "feature_names": ["gender", "embarked"],
+        },
+        [
+            {"engine": "plotly", "template": "seaborn"},
+            {"engine": "matplotlib"},
+        ],
+    ],
+]
+
+info_interact_multiclass_params = [
+    # numeric, numeric
+    [
+        {
+            "features": ["feat_67", "feat_25"],
+            "feature_names": ["feat_67", "feat_25"],
+        },
+        [
+            {
+                "which_classes": [0, 1, 2, 3],
+                "plot_params": {"gaps": {"inner_y": 0.06}},
+                "engine": "plotly",
+            },
+            {
+                "which_classes": [0, 2, 3],
+                "plot_params": {"title": {"subplot_title": {"fontsize": 10}}},
+                "engine": "matplotlib",
+            },
+            {
+                "which_classes": [1, 3, 5, 6],
+                "plot_params": {"gaps": {"inner_y": 0.06}},
+                "engine": "plotly",
+                "show_percentile": True,
+            },
+        ],
+    ],
+]
+
+info_interact_regression_params = [
+    # numeric, onehot
+    [
+        {
+            "features": [
+                "weekofyear",
+                ["StoreType_a", "StoreType_b", "StoreType_c", "StoreType_d"],
+            ],
+            "feature_names": ["weekofyear", "storetype"],
+        },
+        [
+            {
+                "engine": "plotly",
+                "plot_params": {
+                    "subplot_ratio": {"y": [7, 0.8]},
+                    "gaps": {"inner_y": 0.2},
+                },
+                "annotate": True,
+                "show_percentile": True,
+            },
+            {
+                "engine": "matplotlib",
+                "show_percentile": True,
+                "annotate": True,
+            },
+        ],
+    ],
+]
+
+
 class _TestInfoPlot(PlotTestBase):
     def _test_plot_obj(self, target_or_model_type):
         for plot_obj in self.get_plot_objs(target_or_model_type):
@@ -57,6 +291,16 @@ class _TestInfoPlot(PlotTestBase):
             plot_obj.plot(**params)
             self.close_plt(params)
             break
+
+    def _test_real_plot(self, plot_obj, plot_params_list):
+        for plot_params in plot_params_list:
+            fig, axes, summary_df = plot_obj.plot(**plot_params)
+            self.close_plt(plot_params)
+            assert fig is not None
+            if plot_params.get("engine", "plotly") == "matplotlib":
+                assert axes is not None
+            else:
+                assert axes is None
 
 
 class TestTargetPlot(_TestInfoPlot):
@@ -104,6 +348,21 @@ class TestTargetPlot(_TestInfoPlot):
     @pytest.mark.parametrize("params", plot_params)
     def test_plot(self, params):
         self._test_plot(params)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_binary_params)
+    def test_real_binary_model(self, params, plot_params_list, titanic):
+        plot_obj = TargetPlot(df=titanic["data"], target=titanic["target"], **params)
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_multiclass_params)
+    def test_real_multiclass_model(self, params, plot_params_list, otto):
+        plot_obj = TargetPlot(df=otto["data"], target=otto["target"][1:], **params)
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_regression_params)
+    def test_real_regression_model(self, params, plot_params_list, ross):
+        plot_obj = TargetPlot(df=ross["data"], target=ross["target"], **params)
+        self._test_real_plot(plot_obj, plot_params_list)
 
 
 class TestPredictPlot(_TestInfoPlot):
@@ -154,6 +413,39 @@ class TestPredictPlot(_TestInfoPlot):
     def test_plot(self, params):
         self._test_plot(params)
 
+    @pytest.mark.parametrize(
+        "params, plot_params_list", info_binary_params + predict_binary_params
+    )
+    def test_real_binary_model(self, params, plot_params_list, titanic):
+        plot_obj = PredictPlot(
+            model=titanic["model"],
+            df=titanic["data"],
+            model_features=titanic["features"],
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_multiclass_params)
+    def test_real_multiclass_model(self, params, plot_params_list, otto):
+        plot_obj = PredictPlot(
+            model=otto["model"],
+            df=otto["data"],
+            model_features=otto["features"],
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_regression_params)
+    def test_real_regression_model(self, params, plot_params_list, ross):
+        plot_obj = PredictPlot(
+            model=ross["model"],
+            df=ross["data"],
+            model_features=ross["features"],
+            n_classes=0,
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
 
 class TestInterectTargetPlot(_TestInfoPlot):
     def get_plot_objs(self, target_type):
@@ -196,6 +488,29 @@ class TestInterectTargetPlot(_TestInfoPlot):
     @pytest.mark.parametrize("params", plot_params)
     def test_plot(self, params):
         self._test_plot(params)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_interact_binary_params)
+    def test_real_binary_model(self, params, plot_params_list, titanic):
+        plot_obj = InterectTargetPlot(
+            df=titanic["data"], target=titanic["target"], **params
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize(
+        "params, plot_params_list", info_interact_multiclass_params
+    )
+    def test_real_multiclass_model(self, params, plot_params_list, otto):
+        plot_obj = InterectTargetPlot(
+            df=otto["data"], target=otto["target"][1:], **params
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize(
+        "params, plot_params_list", info_interact_regression_params
+    )
+    def test_real_regression_model(self, params, plot_params_list, ross):
+        plot_obj = InterectTargetPlot(df=ross["data"], target=ross["target"], **params)
+        self._test_real_plot(plot_obj, plot_params_list)
 
 
 class TestInterectPredictPlot(_TestInfoPlot):
@@ -240,3 +555,38 @@ class TestInterectPredictPlot(_TestInfoPlot):
     @pytest.mark.parametrize("params", plot_params)
     def test_plot(self, params):
         self._test_plot(params)
+
+    @pytest.mark.parametrize("params, plot_params_list", info_interact_binary_params)
+    def test_real_binary_model(self, params, plot_params_list, titanic):
+        plot_obj = InterectPredictPlot(
+            model=titanic["model"],
+            df=titanic["data"],
+            model_features=titanic["features"],
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize(
+        "params, plot_params_list", info_interact_multiclass_params
+    )
+    def test_real_multiclass_model(self, params, plot_params_list, otto):
+        plot_obj = InterectPredictPlot(
+            model=otto["model"],
+            df=otto["data"],
+            model_features=otto["features"],
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)
+
+    @pytest.mark.parametrize(
+        "params, plot_params_list", info_interact_regression_params
+    )
+    def test_real_regression_model(self, params, plot_params_list, ross):
+        plot_obj = InterectPredictPlot(
+            model=ross["model"],
+            df=ross["data"],
+            model_features=ross["features"],
+            n_classes=0,
+            **params,
+        )
+        self._test_real_plot(plot_obj, plot_params_list)

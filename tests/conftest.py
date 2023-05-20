@@ -7,6 +7,7 @@ import pandas as pd
 from itertools import product
 import matplotlib
 from abc import ABC, abstractmethod
+import warnings
 
 
 class DummyDataGenerator:
@@ -187,9 +188,24 @@ def get_dataset_info(name, root_path):
     return dataset
 
 
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config):
+    warnings.filterwarnings("ignore")
+
+
 @pytest.fixture(scope="session")
 def titanic(root_path):
     return get_dataset_info("titanic", root_path)
+
+
+@pytest.fixture(scope="session")
+def titanic_data(titanic):
+    return titanic["data"]
+
+
+@pytest.fixture(scope="session")
+def titanic_model(titanic):
+    return titanic["model"]
 
 
 @pytest.fixture(scope="session")
