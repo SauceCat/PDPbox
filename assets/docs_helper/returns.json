@@ -1,0 +1,20 @@
+[
+    {
+        "param": "fig",
+        "type": "matplotlib.figure.Figure or plotly.graph_objects.Figure",
+        "desp": "A Matplotlib or Plotly figure object depending on the plot engine being used.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "axes",
+        "type": "dict of matplotlib.axes.Axes or None",
+        "desp": "A dictionary of Matplotlib axes objects. The keys are the names of the axes. The values are the axes objects. If `engine` is 'ploltly', it is None.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "summary_df",
+        "type": "pd.DataFrame",
+        "desp": "A Pandas DataFrame containing the summary statistics for each feature bucket.",
+        "target": ["_InfoPlot.plot"]
+    }
+]

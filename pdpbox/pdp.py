@@ -145,6 +145,41 @@ class _PDPBase:
 
 
 class PDPIsolate(_PDPBase):
+    """
+    A class for performing Partial Dependence Plot (PDP) analysis on a single feature. 
+    This class inherits from the _PDPBase class and implements additional functionality.
+
+    Attributes
+    ----------
+    model
+    n_classes
+    pred_func
+    model_features
+    memory_limit
+    chunk_size
+    n_jobs
+    predict_kwds
+    data_transformer
+    dist_num_samples : :ref:`param-dist_num_samples`
+    plot_type : str
+        The type of the plot to be generated. For this class, it's `'pdp_isolate'`.
+    feature_info : `FeatureInfo`
+        Contains detailed information about the feature to be analyzed.
+    count_df : pd.DataFrame
+        Data frame containing the count of observations for each bin.
+    n_grids : :ref:`param-n_grids`
+    dist_df : pd.DataFrame
+        The distribution of the data points.
+    from_model : :ref:`param-from_model`
+    target : :ref:`param-target`
+    results : :ref:`param-results`
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the PDP plot.
+    """
+
     def __init__(
         self,
         model,
@@ -165,6 +200,29 @@ class PDPIsolate(_PDPBase):
         percentile_range=None,
         grid_range=None,
     ):
+        """
+        Parameters
+        ----------
+        model : :ref:`param-model`
+        df : pd.DataFrame
+            The input DataFrame.
+        model_features : :ref:`param-model_features`
+        feature : :ref:`param-feature`
+        feature_name : :ref:`param-feature_name`
+        pred_func : :ref:`param-pred_func`
+        n_classes : :ref:`param-n_classes`
+        memory_limit : :ref:`param-memory_limit`
+        chunk_size : :ref:`param-chunk_size`
+        n_jobs : :ref:`param-n_jobs`
+        predict_kwds : :ref:`param-predict_kwds`
+        data_transformer : any transformer compatible with scikit-learn API
+            The transformer used to transform the input data before prediction. Defaults to None.
+        cust_grid_points : :ref:`param-cust_grid_points`
+        grid_type : :ref:`param-grid_type`
+        num_grid_points : :ref:`param-num_grid_points`
+        percentile_range : :ref:`param-percentile_range`
+        grid_range : :ref:`param-grid_range`
+        """
         super().__init__(
             model,
             model_features,
@@ -235,6 +293,42 @@ class PDPIsolate(_PDPBase):
         engine="plotly",
         template="plotly_white",
     ):
+        """
+        Generates the Partial Dependence Plot (PDP).
+
+        Parameters
+        ----------
+        center : bool, optional
+            If True, the PDP will be centered. Defaults to True.
+        plot_lines : bool, optional
+            If True, ICE lines will be plotted. Defaults to False.
+        frac_to_plot : float, optional
+            Fraction of ICE lines to plot. Defaults to 1 (plot all lines).
+        cluster : bool, optional
+            If True, ICE lines will be clustered. Defaults to False.
+        n_cluster_centers : int, optional
+            Number of cluster centers. Defaults to None.
+        cluster_method : str, optional
+            Method for clustering. Can be 'accurate' or 'quick'. Defaults to 'accurate'.
+        plot_pts_dist : bool, optional
+            If True, distribution of points will be plotted. Defaults to False.
+        to_bins : bool, optional
+            If True, the x-axis will be converted to bins. Defaults to False.
+        show_percentile : :ref:`param-show_percentile`
+        which_classes : :ref:`param-which_classes`
+        figsize : :ref:`param-figsize`
+        dpi : :ref:`param-dpi`
+        ncols : :ref:`param-ncols`
+        plot_params : :ref:`param-plot_params`
+        engine : :ref:`param-engine`
+        template : :ref:`param-template`
+
+        Returns
+        -------
+        A tuple of 2 elements:
+            1. plotly or matplotlib figure object
+            2. matplotlib axes object or None (when `engine` is `"plotly"`)
+        """
         if plot_params is None:
             plot_params = {}
 
@@ -271,6 +365,39 @@ class PDPIsolate(_PDPBase):
 
 
 class PDPInteract(_PDPBase):
+    """
+    Calculating and plotting Partial Dependence Plot (PDP) for interaction between two features.
+
+    Attributes
+    ----------
+    model
+    n_classes
+    pred_func
+    model_features
+    features
+    feature_names
+    memory_limit
+    chunk_size
+    n_jobs
+    predict_kwds
+    data_transformer
+    dist_num_samples : :ref:`param-dist_num_samples`
+    plot_type : str
+        The type of the plot to be generated. For this class, it's `'pdp_interact'`.
+    pdp_isolate_objs : list
+        List of `PDPIsolate` objects.
+    n_grids : :ref:`param-n_grids`
+    feature_grid_combos : np.ndarray
+        Array of feature grid combinations.
+    from_model : :ref:`param-from_model`
+    target : :ref:`param-target`
+    results : :ref:`param-results`
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the PDP plot.
+    """
     def __init__(
         self,
         model,
@@ -291,6 +418,28 @@ class PDPInteract(_PDPBase):
         grid_ranges=None,
         cust_grid_points=None,
     ):
+        """
+        Parameters
+        ----------
+        model : :ref:`param-model`
+        df : pd.DataFrame
+            The input DataFrame.
+        model_features : :ref:`param-model_features`
+        features : :ref:`param-features`
+        feature_names : :ref:`param-feature_names`
+        pred_func : :ref:`param-pred_func`
+        n_classes : :ref:`param-n_classes`
+        memory_limit : :ref:`param-memory_limit`
+        chunk_size : :ref:`param-chunk_size`
+        n_jobs : :ref:`param-n_jobs`
+        predict_kwds : :ref:`param-predict_kwds`
+        data_transformer : :ref:`param-data_transformer`
+        num_grid_points : :ref:`param-num_grid_points`
+        grid_types : :ref:`param-grid_types`
+        percentile_ranges : :ref:`param-percentile_ranges`
+        grid_ranges : :ref:`param-grid_ranges`
+        cust_grid_points : :ref:`param-cust_grid_points`
+        """
         super().__init__(
             model,
             model_features,
@@ -384,7 +533,32 @@ class PDPInteract(_PDPBase):
         engine="plotly",
         template="plotly_white",
     ):
+        """
+        Plots the interaction Partial Dependence Plot.
 
+        Parameters
+        ----------
+        plot_type : str, optional
+            Type of plot. Can be `'contour'` or `'grid'`. Defaults to `'contour'`.
+        plot_pdp : bool, optional
+            If True, individual PDPs will be plotted. Defaults to False.
+        to_bins : bool, optional
+            If True, the x-axis and y-axis will be converted to bins. Defaults to True.
+        show_percentile : :ref:`param-show_percentile`
+        which_classes : :ref:`param-which_classes`
+        figsize : :ref:`param-figsize`
+        dpi : :ref:`param-dpi`
+        ncols : :ref:`param-ncols`
+        plot_params : :ref:`param-plot_params`
+        engine : :ref:`param-engine`
+        template : :ref:`param-template`
+
+        Returns
+        -------
+        A tuple of 2 elements:
+            1. plotly or matplotlib figure object
+            2. matplotlib axes object or None (when `engine` is `"plotly"`)
+        """
         if plot_params is None:
             plot_params = {}
 

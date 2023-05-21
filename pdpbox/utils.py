@@ -8,29 +8,6 @@ class FeatureInfo:
     A class to store information about a feature, preprocess the data, and
     prepare summary statistics.
 
-    Parameters
-    ----------
-    feature : str
-        The name of the feature column in the input DataFrame.
-    feature_name : str
-        A human-readable name for the feature.
-    df : pd.DataFrame
-        The input DataFrame containing the feature column.
-    cust_grid_points : array-like, optional
-        Custom grid points for the feature. Defaults to None.
-    grid_type : str, optional
-        The type of grid to use, either 'percentile' or 'equal'. Defaults to 'percentile'.
-    num_grid_points : int, optional
-        The number of grid points to use. Defaults to 10.
-    percentile_range : tuple, optional
-        A tuple of two values indicating the range of percentiles to use. Defaults to None.
-    grid_range : tuple, optional
-        A tuple of two values indicating the range of grid values to use. Defaults to None.
-    show_outliers : bool, optional
-        Whether to show outliers in the output. Defaults to False.
-    endpoint : bool, optional
-        Whether to include the endpoint of the range. Defaults to True.
-
     Attributes
     ----------
     col_name : str or list of str
@@ -39,20 +16,6 @@ class FeatureInfo:
         A user-friendly name for the feature.
     type : str
         The type of the feature, as determined by the _check_col function.
-    cust_grid_points : array-like, optional
-        Custom grid points to be used for bucketing the feature values.
-    grid_type : {'percentile', 'equal', 'custom'}, default='percentile'
-        The type of grid to use for bucketing the feature values.
-    num_grid_points : int, default=10
-        The number of grid points to use for bucketing the feature values.
-    percentile_range : tuple of float, optional
-        The range of percentiles to consider for the feature values.
-    grid_range : tuple of float, optional
-        The range of values to consider for the feature values.
-    show_outliers : bool, default=False
-        Whether to include outliers in the analysis.
-    endpoint : bool, default=True
-        Whether to treat the last grid point as an endpoint.
     grids : np.array
         The grid points for the feature.
     num_bins : int
@@ -84,6 +47,23 @@ class FeatureInfo:
         show_outliers=False,
         endpoint=True,
     ):
+        """
+        Initialize a new instance of the FeatureInfo class.
+
+        Parameters
+        ----------
+        feature : :ref:`param-feature`
+        feature_name : :ref:`param-feature_name`
+        df : pd.DataFrame
+            The input DataFrame containing the feature column.
+        cust_grid_points : :ref:`param-cust_grid_points`
+        grid_type : :ref:`param-grid_type`
+        num_grid_points : :ref:`param-num_grid_points`
+        percentile_range : :ref:`param-percentile_range`
+        grid_range : :ref:`param-grid_range`
+        show_outliers : :ref:`param-show_outliers`
+        endpoint : :ref:`param-endpoint`
+        """
         self.col_name = feature
         self.name = feature_name
         self.type = _check_col(self.col_name, df, is_target=False)
@@ -106,8 +86,7 @@ class FeatureInfo:
 
     def _check_grid_type(self):
         """
-        Validates the grid_type attribute and sets it to 'custom' if custom
-        grid points are provided.
+        Validates the `grid_type` attribute and sets it to `'custom'` if `cust_grid_points` are provided.
         """
         assert self.grid_type in {
             "percentile",
@@ -118,9 +97,9 @@ class FeatureInfo:
 
     def _check_range(self):
         """
-        Validates the grid_range and percentile_range attributes, ensuring
-        they are tuples with two elements in ascending order. If percentile_range
-        is used, it also checks that both values are between 0 and 100.
+        Validates the `grid_range` and `percentile_range` attributes, ensuring
+        they are tuples with two elements in ascending order. 
+        If `percentile_range` is used, it also checks that both values are between 0 and 100.
         """
         for name, range_value in [
             ("grid_range", self.grid_range),
@@ -134,51 +113,6 @@ class FeatureInfo:
                     assert all(
                         0 <= v <= 100 for v in range_value
                     ), f"{name} should be between 0 and 100"
-
-    def prepare(self, df):
-        """
-        Prepares the input DataFrame, calculates summary statistics, and returns
-        the results as three separate DataFrames.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            The input DataFrame containing the feature column.
-
-        Returns
-        -------
-        df : pd.DataFrame
-            The processed input DataFrame.
-        count_df : pd.DataFrame
-            A DataFrame containing the count of each bucket.
-        summary_df : pd.DataFrame
-            A DataFrame containing the summary statistics for each bucket.
-        """
-        self._get_grids(df)
-        df = self._map_values_to_buckets(df).reset_index(drop=True)
-        df["count"] = 1
-        count_df = (
-            df.groupby("x", as_index=False).agg({"count": "count"}).sort_values("x")
-        )
-        count_df["count_norm"] = count_df["count"] / count_df["count"].sum()
-
-        summary_df = pd.DataFrame(
-            np.arange(df["x"].min(), df["x"].max() + 1), columns=["x"]
-        )
-        summary_df = summary_df.merge(count_df, on="x", how="left").fillna(0)
-        summary_df["x"] = summary_df["x"].astype(int)
-        summary_df["value"] = summary_df["x"].apply(lambda x: self.display_columns[x])
-
-        info_cols = ["x", "value"]
-        if len(self.percentile_columns):
-            summary_df["percentile"] = summary_df["x"].apply(
-                lambda x: self.percentile_columns[x]
-            )
-            info_cols.append("percentile")
-
-        summary_df = summary_df[info_cols + ["count"]]
-
-        return df, count_df, summary_df
 
     def _get_grids(self, df):
         """
@@ -208,7 +142,7 @@ class FeatureInfo:
 
     def _get_numeric_grids(self, values):
         """
-        Calculates the grid points for numeric features based on the grid_type
+        Calculates the grid points for numeric features based on the `grid_type`
         attribute and other class attributes.
 
         Parameters
@@ -218,10 +152,11 @@ class FeatureInfo:
 
         Returns
         -------
-        grids : np.array
-            The grid points for the feature.
-        percentiles : np.array or None
-            The percentiles corresponding to each grid point, if applicable.
+        A tuple of 2 elements:
+            1. np.array
+                The grid points for the feature. 
+            2. np.array or None
+                The percentiles corresponding to each grid point (or None if not applicable).
         """
         if self.grid_type == "percentile":
             start, end = self.percentile_range or (0, 100)
@@ -254,8 +189,8 @@ class FeatureInfo:
 
         Returns
         -------
-        df : pd.DataFrame
-            The processed DataFrame with an additional column 'x' representing
+        pd.DataFrame
+            The processed DataFrame with an additional column `'x'` representing
             the bucket index for each value.
         """
         col_name, grids = self.col_name, self.grids
@@ -336,6 +271,52 @@ class FeatureInfo:
 
         return df
 
+    def prepare(self, df):
+        """
+        Prepares the input DataFrame, calculates summary statistics, and returns
+        the results as three separate DataFrames.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame containing the feature column.
+
+        Returns
+        -------
+        A tuple of 3 elements:
+            1. pd.DataFrame
+                The processed input DataFrame.
+            2. pd.DataFrame
+                A DataFrame containing the count of each bucket.
+            3. pd.DataFrame
+                A DataFrame containing the summary statistics for each bucket.
+        """
+        self._get_grids(df)
+        df = self._map_values_to_buckets(df).reset_index(drop=True)
+        df["count"] = 1
+        count_df = (
+            df.groupby("x", as_index=False).agg({"count": "count"}).sort_values("x")
+        )
+        count_df["count_norm"] = count_df["count"] / count_df["count"].sum()
+
+        summary_df = pd.DataFrame(
+            np.arange(df["x"].min(), df["x"].max() + 1), columns=["x"]
+        )
+        summary_df = summary_df.merge(count_df, on="x", how="left").fillna(0)
+        summary_df["x"] = summary_df["x"].astype(int)
+        summary_df["value"] = summary_df["x"].apply(lambda x: self.display_columns[x])
+
+        info_cols = ["x", "value"]
+        if len(self.percentile_columns):
+            summary_df["percentile"] = summary_df["x"].apply(
+                lambda x: self.percentile_columns[x]
+            )
+            info_cols.append("percentile")
+
+        summary_df = summary_df[info_cols + ["count"]]
+
+        return df, count_df, summary_df
+
 
 def _to_rgba(color, opacity=1.0):
     """
@@ -371,7 +352,7 @@ def _check_col(col, df, is_target=True):
 
     Returns
     -------
-    col_type : str
+    str
         The determined type of the column.
         For target columns, possible values are: "binary", "multi-class", "regression".
         For feature columns, possible values are: "binary", "onehot", "numeric".
@@ -494,18 +475,19 @@ def _check_model(model, n_classes, pred_func):
 
     Returns
     -------
-    n_classes : int
-        The number of classes in the target variable.
-    pred_func : callable
-        The prediction function to be used.
-    from_model : bool
-        Flag indicating if the prediction function was obtained from the model or was provided as input.
+    A tuple of 3 elements:
+        1. int
+            The number of classes in the target variable.
+        2. callable
+            The prediction function to be used.
+        3. bool
+            Flag indicating if the prediction function was obtained from the model or was provided as input.
 
     Raises
     ------
     AssertionError
-        If n_classes is not provided and cannot be accessed through model.n_classes_,
-        or if pred_func is not provided and neither model.predict_proba nor model.predict exist.
+        If `n_classes` is not provided and cannot be accessed through `model.n_classes_`,
+        or if `pred_func` is not provided and neither `model.predict_proba` nor `model.predict` exist.
     """
 
     n_classes_ = None
@@ -551,7 +533,7 @@ def _check_classes(which_classes, n_classes):
 
     Returns
     -------
-    which_classes : list
+    list
         List of valid class indices.
 
     Raises
@@ -584,7 +566,7 @@ def _check_memory_limit(memory_limit):
     Raises
     ------
     ValueError
-        If memory_limit is not between 0 and 1 (exclusive).
+        If `memory_limit` is not between 0 and 1 (exclusive).
     """
     if memory_limit <= 0 or memory_limit >= 1:
         raise ValueError("memory_limit: should be (0, 1)")
@@ -592,7 +574,7 @@ def _check_memory_limit(memory_limit):
 
 def _check_frac_to_plot(frac_to_plot):
     """
-    Make sure frac_to_plot is between 0 and 1 if it is float, and greater than 0 if it is int.
+    Make sure `frac_to_plot` is between 0 and 1 if it is float, and greater than 0 if it is int.
 
     Parameters
     ----------
@@ -602,7 +584,7 @@ def _check_frac_to_plot(frac_to_plot):
     Raises
     ------
     ValueError
-        If frac_to_plot is not within the valid range for the given type (float or int).
+        If `frac_to_plot` is not within the valid range for the given type (float or int).
     """
 
     if type(frac_to_plot) == float:
@@ -632,7 +614,7 @@ def _calc_n_jobs(df, n_grids, memory_limit, n_jobs):
 
     Returns
     -------
-    true_n_jobs : int
+    int
         The calculated number of jobs to be executed in parallel.
     """
     _check_memory_limit(memory_limit)
@@ -738,7 +720,7 @@ def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
 
     Returns
     -------
-    preds : array
+    np.array
         Predictions made by the model.
     """
     total = len(X)
@@ -765,15 +747,15 @@ def _check_cluster_params(n_cluster_centers, cluster_method):
     Parameters
     ----------
     n_cluster_centers : int or None
-        The number of cluster centers to be used. If None, a ValueError is raised.
+        The number of cluster centers to be used. If None, a `ValueError` is raised.
     cluster_method : str
-        The method used for clustering. Should be either "approx" or "accurate".
-        If it's not, a ValueError is raised.
+        The method used for clustering. Should be either `"approx"` or `"accurate"`.
+        If it's not, a `ValueError` is raised.
 
     Raises
     ------
     ValueError
-        If `n_cluster_centers` is None or `cluster_method` is not "approx" or "accurate".
+        If `n_cluster_centers` is None or `cluster_method` is not `"approx"` or `"accurate"`.
     """
     if n_cluster_centers is None:
         raise ValueError("n_cluster_centers should be specified.")
@@ -789,17 +771,15 @@ def _check_plot_engine(engine):
     """
     Check the validity of the plot engine.
 
-    This function raises a ValueError if the provided engine is not 'plotly' or 'matplotlib'.
-
     Parameters
     ----------
     engine : str
-        The name of the plot engine to check.
+        The value of the plot engine to check.
 
     Raises
     ------
     ValueError
-        If `engine` is not 'plotly' or 'matplotlib'.
+        If `engine` is not `'plotly'` or `'matplotlib'`.
     """
     if engine not in ["plotly", "matplotlib"]:
         raise ValueError("plot_engine should be either 'plotly' or 'matplotlib'.")
@@ -807,17 +787,17 @@ def _check_plot_engine(engine):
 
 def _check_pdp_interact_plot_type(plot_type):
     """
-    Check the validity of the plot type for PDPInteract.
+    Check the validity of the `plot_type` for `PDPInteract`.
 
     Parameters
     ----------
     plot_type : str
-        The name of the plot type to check.
+        The value of the plot type to check.
 
     Raises
     ------
     ValueError
-        If `plot_type` is not 'grid' or 'contour'.
+        If `plot_type` is not `'grid'` or `'contour'`.
     """
     if plot_type not in ["grid", "contour"]:
         raise ValueError("plot_type should be either 'grid' or 'contour'.")

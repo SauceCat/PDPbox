@@ -1,0 +1,308 @@
+[
+    {
+        "param": "show_percentile",
+        "type": "bool, optional",
+        "desp": "If True, percentiles are shown in the plot. Default is False.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "which_classes",
+        "type": "list of int, optional",
+        "desp": "List of class indices to plot. If None, all classes will be plotted.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "figsize",
+        "type": "tuple or None, optional",
+        "desp": "The figure size for matplotlib or plotly figure. If None, the default figure size is used. Default is None.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "dpi",
+        "type": "int, optional",
+        "desp": "The resolution of the plot, measured in dots per inch. Only applicable when `engine` is 'matplotlib'. Default is 300.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "ncols",
+        "type": "int, optional",
+        "desp": "The number of columns of subplots in the figure. Default is 2.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "plot_params",
+        "type": "dict or None, optional",
+        "desp": "Custom plot parameters that control the style and aesthetics of the plot. Default is None.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "engine",
+        "type": "{'matplotlib', 'plotly'}, optional",
+        "desp": "The plotting engine to use. Default is 'plotly'.",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "template",
+        "type": "str, optional",
+        "desp": "The template to use for plotly plots. Only applicable when `engine` is 'plotly'. Default is 'plotly_white'. Reference: https://plotly.com/python/templates/",
+        "target": ["_InfoPlot.plot"]
+    },
+    {
+        "param": "feature",
+        "type": "str",
+        "desp": "The name of the feature column in the input DataFrame.",
+        "target": []
+    },
+    {
+        "param": "feature_name",
+        "type": "str",
+        "desp": "A human-readable name for the feature.",
+        "target": []
+    },
+    {
+        "param": "cust_grid_points",
+        "type": "array-like, or list of arrays (when it is an interaction plot), optional",
+        "desp": "Custom grid points for the feature. Defaults to None.",
+        "target": []
+    },
+    {
+        "param": "grid_type",
+        "type": "str, optional",
+        "desp": "The type of grid to use, either `'percentile'`` or `'equal'`. Defaults to `'percentile'`.",
+        "target": []
+    },
+    {
+        "param": "grid_types",
+        "type": "list of str, optional",
+        "desp": "The type of grid to use, either `'percentile'`` or `'equal'`. Defaults to `'percentile'`.",
+        "target": []
+    },
+    {
+        "param": "num_grid_points",
+        "type": "int, or a list of int (when it is an interaction plot), optional",
+        "desp": "The number of grid points to use. Defaults to 10.",
+        "target": []
+    },
+    {
+        "param": "percentile_range",
+        "type": "tuple, optional",
+        "desp": "A tuple of two values indicating the range of percentiles to use. Defaults to None.",
+        "target": []
+    },
+    {
+        "param": "percentile_ranges",
+        "type": "list of tuples, optional",
+        "desp": "A tuple of two values indicating the range of percentiles to use. Defaults to None.",
+        "target": []
+    },
+    {
+        "param": "grid_range",
+        "type": "tuple, optional",
+        "desp": "A tuple of two values indicating the range of grid values to use. Defaults to None.",
+        "target": []
+    },
+    {
+        "param": "grid_ranges",
+        "type": "list of tuples, optional",
+        "desp": "A tuple of two values indicating the range of grid values to use. Defaults to None.",
+        "target": []
+    },
+    {
+        "param": "show_outliers",
+        "type": "bool, optional",
+        "desp": "Whether to show outliers in the output. Defaults to False.",
+        "target": []
+    },
+    {
+        "param": "endpoint",
+        "type": "bool, optional",
+        "desp": "Whether to include the endpoint of the range. Defaults to True.",
+        "target": []
+    },
+    {
+        "param": "num_plots",
+        "type": "int",
+        "desp": "The number of plots.",
+        "target": []
+    },
+    {
+        "param": "plot_type_to_title",
+        "type": "dict",
+        "desp": "Dictionary containing title and subtitle text for each plot type.",
+        "target": []
+    },
+    {
+        "param": "subplot_ratio",
+        "type": "dict",
+        "desp": "The ratio for the subplots.",
+        "target": []
+    },
+    {
+        "param": "gaps",
+        "type": "dict",
+        "desp": "The gaps for the plot elements.",
+        "target": []
+    },
+    {
+        "param": "plot_sizes",
+        "type": "dict",
+        "desp": "The sizes of plot elements.",
+        "target": []
+    },
+    {
+        "param": "model",
+        "type": "object",
+        "desp": "A trained model object. The model should have a `predict` or `predict_proba` method.",
+        "target": []
+    },
+    {
+        "param": "model_features",
+        "type": "list",
+        "desp": "A list of features used in the model.",
+        "target": []
+    },
+    {
+        "param": "pred_func",
+        "type": "function, optional",
+        "desp": "A custom prediction function. If not provided, `predict` or `predict_proba` method of the model is used.",
+        "target": []
+    },
+    {
+        "param": "n_classes",
+        "type": "int, optional",
+        "desp": "The number of classes for a classification problem. Not necessary for regression models.",
+        "target": []
+    },
+    {
+        "param": "memory_limit",
+        "type": "float, optional",
+        "desp": "The maximum proportion of memory that can be used by the calculation process.",
+        "target": []
+    },
+    {
+        "param": "chunk_size",
+        "type": "int, optional",
+        "desp": "The number of instances to predict at each iteration.",
+        "target": []
+    },
+    {
+        "param": "n_jobs",
+        "type": "int, optional",
+        "desp": "The number of jobs to run in parallel for computation. If set to -1, all CPUs are used.",
+        "target": []
+    },
+    {
+        "param": "predict_kwds",
+        "type": "dict, optional",
+        "desp": "Additional keyword arguments to pass to the model's predict function.",
+        "target": []
+    },
+    {
+        "param": "data_transformer",
+        "type": "function, optional",
+        "desp": "A function to transform the input data before prediction.",
+        "target": []
+    },
+    {
+        "param": "features",
+        "type": "list",
+        "desp": "List of feature names used in the model. This list should contain the features that you want to analyze for model understanding and interpretation.",
+        "target": []
+    },
+    {
+        "param": "feature_names",
+        "type": "list",
+        "desp": "List of feature names for display. This list should match the features that you want to analyze for model understanding and interpretation.",
+        "target": []
+    },
+    {
+        "param": "dist_num_samples",
+        "type": "int",
+        "desp": "The number of samples to use for estimating the distribution of the data. This is used to handle large datasets by sampling a smaller subset for efficiency.",
+        "target": []
+    },
+    {
+        "param": "n_grids",
+        "type": "int",
+        "desp": "The number of grid points. This parameter determines how many points in the feature space the Partial Dependence Plot (PDP) is calculated for.",
+        "target": []
+    },
+    {
+        "param": "from_model",
+        "type": "bool",
+        "desp": "A flag indicating if the prediction function was obtained from the model or was provided as input.",
+        "target": []
+    },
+    {
+        "param": "target",
+        "type": "list",
+        "desp": "List of target classes. These are the classes for which the PDP will be calculated.",
+        "target": []
+    },
+    {
+        "param": "results",
+        "type": "list of `PDResults`",
+        "desp": "The results of the Partial Dependence Plot (PDP) analysis. This list contains PDResults objects, each of which represents the results of the PDP analysis for a given target class.",
+        "target": []
+    },
+    {
+        "param": "cmaps",
+        "type": "iterator",
+        "desp": "An iterator that produces color maps to be used for the plot. Each color map is used for one class in the case of multi-class classification. For binary classification or regression, only the first color map is used.",
+        "target": []
+    },
+    {
+        "param": "plot_engines",
+        "type": "dict",
+        "desp": "A dictionary that maps plot types to their respective plotting engines. The keys in this dictionary are the plot types, and the values are the corresponding plotting engine instances or classes. Each plotting engine should have methods for creating the desired plot for its corresponding plot type.",
+        "target": []
+    },
+    {
+        "param": "feature_info",
+        "type": "object",
+        "desp": "An instance of the FeatureInfo class. This object holds all the necessary information about the feature to be plotted, including the name, type, distribution, and other relevant details.",
+        "target": []
+    },
+    {
+        "param": "feature_infos",
+        "type": "list of objects",
+        "desp": "An instance of the FeatureInfo class. This object holds all the necessary information about the feature to be plotted, including the name, type, distribution, and other relevant details.",
+        "target": []
+    },
+    {
+        "param": "count_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the count of each bucket. Each bucket represents a distinct group or category in the feature.",
+        "target": []
+    },
+    {
+        "param": "summary_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the summary statistics for each bucket. These statistics may include measures like mean, median, etc., depending on the nature of the data. Each row corresponds to a distinct bucket in the feature.",
+        "target": []
+    },
+    {
+        "param": "target_lines",
+        "type": "list of pd.DataFrame",
+        "desp": "A list of DataFrames, each containing the aggregate measures of the target variable corresponding to each bucket of the feature. These aggregates may include measures such as mean or quartiles, and are typically used to visualize the relationship between the feature and the target variable.",
+        "target": []
+    },
+    {
+        "param": "plot_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the aggregated target values for each unique pair of feature values.",
+        "target": []
+    },
+    {
+        "param": "feat_name",
+        "type": "str",
+        "desp": "The name of the feature for which the Partial Dependence Plot (PDP) is being plotted.",
+        "target": []
+    },
+    {
+        "param": "feat_type",
+        "type": "str",
+        "desp": "The type of the feature being plotted. This could be continuous, categorical, or binary. The type of the feature could influence the kind of plots and aggregations used.",
+        "target": []
+    }
+]

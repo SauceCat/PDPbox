@@ -26,13 +26,51 @@ from itertools import cycle
 
 
 class PDPIsolatePlotEngine:
+    """
+    A class to handle the plotting of `PDPIsolate` using Matplotlib or Plotly.
+
+    Attributes:
+    -----------
+    plot_obj
+    which_classes
+    feat_name : :ref:`param-feat_name`
+    feat_type : :ref:`param-feat_type`
+    is_numeric : bool
+        A boolean flag indicating whether the feature being plotted is numeric.
+    display_columns : FeatureInfo.display_columns
+    percentile_columns: FeatureInfo.percentile_columns
+    grids: list of str
+        The grids in string format.
+    percentiles: list of float
+        The percentiles for the grids.
+    plot_style : `PDPIsolatePlotStyle` object
+        Contains the stylistic parameters and configurations for the plot such as color, font, etc.
+    cmaps : :ref:`param-cmaps`
+    
+    Methods:
+    --------
+    plot() :
+        Generates the PDP plot.
+    plot_matplotlib() :
+        Plot using Matplotlib.
+    plot_plotly() :
+        Plot using Plotly.
+    """
+
     def __init__(
         self,
         plot_obj,
         which_classes,
         plot_params,
     ):
-
+        """
+        Parameters:
+        -----------
+        plot_obj : object
+            An instance of the `PDPIsolate` class.
+        which_classes : :ref:`param-which_classes`
+        plot_params : :ref:`param-plot_params`
+        """
         feature_info = plot_obj.feature_info
         self.feat_name = feature_info.name
         self.feat_type = feature_info.type
@@ -550,12 +588,49 @@ class PDPIsolatePlotEngine:
 
 
 class PDPInteractPlotEngine:
+    """
+    A class to handle the plotting of `PDPInteract` using Matplotlib or Plotly.
+
+    Attributes:
+    -----------
+    which_classes
+    plot_obj
+    display_columns : list of FeatureInfo.display_columns
+    percentile_columns: list of FeatureInfo.percentile_columns
+    grids : list of list
+        The grids in string format.
+    percentiles : list of list
+        The percentiles for the grids. 
+    feat_grids : list of FeatureInfo.grids
+    feat_types : list of FeatureInfo.type
+    feat_names : list of FeatureInfo.name
+    plot_style : object
+        A instance of the `PDPInteractPlotStyle` class.
+    cmaps : :ref:`param-cmaps`
+    
+    Methods:
+    --------
+    plot() :
+        Generates the PDP plot.
+    plot_matplotlib() :
+        Plot using Matplotlib.
+    plot_plotly() :
+        Plot using Plotly.
+    """
     def __init__(
         self,
         plot_obj,
         which_classes,
         plot_params,
     ):
+        """
+        Parameters:
+        -----------
+        plot_obj : object
+            An instance of the `PDPInteract` class.
+        which_classes : :ref:`param-which_classes`
+        plot_params : :ref:`param-plot_params`
+        """
         self.which_classes = which_classes
         self.plot_obj = plot_obj
         feature_infos = [obj.feature_info for obj in self.plot_obj.pdp_isolate_objs]

@@ -1,0 +1,8 @@
+[
+    {
+        "param": "feature",
+        "type": "str",
+        "desp": "The name of the feature column in the input DataFrame.",
+        "target": []
+    }
+]
