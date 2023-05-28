@@ -1,308 +1,1536 @@
 [
     {
-        "param": "show_percentile",
-        "type": "bool, optional",
-        "desp": "If True, percentiles are shown in the plot. Default is False.",
-        "target": ["_InfoPlot.plot"]
+        "param": "fig",
+        "type": "matplotlib.figure.Figure or plotly.graph_objects.Figure",
+        "desp": "A Matplotlib or Plotly figure object depending on the plot engine being used.",
+        "target": {
+            "params": [],
+            "returns": [
+                "info_plots._InfoPlot.plot", 
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "attrs": []
+        }
     },
     {
-        "param": "which_classes",
-        "type": "list of int, optional",
-        "desp": "List of class indices to plot. If None, all classes will be plotted.",
-        "target": ["_InfoPlot.plot"]
+        "param": "axes",
+        "type": "dict of matplotlib.axes.Axes or None",
+        "desp": "A dictionary of Matplotlib axes objects. The keys are the names of the axes. The values are the axes objects. If `engine` is 'ploltly', it is None.",
+        "target": {
+            "params": [],
+            "returns": [
+                "info_plots._InfoPlot.plot", 
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "attrs": []
+        }
     },
     {
-        "param": "figsize",
-        "type": "tuple or None, optional",
-        "desp": "The figure size for matplotlib or plotly figure. If None, the default figure size is used. Default is None.",
-        "target": ["_InfoPlot.plot"]
+        "param": "axes",
+        "type": "matplotlib.axes.Axes",
+        "desp": "The axes object to modify.",
+        "target": {
+            "params": [
+                "styles._axes_modify",
+                "styles._modify_legend_axes",
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
     },
     {
-        "param": "dpi",
-        "type": "int, optional",
-        "desp": "The resolution of the plot, measured in dots per inch. Only applicable when `engine` is 'matplotlib'. Default is 300.",
-        "target": ["_InfoPlot.plot"]
+        "param": "summary_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the summary statistics of target (for target plot) or predict (for predict plot) values for each feature bucket.",
+        "target": {
+            "params": [],
+            "returns": [
+                "info_plots._InfoPlot.plot", 
+                "info_plots._InteractInfoPlot.plot"
+            ],
+            "attrs": [
+                "info_plots.TargetPlot", 
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "ncols",
-        "type": "int, optional",
-        "desp": "The number of columns of subplots in the figure. Default is 2.",
-        "target": ["_InfoPlot.plot"]
+        "param": "plot_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the aggregated target (for target plot) or predict (for predict plot) values for each unique pair of feature values.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "plot_params",
-        "type": "dict or None, optional",
-        "desp": "Custom plot parameters that control the style and aesthetics of the plot. Default is None.",
-        "target": ["_InfoPlot.plot"]
-    },
-    {
-        "param": "engine",
-        "type": "{'matplotlib', 'plotly'}, optional",
-        "desp": "The plotting engine to use. Default is 'plotly'.",
-        "target": ["_InfoPlot.plot"]
-    },
-    {
-        "param": "template",
-        "type": "str, optional",
-        "desp": "The template to use for plotly plots. Only applicable when `engine` is 'plotly'. Default is 'plotly_white'. Reference: https://plotly.com/python/templates/",
-        "target": ["_InfoPlot.plot"]
-    },
-    {
-        "param": "feature",
+        "param": "plot_type",
         "type": "str",
-        "desp": "The name of the feature column in the input DataFrame.",
-        "target": []
+        "desp": "The type of the plot to be generated.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot",
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract",
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
     },
     {
-        "param": "feature_name",
-        "type": "str",
-        "desp": "A human-readable name for the feature.",
-        "target": []
+        "param": "plot_type",
+        "type": "{'grid', 'contour'}",
+        "desp": "The type of interaction plot to be generated.",
+        "target": {
+            "params": [
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": []
+        }
     },
     {
-        "param": "cust_grid_points",
-        "type": "array-like, or list of arrays (when it is an interaction plot), optional",
-        "desp": "Custom grid points for the feature. Defaults to None.",
-        "target": []
-    },
-    {
-        "param": "grid_type",
-        "type": "str, optional",
-        "desp": "The type of grid to use, either `'percentile'`` or `'equal'`. Defaults to `'percentile'`.",
-        "target": []
-    },
-    {
-        "param": "grid_types",
-        "type": "list of str, optional",
-        "desp": "The type of grid to use, either `'percentile'`` or `'equal'`. Defaults to `'percentile'`.",
-        "target": []
-    },
-    {
-        "param": "num_grid_points",
-        "type": "int, or a list of int (when it is an interaction plot), optional",
-        "desp": "The number of grid points to use. Defaults to 10.",
-        "target": []
-    },
-    {
-        "param": "percentile_range",
-        "type": "tuple, optional",
-        "desp": "A tuple of two values indicating the range of percentiles to use. Defaults to None.",
-        "target": []
-    },
-    {
-        "param": "percentile_ranges",
-        "type": "list of tuples, optional",
-        "desp": "A tuple of two values indicating the range of percentiles to use. Defaults to None.",
-        "target": []
-    },
-    {
-        "param": "grid_range",
-        "type": "tuple, optional",
-        "desp": "A tuple of two values indicating the range of grid values to use. Defaults to None.",
-        "target": []
-    },
-    {
-        "param": "grid_ranges",
-        "type": "list of tuples, optional",
-        "desp": "A tuple of two values indicating the range of grid values to use. Defaults to None.",
-        "target": []
-    },
-    {
-        "param": "show_outliers",
-        "type": "bool, optional",
-        "desp": "Whether to show outliers in the output. Defaults to False.",
-        "target": []
-    },
-    {
-        "param": "endpoint",
-        "type": "bool, optional",
-        "desp": "Whether to include the endpoint of the range. Defaults to True.",
-        "target": []
-    },
-    {
-        "param": "num_plots",
-        "type": "int",
-        "desp": "The number of plots.",
-        "target": []
-    },
-    {
-        "param": "plot_type_to_title",
+        "param": "plot_engines",
         "type": "dict",
-        "desp": "Dictionary containing title and subtitle text for each plot type.",
-        "target": []
+        "desp": "A dictionary that maps plot types to their plotting engines.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "subplot_ratio",
-        "type": "dict",
-        "desp": "The ratio for the subplots.",
-        "target": []
+        "param": "feature_info",
+        "type": ":class:`FeatureInfo`",
+        "desp": "An instance of the `FeatureInfo` class.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "pdp.PDPIsolate"
+            ]
+        }
     },
     {
-        "param": "gaps",
-        "type": "dict",
-        "desp": "The gaps for the plot elements.",
-        "target": []
+        "param": "feature_infos",
+        "type": "list of :class:`FeatureInfo`",
+        "desp": "A list of `FeatureInfo` objects.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "plot_sizes",
-        "type": "dict",
-        "desp": "The sizes of plot elements.",
-        "target": []
+        "param": "pdp_isolate_objs",
+        "type": "list of :class:`PDPIsolate`",
+        "desp": "A list of `PDPIsolate` objects, for two features.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPInteract"
+            ]
+        }
     },
     {
-        "param": "model",
-        "type": "object",
-        "desp": "A trained model object. The model should have a `predict` or `predict_proba` method.",
-        "target": []
+        "param": "feature_cols",
+        "type": "list of str",
+        "desp": "List of feature columns.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "model_features",
-        "type": "list",
-        "desp": "A list of features used in the model.",
-        "target": []
-    },
-    {
-        "param": "pred_func",
-        "type": "function, optional",
-        "desp": "A custom prediction function. If not provided, `predict` or `predict_proba` method of the model is used.",
-        "target": []
+        "param": "target",
+        "type": "list of int",
+        "desp": "List of target indices. For binary and regression problems, the list will be just [0]. For multi-class targets, the list is the class indices.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot",
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
     },
     {
         "param": "n_classes",
-        "type": "int, optional",
-        "desp": "The number of classes for a classification problem. Not necessary for regression models.",
-        "target": []
+        "type": "int",
+        "desp": "The number of classes inferred from the target columns.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.InteractTargetPlot"
+            ]
+        }
     },
     {
-        "param": "memory_limit",
-        "type": "float, optional",
-        "desp": "The maximum proportion of memory that can be used by the calculation process.",
-        "target": []
+        "param": "n_classes",
+        "type": "int",
+        "desp": "The number of classes provided, or inferred from the model when it is not provided.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.PredictPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "chunk_size",
-        "type": "int, optional",
-        "desp": "The number of instances to predict at each iteration.",
-        "target": []
+        "param": "df",
+        "type": "pd.DataFrame",
+        "desp": "A processed DataFrame that includes feature and target (for target plot) or predict (for predict plot) columns, feature buckets, along with the count of samples within each bucket.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "info_plots.InteractTargetPlot",
+                "info_plots.InteractPredictPlot"
+            ]
+        }
     },
     {
-        "param": "n_jobs",
-        "type": "int, optional",
-        "desp": "The number of jobs to run in parallel for computation. If set to -1, all CPUs are used.",
-        "target": []
+        "param": "count_df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the count as well as the normalized count (percentage) of samples within each feature bucket.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot",
+                "pdp.PDPIsolate"
+            ]
+        }
     },
     {
-        "param": "predict_kwds",
-        "type": "dict, optional",
-        "desp": "Additional keyword arguments to pass to the model's predict function.",
-        "target": []
+        "param": "target_lines",
+        "type": "list of pd.DataFrame",
+        "desp": "A list of DataFrames, each DataFrame includes aggregate metrics across feature buckets for a target (for target plot) or predict (for predict plot) variable. For binary and regression problems, the list will contain a single DataFrame. For multi-class targets, the list will contain a DataFrame for each class.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "info_plots.TargetPlot",
+                "info_plots.PredictPlot"
+            ]
+        }
     },
     {
-        "param": "data_transformer",
-        "type": "function, optional",
-        "desp": "A function to transform the input data before prediction.",
-        "target": []
+        "param": "show_percentile",
+        "type": "bool",
+        "desp": "If True, percentiles are shown in the plot.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "which_classes",
+        "type": "list of int",
+        "desp": "List of class indices to plot. If None, all classes will be plotted.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "plot_style",
+        "type": ":class:`InfoPlotStyle`",
+        "desp": "An instance of the `InfoPlotStyle` class.",
+        "target": {
+            "params": [
+                "styles._axes_modify",
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "percentile_columns",
+        "type": "list of str",
+        "desp": "percentile_columns from :class:`FeatureInfo`",
+        "target": {
+            "params": [
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "figsize",
+        "type": "tuple or None",
+        "desp": "The figure size for matplotlib or plotly figure. If None, the default figure size is used.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "dpi",
+        "type": "int",
+        "desp": "The resolution of the plot, measured in dots per inch. Only applicable when `engine` is 'matplotlib'.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "ncols",
+        "type": "int",
+        "desp": "The number of columns of subplots in the figure.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "nrows",
+        "type": "int",
+        "desp": "The number of rows of subplots in the figure.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "annotate",
+        "type": "bool",
+        "desp": "If it is True, the circles on the plot will be annotated with detailed information.",
+        "target": {
+            "params": [
+                "info_plots._InteractInfoPlot.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InteractInfoPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "plot_pdp",
+        "type": "bool",
+        "desp": "If it is True, pdp for each feature will be plotted.",
+        "target": {
+            "params": [
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "plot_params",
+        "type": "dict or None",
+        "desp": "Custom plot parameters that control the style and aesthetics of the plot.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "engine",
+        "type": "{'matplotlib', 'plotly'}",
+        "desp": "The plotting engine to use.",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "template",
+        "type": "str",
+        "desp": "The template to use for plotly plots. Only applicable when `engine` is 'plotly'. Reference: https://plotly.com/python/templates/",
+        "target": {
+            "params": [
+                "info_plots._InfoPlot.plot",
+                "info_plots._InteractInfoPlot.plot",
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that at least contains the feature(s) and target columns.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.InteractTargetPlot.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that at least contains the feature(s).",
+        "target": {
+            "params": [
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "df",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that at least contains columns specified by `model_features`.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "feature",
+        "type": "str or list of str",
+        "desp": "The column name(s) of the chosen feature. It is a list of str when the chosen feature is one-hot encoded.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "col_name",
+        "type": "str or list of str",
+        "desp": "The column name(s) of the feature in the input DataFrame.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
     },
     {
         "param": "features",
         "type": "list",
-        "desp": "List of feature names used in the model. This list should contain the features that you want to analyze for model understanding and interpretation.",
-        "target": []
+        "desp": "List of column name(s) for the 2 chosen features. The length of the list should be strictly 2.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "feature_name",
+        "type": "str",
+        "desp": "A custom name for the chosen feature.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "name",
+        "type": "str",
+        "desp": "The custom name of the feature.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "feat_name",
+        "type": "str",
+        "desp": "The name of the feature to be plotted.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": []
+        }
     },
     {
         "param": "feature_names",
         "type": "list",
-        "desp": "List of feature names for display. This list should match the features that you want to analyze for model understanding and interpretation.",
-        "target": []
+        "desp": "List of custom names for the 2 chosen features. The length of the list should be strictly 2.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "type",
+        "type": "str",
+        "desp": "The type of the feature, as determined by the _check_col function.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "model",
+        "type": "object",
+        "desp": "A trained model object. The model should have a `predict` or `predict_proba` method. Otherwise a custom prediction function should be provided through `pred_func`.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "model_features",
+        "type": "list of str",
+        "desp": "A list of features used in model prediction.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "pred_func",
+        "type": "callable",
+        "desp": "A custom prediction function. If not provided, `predict` or `predict_proba` method of `model` is used to generate the predictions.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "n_classes",
+        "type": "int",
+        "desp": "Number of classes. If it is None, will infer from `model.n_classes_`. Please set it as 0 for regression.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "predict_kwds",
+        "type": "dict",
+        "desp": "Additional keyword arguments to pass to the `model`'s predict function.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "memory_limit",
+        "type": "float",
+        "desp": "The maximum proportion of memory that can be used by the calculation process.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "n_jobs",
+        "type": "int",
+        "desp": "The number of jobs to run in parallel for computation. If set to -1, all CPUs are used.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "data_transformer",
+        "type": "callable",
+        "desp": "A function to transform the input data before prediction.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "chunk_size",
+        "type": "int",
+        "desp": "The number of samples to predict at each iteration. -1 means all samples at once.",
+        "target": {
+            "params": [
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "target",
+        "type": "str or list of str",
+        "desp": "The target column or columns (when it is multi-class).",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.InteractTargetPlot.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "cust_grid_points",
+        "type": "array-like or list of arrays",
+        "desp": "Custom grid points for the feature. For interact plot, it can also be a list of two arrays, indicating the grid points for each feature.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "grid_type",
+        "type": "{'percentile', 'equal'}",
+        "desp": "The grid type. Only applicable for numeric feature.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "grid_types",
+        "type": "str or list of str",
+        "desp": "Same as `grid_type`, but could be a list of two strings, indicating the grid type for each feature.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "num_grid_points",
+        "type": "int or list of int",
+        "desp": "The number of grid points to use. Only applicable for numeric feature. For interact plot, it can also be a list of two integers, indicating the number of grid points for each feature.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "pdp.PDPInteract.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "percentile_range",
+        "type": "tuple",
+        "desp": "A tuple of two values indicating the range of percentiles to use. Only applicable for numeric feature and when `grid_type` is 'percentile'. If it is None, will use all samples.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "percentile_ranges",
+        "type": "tuple or a list of tuples",
+        "desp": "Same as `percentile_range`, but could be a list of two tuples, indicating the percentile range for each feature.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "grid_range",
+        "type": "tuple",
+        "desp": "A tuple of two values indicating the range of grid values to use. Only applicable for numeric feature. If it is None, will use all samples.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "pdp.PDPIsolate.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "grid_ranges",
+        "type": "tuple or list of tuples",
+        "desp": "Same as `grid_range`, but could be a list of two tuples, indicating the grid range for each feature.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "pdp.PDPInteract.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "show_outliers",
+        "type": "bool or list of bool",
+        "desp": "Whether to show outliers in the plot. Only applicable for numeric feature. For interact plot, it can also be a list of two booleans, indicating whether to show outliers for each feature.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "endpoint",
+        "type": "bool",
+        "desp": "Whether to include the endpoint of the range.",
+        "target": {
+            "params": [
+                "info_plots.TargetPlot.__init__",
+                "info_plots.PredictPlot.__init__",
+                "utils.FeatureInfo.__init__"
+            ],
+            "returns": [],
+            "attrs": [
+                "utils.FeatureInfo"
+            ]
+        }
+    },
+    {
+        "param": "endpoints",
+        "type": "bool or list of bool",
+        "desp": "Same as `endpoint`, but could be a list of two booleans, indicating whether to include the endpoint for each feature.",
+        "target": {
+            "params": [
+                "info_plots.InteractTargetPlot.__init__",
+                "info_plots.InteractPredictPlot.__init__"
+            ],
+            "returns": [],
+            "attrs": []
+        }
     },
     {
         "param": "dist_num_samples",
         "type": "int",
         "desp": "The number of samples to use for estimating the distribution of the data. This is used to handle large datasets by sampling a smaller subset for efficiency.",
-        "target": []
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
     },
     {
         "param": "n_grids",
         "type": "int",
-        "desp": "The number of grid points. This parameter determines how many points in the feature space the Partial Dependence Plot (PDP) is calculated for.",
-        "target": []
+        "desp": "The number of feature grids. For interact plot, it is the product of `n_grids` of two features.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "feature_grid_combos",
+        "type": "numpy.ndarray",
+        "desp": "A 2D array that contains the combinations of feature grids. The shape of the array is (n_grids, ...).",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPInteract"
+            ]
+        }
+    },
+    {
+        "param": "dist_df",
+        "type": "pandas.Series",
+        "desp": "The distribution of the data points.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate"
+            ]
+        }
     },
     {
         "param": "from_model",
         "type": "bool",
         "desp": "A flag indicating if the prediction function was obtained from the model or was provided as input.",
-        "target": []
-    },
-    {
-        "param": "target",
-        "type": "list",
-        "desp": "List of target classes. These are the classes for which the PDP will be calculated.",
-        "target": []
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
     },
     {
         "param": "results",
-        "type": "list of `PDResults`",
-        "desp": "The results of the Partial Dependence Plot (PDP) analysis. This list contains PDResults objects, each of which represents the results of the PDP analysis for a given target class.",
-        "target": []
+        "type": "list of :class:`PDResults`",
+        "desp": "The results of the Partial Dependence Plot (PDP) analysis. For binary and regression problems, the list will contain a single `PDResults` object. For multi-class targets, the list will contain a `PDResults` object for each class.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPIsolate",
+                "pdp.PDPInteract"
+            ]
+        }
     },
     {
-        "param": "cmaps",
-        "type": "iterator",
-        "desp": "An iterator that produces color maps to be used for the plot. Each color map is used for one class in the case of multi-class classification. For binary classification or regression, only the first color map is used.",
-        "target": []
+        "param": "class_id",
+        "type": "int or None",
+        "desp": "The class index for multi-class problems. For binary and resgression problems, it is None.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPResult"
+            ]
+        }
     },
     {
-        "param": "plot_engines",
+        "param": "ice_lines",
+        "type": "pd.DataFrame",
+        "desp": "A DataFrame that contains the calculated ICE lines. The shape of the DataFrame is (n_samples, n_grids).",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPResult"
+            ]
+        }
+    },
+    {
+        "param": "pdp",
+        "type": "numpy.ndarray",
+        "desp": "The calculated PDP values. The shape of the array is (n_grids,).",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "pdp.PDPResult"
+            ]
+        }
+    },
+    {
+        "param": "center",
+        "type": "bool",
+        "desp": "If True, the PDP will be centered by deducting the values of `grids[0]`.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "plot_lines",
+        "type": "bool",
+        "desp": "If True, ICE lines will be plotted.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "frac_to_plot",
+        "type": "int or float",
+        "desp": "Fraction of ICE lines to plot.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "cluster",
+        "type": "bool",
+        "desp": "If True, ICE lines will be clustered.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "n_cluster_centers",
+        "type": "int or None",
+        "desp": "Number of cluster centers. Need to provide when `cluster` is True.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "cluster_method",
+        "type": "{'accurate', 'approx'}",
+        "desp": "Method for clustering. If 'accurate', use KMeans. If 'approx', use MiniBatchKMeans.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "plot_pts_dist",
+        "type": "bool",
+        "desp": "If True, distribution of points will be plotted.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "to_bins",
+        "type": "bool",
+        "desp": "If True, the axis will be converted to bins. Only applicable for numeric feature.",
+        "target": {
+            "params": [
+                "pdp.PDPIsolate.plot",
+                "pdp.PDPInteract.plot"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "num_bins",
+        "type": "int",
+        "desp": "The number of feature bins. For binary and one-hot encoded features, it is the same as number of grids. For numeric features, it is the number of grids minus 1.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "font_family",
+        "type": "str",
+        "desp": "The font family to use for the plot.",
+        "target": {
+            "params": [
+                "styles._modify_legend_axes"
+            ],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "tick",
         "type": "dict",
-        "desp": "A dictionary that maps plot types to their respective plotting engines. The keys in this dictionary are the plot types, and the values are the corresponding plotting engine instances or classes. Each plotting engine should have methods for creating the desired plot for its corresponding plot type.",
-        "target": []
+        "desp": "The tick style. Configurable through `plot_params['tick']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
     },
     {
-        "param": "feature_info",
-        "type": "object",
-        "desp": "An instance of the FeatureInfo class. This object holds all the necessary information about the feature to be plotted, including the name, type, distribution, and other relevant details.",
-        "target": []
+        "param": "label",
+        "type": "dict",
+        "desp": "The label style. Configurable through `plot_params['label']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
     },
     {
-        "param": "feature_infos",
-        "type": "list of objects",
-        "desp": "An instance of the FeatureInfo class. This object holds all the necessary information about the feature to be plotted, including the name, type, distribution, and other relevant details.",
-        "target": []
-    },
-    {
-        "param": "count_df",
-        "type": "pd.DataFrame",
-        "desp": "A DataFrame that contains the count of each bucket. Each bucket represents a distinct group or category in the feature.",
-        "target": []
-    },
-    {
-        "param": "summary_df",
-        "type": "pd.DataFrame",
-        "desp": "A DataFrame that contains the summary statistics for each bucket. These statistics may include measures like mean, median, etc., depending on the nature of the data. Each row corresponds to a distinct bucket in the feature.",
-        "target": []
-    },
-    {
-        "param": "target_lines",
-        "type": "list of pd.DataFrame",
-        "desp": "A list of DataFrames, each containing the aggregate measures of the target variable corresponding to each bucket of the feature. These aggregates may include measures such as mean or quartiles, and are typically used to visualize the relationship between the feature and the target variable.",
-        "target": []
-    },
-    {
-        "param": "plot_df",
-        "type": "pd.DataFrame",
-        "desp": "A DataFrame that contains the aggregated target values for each unique pair of feature values.",
-        "target": []
-    },
-    {
-        "param": "feat_name",
+        "param": "label",
         "type": "str",
-        "desp": "The name of the feature for which the Partial Dependence Plot (PDP) is being plotted.",
-        "target": []
+        "desp": "The axis label.",
+        "target": {
+            "params": [
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
     },
     {
-        "param": "feat_type",
-        "type": "str",
-        "desp": "The type of the feature being plotted. This could be continuous, categorical, or binary. The type of the feature could influence the kind of plots and aggregations used.",
-        "target": []
+        "param": "title",
+        "type": "dict",
+        "desp": "The title style. You can config three types of titles: 'title', 'subtitle', 'subplot_title'. Configurable through `plot_params['title']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "plot_type_to_title",
+        "type": "dict",
+        "desp": "Dictionary containing title and subtitle text for each plot type.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "line",
+        "type": "dict",
+        "desp": "The style config for the line plot. Configurable through `plot_params['line']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "bar",
+        "type": "dict",
+        "desp": "The style config for the bar plot. Configurable through `plot_params['bar']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "box",
+        "type": "dict",
+        "desp": "The style config for the box plot. Only applicable for `PredictPlot`. Configurable through `plot_params['box']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "marker",
+        "type": "dict",
+        "desp": "The style config for the scatter plot marker. Configurable through `plot_params['marker']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InteractInfoPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "legend",
+        "type": "dict",
+        "desp": "The style config for the legend, including color bar and marker. Configurable through `plot_params['legend']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InteractInfoPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "clustering",
+        "type": "dict",
+        "desp": "The clustering config.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "std_fill",
+        "type": "bool",
+        "desp": "If it is True, std of pdp will be colored. Configurable through `plot_params['std_fill']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "pdp_hl",
+        "type": "bool",
+        "desp": "If it is True, pdp will be highlighted. Configurable through `plot_params['pdp_hl']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "dist",
+        "type": "dict",
+        "desp": "The style config for the distribution plot. Configurable through `plot_params['dist']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPIsolatePlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "interact",
+        "type": "dict",
+        "desp": "The style config for the interaction pdp. Configurable through `plot_params['interact']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "isolate",
+        "type": "dict",
+        "desp": "The style config for the isolation pdp. Configurable through `plot_params['isolate']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "subplot_ratio",
+        "type": "dict",
+        "desp": "The ratio for the subplots. Configurable through `plot_params['subplot_ratio']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "gaps",
+        "type": "dict",
+        "desp": "The gaps between subplots, as well as the inner gaps for each subplot. Configurable through `plot_params['gaps']`.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "plot_sizes",
+        "type": "dict",
+        "desp": "The calculated plot sizes.",
+        "target": {
+            "params": [],
+            "returns": [],
+            "attrs": [
+                "styles.InfoPlotStyle",
+                "styles.InteractInfoPlotStyle",
+                "styles.PDPIsolatePlotStyle",
+                "styles.PDPInteractPlotStyle"
+            ]
+        }
+    },
+    {
+        "param": "top",
+        "type": "bool",
+        "desp": "If True, set the target x-axis ticks position at the top of the plot.",
+        "target": {
+            "params": [
+                "styles._axes_modify",
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "right",
+        "type": "bool",
+        "desp": "If True, set the target y-axis ticks position at the right side of the plot.",
+        "target": {
+            "params": [
+                "styles._axes_modify",
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "grid",
+        "type": "bool",
+        "desp": "If True, display the grid on the plot.",
+        "target": {
+            "params": [
+                "styles._axes_modify"
+            ],
+            "returns": [],
+            "attrs": []
+        }
+    },
+    {
+        "param": "is_y",
+        "type": "bool",
+        "desp": "If True, the percentile values will be displayed on the y-axis, otherwise they will be displayed on the x-axis.",
+        "target": {
+            "params": [
+                "styles._display_percentile"
+            ],
+            "returns": [],
+            "attrs": []
+        }
     }
 ]
