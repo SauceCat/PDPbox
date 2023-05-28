@@ -9,8 +9,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from pdpbox.info_plots import (
     TargetPlot,
     PredictPlot,
-    InterectTargetPlot,
-    InterectPredictPlot,
+    InteractTargetPlot,
+    InteractPredictPlot,
 )
 from pdpbox.utils import FeatureInfo, _make_list
 from conftest import DummyModel, PlotTestBase
@@ -447,10 +447,10 @@ class TestPredictPlot(_TestInfoPlot):
         self._test_real_plot(plot_obj, plot_params_list)
 
 
-class TestInterectTargetPlot(_TestInfoPlot):
+class TestInteractTargetPlot(_TestInfoPlot):
     def get_plot_objs(self, target_type):
         for df, features, feat_types in self.data_gen.get_dummy_dfs(target_type):
-            yield InterectTargetPlot(
+            yield InteractTargetPlot(
                 df,
                 features,
                 ["Feature 1", "Feature 2"],
@@ -491,7 +491,7 @@ class TestInterectTargetPlot(_TestInfoPlot):
 
     @pytest.mark.parametrize("params, plot_params_list", info_interact_binary_params)
     def test_real_binary_model(self, params, plot_params_list, titanic):
-        plot_obj = InterectTargetPlot(
+        plot_obj = InteractTargetPlot(
             df=titanic["data"], target=titanic["target"], **params
         )
         self._test_real_plot(plot_obj, plot_params_list)
@@ -500,7 +500,7 @@ class TestInterectTargetPlot(_TestInfoPlot):
         "params, plot_params_list", info_interact_multiclass_params
     )
     def test_real_multiclass_model(self, params, plot_params_list, otto):
-        plot_obj = InterectTargetPlot(
+        plot_obj = InteractTargetPlot(
             df=otto["data"], target=otto["target"][1:], **params
         )
         self._test_real_plot(plot_obj, plot_params_list)
@@ -509,15 +509,15 @@ class TestInterectTargetPlot(_TestInfoPlot):
         "params, plot_params_list", info_interact_regression_params
     )
     def test_real_regression_model(self, params, plot_params_list, ross):
-        plot_obj = InterectTargetPlot(df=ross["data"], target=ross["target"], **params)
+        plot_obj = InteractTargetPlot(df=ross["data"], target=ross["target"], **params)
         self._test_real_plot(plot_obj, plot_params_list)
 
 
-class TestInterectPredictPlot(_TestInfoPlot):
+class TestInteractPredictPlot(_TestInfoPlot):
     def get_plot_objs(self, model_type):
         for df, features, feat_types in self.data_gen.get_dummy_dfs():
             model = DummyModel(model_type, features, feat_types, interact=True)
-            yield InterectPredictPlot(
+            yield InteractPredictPlot(
                 df,
                 features,
                 ["Feature 1", "Feature 2"],
@@ -558,7 +558,7 @@ class TestInterectPredictPlot(_TestInfoPlot):
 
     @pytest.mark.parametrize("params, plot_params_list", info_interact_binary_params)
     def test_real_binary_model(self, params, plot_params_list, titanic):
-        plot_obj = InterectPredictPlot(
+        plot_obj = InteractPredictPlot(
             model=titanic["model"],
             df=titanic["data"],
             model_features=titanic["features"],
@@ -570,7 +570,7 @@ class TestInterectPredictPlot(_TestInfoPlot):
         "params, plot_params_list", info_interact_multiclass_params
     )
     def test_real_multiclass_model(self, params, plot_params_list, otto):
-        plot_obj = InterectPredictPlot(
+        plot_obj = InteractPredictPlot(
             model=otto["model"],
             df=otto["data"],
             model_features=otto["features"],
@@ -582,7 +582,7 @@ class TestInterectPredictPlot(_TestInfoPlot):
         "params, plot_params_list", info_interact_regression_params
     )
     def test_real_regression_model(self, params, plot_params_list, ross):
-        plot_obj = InterectPredictPlot(
+        plot_obj = InteractPredictPlot(
             model=ross["model"],
             df=ross["data"],
             model_features=ross["features"],
