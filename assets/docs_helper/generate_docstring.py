@@ -1,3 +1,18 @@
+"""
+A script to generate docstrings for Python files based on a JSON config.
+
+Usage
+-----
+python generate_docstring.py --param_file parameters.json --py_files file1.py file2.py
+
+Returns
+-------
+The script will generate a new file for each Python file provided with the suffix "_updated".
+User can then compare the original file and the updated file to check if the docstrings are
+generated correctly. If the docstrings are correct, the updated file can be used to replace
+the original file.
+"""
+
 import ast
 import json
 import re
@@ -293,7 +308,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--param_file",
         type=str,
-        help="Path to the JSON file that contains docstring config.",
+        default="parameters.json",
+        required=False,
+        help="Path to the JSON file that contains docstring config. Default is parameters.json.",
     )
     parser.add_argument(
         "--py_files",
