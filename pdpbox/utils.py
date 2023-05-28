@@ -13,25 +13,36 @@ class FeatureInfo:
     col_name : str or list of str
         The column name(s) of the feature in the input DataFrame.
     name : str
-        A user-friendly name for the feature.
+        The custom name of the feature.
     type : str
         The type of the feature, as determined by the _check_col function.
-    grids : np.array
-        The grid points for the feature.
-    num_bins : int
-        The number of bins created by the grid points.
-    percentiles : np.array or None
-        The percentiles corresponding to each grid point, if applicable.
-    display_columns : list of str
-        The display labels for each bucket.
-    percentile_columns : list of str
-        The percentile labels for each bucket, if applicable.
+    cust_grid_points : array-like or list of arrays
+        Custom grid points for the feature. For interact plot, it can also be a
+        list of two arrays, indicating the grid points for each feature.
+    grid_type : {'percentile', 'equal'}
+        The grid type. Only applicable for numeric feature.
+    num_grid_points : int or list of int
+        The number of grid points to use. Only applicable for numeric feature. For
+        interact plot, it can also be a list of two integers, indicating the number
+        of grid points for each feature.
+    percentile_range : tuple
+        A tuple of two values indicating the range of percentiles to use. Only
+        applicable for numeric feature and when `grid_type` is 'percentile'. If it
+        is None, will use all samples.
+    grid_range : tuple
+        A tuple of two values indicating the range of grid values to use. Only
+        applicable for numeric feature. If it is None, will use all samples.
+    show_outliers : bool or list of bool
+        Whether to show outliers in the plot. Only applicable for numeric feature.
+        For interact plot, it can also be a list of two booleans, indicating
+        whether to show outliers for each feature.
+    endpoint : bool
+        Whether to include the endpoint of the range.
 
     Methods
     -------
-    prepare(df)
-        Prepares the input DataFrame, calculates summary statistics,
-        and returns the results as three separate DataFrames.
+    prepare(**kwargs)
+        Prepares the input DataFrame and calculates summary statistics.
     """
 
     def __init__(
@@ -48,21 +59,41 @@ class FeatureInfo:
         endpoint=True,
     ):
         """
-        Initialize a new instance of the FeatureInfo class.
+        Initializes the `FeatureInfo` class.
 
         Parameters
         ----------
-        feature : :ref:`param-feature`
-        feature_name : :ref:`param-feature_name`
+        feature : str or list of str
+            The column name(s) of the chosen feature. It is a list of str when the
+            chosen feature is one-hot encoded.
+        feature_name : str
+            A custom name for the chosen feature.
         df : pd.DataFrame
-            The input DataFrame containing the feature column.
-        cust_grid_points : :ref:`param-cust_grid_points`
-        grid_type : :ref:`param-grid_type`
-        num_grid_points : :ref:`param-num_grid_points`
-        percentile_range : :ref:`param-percentile_range`
-        grid_range : :ref:`param-grid_range`
-        show_outliers : :ref:`param-show_outliers`
-        endpoint : :ref:`param-endpoint`
+            A DataFrame that at least contains the feature(s).
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        grid_type : {'percentile', 'equal'}, optional
+            The grid type. Only applicable for numeric feature. Default is percentile.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        percentile_range : tuple, optional
+            A tuple of two values indicating the range of percentiles to use. Only
+            applicable for numeric feature and when `grid_type` is 'percentile'. If it
+            is None, will use all samples. Default is None.
+        grid_range : tuple, optional
+            A tuple of two values indicating the range of grid values to use. Only
+            applicable for numeric feature. If it is None, will use all samples.
+            Default is None.
+        show_outliers : bool or list of bool, optional
+            Whether to show outliers in the plot. Only applicable for numeric feature.
+            For interact plot, it can also be a list of two booleans, indicating
+            whether to show outliers for each feature. Default is False.
+        endpoint : bool, optional
+            Whether to include the endpoint of the range. Default is True.
         """
         self.col_name = feature
         self.name = feature_name
@@ -86,7 +117,7 @@ class FeatureInfo:
 
     def _check_grid_type(self):
         """
-        Validates the `grid_type` attribute and sets it to `'custom'` if `cust_grid_points` are provided.
+        Validates the `grid_type` attribute and sets it to 'custom' if `cust_grid_points` are provided.
         """
         assert self.grid_type in {
             "percentile",
@@ -98,7 +129,7 @@ class FeatureInfo:
     def _check_range(self):
         """
         Validates the `grid_range` and `percentile_range` attributes, ensuring
-        they are tuples with two elements in ascending order. 
+        they are tuples with two elements in ascending order.
         If `percentile_range` is used, it also checks that both values are between 0 and 100.
         """
         for name, range_value in [
@@ -117,12 +148,7 @@ class FeatureInfo:
     def _get_grids(self, df):
         """
         Determines the appropriate grid points for the feature based on its
-        type and other class attributes.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            The input DataFrame containing the feature column.
+        type and other class attributes based on the input DataFrame.
         """
         self.percentiles = None
         if self.type == "binary":
@@ -143,20 +169,8 @@ class FeatureInfo:
     def _get_numeric_grids(self, values):
         """
         Calculates the grid points for numeric features based on the `grid_type`
-        attribute and other class attributes.
-
-        Parameters
-        ----------
-        values : array-like
-            The values of the feature column.
-
-        Returns
-        -------
-        A tuple of 2 elements:
-            1. np.array
-                The grid points for the feature. 
-            2. np.array or None
-                The percentiles corresponding to each grid point (or None if not applicable).
+        attribute and other class attributes. Return the grid points and percentiles
+        corresponding to each grid point (or None if not applicable).
         """
         if self.grid_type == "percentile":
             start, end = self.percentile_range or (0, 100)
@@ -180,18 +194,8 @@ class FeatureInfo:
     def _map_values_to_buckets(self, df):
         """
         Maps the values of the feature column to the appropriate bucket based
-        on the grids attribute.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            The input DataFrame containing the feature column.
-
-        Returns
-        -------
-        pd.DataFrame
-            The processed DataFrame with an additional column `'x'` representing
-            the bucket index for each value.
+        on the grids attribute. Returns the input DataFrame with an additional
+        column 'x' representing the bucket index for each value.
         """
         col_name, grids = self.col_name, self.grids
         percentile_columns = []
@@ -273,23 +277,10 @@ class FeatureInfo:
 
     def prepare(self, df):
         """
-        Prepares the input DataFrame, calculates summary statistics, and returns
-        the results as three separate DataFrames.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            The input DataFrame containing the feature column.
-
-        Returns
-        -------
-        A tuple of 3 elements:
-            1. pd.DataFrame
-                The processed input DataFrame.
-            2. pd.DataFrame
-                A DataFrame containing the count of each bucket.
-            3. pd.DataFrame
-                A DataFrame containing the summary statistics for each bucket.
+        Process the input DataFrame, calculates summary statistics, returns
+        3 DataFrames: the processed input DataFrame, a DataFrame containing the
+        count of each bucket, and a DataFrame containing the summary statistics
+        for each bucket.
         """
         self._get_grids(df)
         df = self._map_values_to_buckets(df).reset_index(drop=True)
@@ -475,13 +466,12 @@ def _check_model(model, n_classes, pred_func):
 
     Returns
     -------
-    A tuple of 3 elements:
-        1. int
-            The number of classes in the target variable.
-        2. callable
-            The prediction function to be used.
-        3. bool
-            Flag indicating if the prediction function was obtained from the model or was provided as input.
+    int
+        The number of classes in the target variable.
+    callable
+        The prediction function to be used.
+    bool
+        Flag indicating if the prediction function was obtained from the model or was provided as input.
 
     Raises
     ------
@@ -749,13 +739,13 @@ def _check_cluster_params(n_cluster_centers, cluster_method):
     n_cluster_centers : int or None
         The number of cluster centers to be used. If None, a `ValueError` is raised.
     cluster_method : str
-        The method used for clustering. Should be either `"approx"` or `"accurate"`.
+        The method used for clustering. Should be either "approx" or "accurate".
         If it's not, a `ValueError` is raised.
 
     Raises
     ------
     ValueError
-        If `n_cluster_centers` is None or `cluster_method` is not `"approx"` or `"accurate"`.
+        If `n_cluster_centers` is None or `cluster_method` is not "approx" or "accurate".
     """
     if n_cluster_centers is None:
         raise ValueError("n_cluster_centers should be specified.")
@@ -779,7 +769,7 @@ def _check_plot_engine(engine):
     Raises
     ------
     ValueError
-        If `engine` is not `'plotly'` or `'matplotlib'`.
+        If `engine` is not 'plotly' or 'matplotlib'.
     """
     if engine not in ["plotly", "matplotlib"]:
         raise ValueError("plot_engine should be either 'plotly' or 'matplotlib'.")
@@ -797,7 +787,7 @@ def _check_pdp_interact_plot_type(plot_type):
     Raises
     ------
     ValueError
-        If `plot_type` is not `'grid'` or `'contour'`.
+        If `plot_type` is not 'grid' or 'contour'.
     """
     if plot_type not in ["grid", "contour"]:
         raise ValueError("plot_type should be either 'grid' or 'contour'.")

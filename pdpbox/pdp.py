@@ -28,6 +28,21 @@ warnings.filterwarnings("ignore")
 
 
 class PDPResult:
+    """
+    Stores the results of the PDP analysis.
+
+    Attributes
+    ----------
+    class_id : int or None
+        The class index for multi-class problems. For binary and resgression
+        problems, it is None.
+    ice_lines : pd.DataFrame
+        A DataFrame that contains the calculated ICE lines. The shape of the
+        DataFrame is (n_samples, n_grids).
+    pdp : numpy.ndarray
+        The calculated PDP values. The shape of the array is (n_grids,).
+    """
+
     def __init__(
         self,
         class_id,
@@ -146,33 +161,62 @@ class _PDPBase:
 
 class PDPIsolate(_PDPBase):
     """
-    A class for performing Partial Dependence Plot (PDP) analysis on a single feature. 
-    This class inherits from the _PDPBase class and implements additional functionality.
+    Performs Partial Dependence Plot (PDP) analysis on a single feature.
 
     Attributes
     ----------
-    model
-    n_classes
-    pred_func
-    model_features
-    memory_limit
-    chunk_size
-    n_jobs
-    predict_kwds
-    data_transformer
-    dist_num_samples : :ref:`param-dist_num_samples`
+    model : object
+        A trained model object. The model should have a `predict` or
+        `predict_proba` method. Otherwise a custom prediction function should be
+        provided through `pred_func`.
+    n_classes : int
+        Number of classes. If it is None, will infer from `model.n_classes_`.
+        Please set it as 0 for regression.
+    pred_func : callable
+        A custom prediction function. If not provided, `predict` or `predict_proba`
+        method of `model` is used to generate the predictions.
+    model_features : list of str
+        A list of features used in model prediction.
+    memory_limit : float
+        The maximum proportion of memory that can be used by the calculation
+        process.
+    chunk_size : int
+        The number of samples to predict at each iteration. -1 means all samples at
+        once.
+    n_jobs : int
+        The number of jobs to run in parallel for computation. If set to -1, all
+        CPUs are used.
+    predict_kwds : dict
+        Additional keyword arguments to pass to the `model`'s predict function.
+    data_transformer : callable
+        A function to transform the input data before prediction.
+    dist_num_samples : int
+        The number of samples to use for estimating the distribution of the data.
+        This is used to handle large datasets by sampling a smaller subset for
+        efficiency.
     plot_type : str
-        The type of the plot to be generated. For this class, it's `'pdp_isolate'`.
-    feature_info : `FeatureInfo`
-        Contains detailed information about the feature to be analyzed.
+        The type of the plot to be generated.
+    feature_info : :class:`FeatureInfo`
+        An instance of the `FeatureInfo` class.
     count_df : pd.DataFrame
-        Data frame containing the count of observations for each bin.
-    n_grids : :ref:`param-n_grids`
-    dist_df : pd.DataFrame
+        A DataFrame that contains the count as well as the normalized count
+        (percentage) of samples within each feature bucket.
+    n_grids : int
+        The number of feature grids. For interact plot, it is the product of
+        `n_grids` of two features.
+    dist_df : pandas.Series
         The distribution of the data points.
-    from_model : :ref:`param-from_model`
-    target : :ref:`param-target`
-    results : :ref:`param-results`
+    from_model : bool
+        A flag indicating if the prediction function was obtained from the model or
+        was provided as input.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    results : list of :class:`PDResults`
+        The results of the Partial Dependence Plot (PDP) analysis. For binary and
+        regression problems, the list will contain a single `PDResults` object. For
+        multi-class targets, the list will contain a `PDResults` object for each
+        class.
 
     Methods
     -------
@@ -201,27 +245,61 @@ class PDPIsolate(_PDPBase):
         grid_range=None,
     ):
         """
+        Initializes a `PDPIsolate` instance.
+
         Parameters
         ----------
-        model : :ref:`param-model`
+        model : object
+            A trained model object. The model should have a `predict` or
+            `predict_proba` method. Otherwise a custom prediction function should be
+            provided through `pred_func`.
         df : pd.DataFrame
-            The input DataFrame.
-        model_features : :ref:`param-model_features`
-        feature : :ref:`param-feature`
-        feature_name : :ref:`param-feature_name`
-        pred_func : :ref:`param-pred_func`
-        n_classes : :ref:`param-n_classes`
-        memory_limit : :ref:`param-memory_limit`
-        chunk_size : :ref:`param-chunk_size`
-        n_jobs : :ref:`param-n_jobs`
-        predict_kwds : :ref:`param-predict_kwds`
-        data_transformer : any transformer compatible with scikit-learn API
-            The transformer used to transform the input data before prediction. Defaults to None.
-        cust_grid_points : :ref:`param-cust_grid_points`
-        grid_type : :ref:`param-grid_type`
-        num_grid_points : :ref:`param-num_grid_points`
-        percentile_range : :ref:`param-percentile_range`
-        grid_range : :ref:`param-grid_range`
+            A DataFrame that at least contains columns specified by `model_features`.
+        model_features : list of str
+            A list of features used in model prediction.
+        feature : str or list of str
+            The column name(s) of the chosen feature. It is a list of str when the
+            chosen feature is one-hot encoded.
+        feature_name : str
+            A custom name for the chosen feature.
+        pred_func : callable, optional
+            A custom prediction function. If not provided, `predict` or `predict_proba`
+            method of `model` is used to generate the predictions. Default is None.
+        n_classes : int, optional
+            Number of classes. If it is None, will infer from `model.n_classes_`.
+            Please set it as 0 for regression. Default is None.
+        memory_limit : float, optional
+            The maximum proportion of memory that can be used by the calculation
+            process. Default is 0.5.
+        chunk_size : int, optional
+            The number of samples to predict at each iteration. -1 means all samples at
+            once. Default is -1.
+        n_jobs : int, optional
+            The number of jobs to run in parallel for computation. If set to -1, all
+            CPUs are used. Default is 1.
+        predict_kwds : dict, optional
+            Additional keyword arguments to pass to the `model`'s predict function.
+            Default is {}.
+        data_transformer : callable, optional
+            A function to transform the input data before prediction. Default is None.
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        grid_type : {'percentile', 'equal'}, optional
+            The grid type. Only applicable for numeric feature. Default is percentile.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        percentile_range : tuple, optional
+            A tuple of two values indicating the range of percentiles to use. Only
+            applicable for numeric feature and when `grid_type` is 'percentile'. If it
+            is None, will use all samples. Default is None.
+        grid_range : tuple, optional
+            A tuple of two values indicating the range of grid values to use. Only
+            applicable for numeric feature. If it is None, will use all samples.
+            Default is None.
         """
         super().__init__(
             model,
@@ -299,35 +377,57 @@ class PDPIsolate(_PDPBase):
         Parameters
         ----------
         center : bool, optional
-            If True, the PDP will be centered. Defaults to True.
+            If True, the PDP will be centered by deducting the values of `grids[0]`.
+            Default is True.
         plot_lines : bool, optional
-            If True, ICE lines will be plotted. Defaults to False.
-        frac_to_plot : float, optional
-            Fraction of ICE lines to plot. Defaults to 1 (plot all lines).
+            If True, ICE lines will be plotted. Default is False.
+        frac_to_plot : int or float, optional
+            Fraction of ICE lines to plot. Default is 1.
         cluster : bool, optional
-            If True, ICE lines will be clustered. Defaults to False.
-        n_cluster_centers : int, optional
-            Number of cluster centers. Defaults to None.
-        cluster_method : str, optional
-            Method for clustering. Can be 'accurate' or 'quick'. Defaults to 'accurate'.
+            If True, ICE lines will be clustered. Default is False.
+        n_cluster_centers : int or None, optional
+            Number of cluster centers. Need to provide when `cluster` is True. Default
+            is None.
+        cluster_method : {'accurate', 'approx'}, optional
+            Method for clustering. If 'accurate', use KMeans. If 'approx', use
+            MiniBatchKMeans. Default is accurate.
         plot_pts_dist : bool, optional
-            If True, distribution of points will be plotted. Defaults to False.
+            If True, distribution of points will be plotted. Default is False.
         to_bins : bool, optional
-            If True, the x-axis will be converted to bins. Defaults to False.
-        show_percentile : :ref:`param-show_percentile`
-        which_classes : :ref:`param-which_classes`
-        figsize : :ref:`param-figsize`
-        dpi : :ref:`param-dpi`
-        ncols : :ref:`param-ncols`
-        plot_params : :ref:`param-plot_params`
-        engine : :ref:`param-engine`
-        template : :ref:`param-template`
+            If True, the axis will be converted to bins. Only applicable for numeric
+            feature. Default is False.
+        show_percentile : bool, optional
+            If True, percentiles are shown in the plot. Default is False.
+        which_classes : list of int, optional
+            List of class indices to plot. If None, all classes will be plotted.
+            Default is None.
+        figsize : tuple or None, optional
+            The figure size for matplotlib or plotly figure. If None, the default
+            figure size is used. Default is None.
+        dpi : int, optional
+            The resolution of the plot, measured in dots per inch. Only applicable when
+            `engine` is 'matplotlib'. Default is 300.
+        ncols : int, optional
+            The number of columns of subplots in the figure. Default is 2.
+        plot_params : dict or None, optional
+            Custom plot parameters that control the style and aesthetics of the plot.
+            Default is None.
+        engine : {'matplotlib', 'plotly'}, optional
+            The plotting engine to use. Default is plotly.
+        template : str, optional
+            The template to use for plotly plots. Only applicable when `engine` is
+            'plotly'. Reference: https://plotly.com/python/templates/ Default is
+            plotly_white.
 
         Returns
         -------
-        A tuple of 2 elements:
-            1. plotly or matplotlib figure object
-            2. matplotlib axes object or None (when `engine` is `"plotly"`)
+        matplotlib.figure.Figure or plotly.graph_objects.Figure
+            A Matplotlib or Plotly figure object depending on the plot engine being
+            used.
+        dict of matplotlib.axes.Axes or None
+            A dictionary of Matplotlib axes objects. The keys are the names of the
+            axes. The values are the axes objects. If `engine` is 'ploltly', it is
+            None.
         """
         if plot_params is None:
             plot_params = {}
@@ -366,38 +466,73 @@ class PDPIsolate(_PDPBase):
 
 class PDPInteract(_PDPBase):
     """
-    Calculating and plotting Partial Dependence Plot (PDP) for interaction between two features.
+    Performs Partial Dependence Plot (PDP) analysis for interaction between two features.
 
     Attributes
     ----------
-    model
-    n_classes
-    pred_func
-    model_features
-    features
-    feature_names
-    memory_limit
-    chunk_size
-    n_jobs
-    predict_kwds
-    data_transformer
-    dist_num_samples : :ref:`param-dist_num_samples`
+    model : object
+        A trained model object. The model should have a `predict` or
+        `predict_proba` method. Otherwise a custom prediction function should be
+        provided through `pred_func`.
+    n_classes : int
+        Number of classes. If it is None, will infer from `model.n_classes_`.
+        Please set it as 0 for regression.
+    pred_func : callable
+        A custom prediction function. If not provided, `predict` or `predict_proba`
+        method of `model` is used to generate the predictions.
+    model_features : list of str
+        A list of features used in model prediction.
+    memory_limit : float
+        The maximum proportion of memory that can be used by the calculation
+        process.
+    chunk_size : int
+        The number of samples to predict at each iteration. -1 means all samples at
+        once.
+    n_jobs : int
+        The number of jobs to run in parallel for computation. If set to -1, all
+        CPUs are used.
+    predict_kwds : dict
+        Additional keyword arguments to pass to the `model`'s predict function.
+    data_transformer : callable
+        A function to transform the input data before prediction.
+    dist_num_samples : int
+        The number of samples to use for estimating the distribution of the data.
+        This is used to handle large datasets by sampling a smaller subset for
+        efficiency.
     plot_type : str
-        The type of the plot to be generated. For this class, it's `'pdp_interact'`.
-    pdp_isolate_objs : list
-        List of `PDPIsolate` objects.
-    n_grids : :ref:`param-n_grids`
-    feature_grid_combos : np.ndarray
-        Array of feature grid combinations.
-    from_model : :ref:`param-from_model`
-    target : :ref:`param-target`
-    results : :ref:`param-results`
+        The type of the plot to be generated.
+    features : list
+        List of column name(s) for the 2 chosen features. The length of the list
+        should be strictly 2.
+    feature_names : list
+        List of custom names for the 2 chosen features. The length of the list
+        should be strictly 2.
+    pdp_isolate_objs : list of :class:`PDPIsolate`
+        A list of `PDPIsolate` objects, for two features.
+    n_grids : int
+        The number of feature grids. For interact plot, it is the product of
+        `n_grids` of two features.
+    feature_grid_combos : numpy.ndarray
+        A 2D array that contains the combinations of feature grids. The shape of
+        the array is (n_grids, ...).
+    from_model : bool
+        A flag indicating if the prediction function was obtained from the model or
+        was provided as input.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    results : list of :class:`PDResults`
+        The results of the Partial Dependence Plot (PDP) analysis. For binary and
+        regression problems, the list will contain a single `PDResults` object. For
+        multi-class targets, the list will contain a `PDResults` object for each
+        class.
 
     Methods
     -------
     plot(**kwargs) :
         Generates the PDP plot.
     """
+
     def __init__(
         self,
         model,
@@ -419,26 +554,61 @@ class PDPInteract(_PDPBase):
         cust_grid_points=None,
     ):
         """
+        Initializes a `PDPInteract` instance.
+
         Parameters
         ----------
-        model : :ref:`param-model`
+        model : object
+            A trained model object. The model should have a `predict` or
+            `predict_proba` method. Otherwise a custom prediction function should be
+            provided through `pred_func`.
         df : pd.DataFrame
-            The input DataFrame.
-        model_features : :ref:`param-model_features`
-        features : :ref:`param-features`
-        feature_names : :ref:`param-feature_names`
-        pred_func : :ref:`param-pred_func`
-        n_classes : :ref:`param-n_classes`
-        memory_limit : :ref:`param-memory_limit`
-        chunk_size : :ref:`param-chunk_size`
-        n_jobs : :ref:`param-n_jobs`
-        predict_kwds : :ref:`param-predict_kwds`
-        data_transformer : :ref:`param-data_transformer`
-        num_grid_points : :ref:`param-num_grid_points`
-        grid_types : :ref:`param-grid_types`
-        percentile_ranges : :ref:`param-percentile_ranges`
-        grid_ranges : :ref:`param-grid_ranges`
-        cust_grid_points : :ref:`param-cust_grid_points`
+            A DataFrame that at least contains columns specified by `model_features`.
+        model_features : list of str
+            A list of features used in model prediction.
+        features : list
+            List of column name(s) for the 2 chosen features. The length of the list
+            should be strictly 2.
+        feature_names : list
+            List of custom names for the 2 chosen features. The length of the list
+            should be strictly 2.
+        pred_func : callable, optional
+            A custom prediction function. If not provided, `predict` or `predict_proba`
+            method of `model` is used to generate the predictions. Default is None.
+        n_classes : int, optional
+            Number of classes. If it is None, will infer from `model.n_classes_`.
+            Please set it as 0 for regression. Default is None.
+        memory_limit : float, optional
+            The maximum proportion of memory that can be used by the calculation
+            process. Default is 0.5.
+        chunk_size : int, optional
+            The number of samples to predict at each iteration. -1 means all samples at
+            once. Default is -1.
+        n_jobs : int, optional
+            The number of jobs to run in parallel for computation. If set to -1, all
+            CPUs are used. Default is 1.
+        predict_kwds : dict, optional
+            Additional keyword arguments to pass to the `model`'s predict function.
+            Default is {}.
+        data_transformer : callable, optional
+            A function to transform the input data before prediction. Default is None.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        grid_types : str or list of str, optional
+            Same as `grid_type`, but could be a list of two strings, indicating the
+            grid type for each feature. Default is percentile.
+        percentile_ranges : tuple or a list of tuples, optional
+            Same as `percentile_range`, but could be a list of two tuples, indicating
+            the percentile range for each feature. Default is None.
+        grid_ranges : tuple or list of tuples, optional
+            Same as `grid_range`, but could be a list of two tuples, indicating the
+            grid range for each feature. Default is None.
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
         """
         super().__init__(
             model,
@@ -534,30 +704,49 @@ class PDPInteract(_PDPBase):
         template="plotly_white",
     ):
         """
-        Plots the interaction Partial Dependence Plot.
+        Generates the Partial Dependence Plot (PDP).
 
         Parameters
         ----------
-        plot_type : str, optional
-            Type of plot. Can be `'contour'` or `'grid'`. Defaults to `'contour'`.
+        plot_type : {'grid', 'contour'}, optional
+            The type of interaction plot to be generated. Default is contour.
         plot_pdp : bool, optional
-            If True, individual PDPs will be plotted. Defaults to False.
+            If it is True, pdp for each feature will be plotted. Default is False.
         to_bins : bool, optional
-            If True, the x-axis and y-axis will be converted to bins. Defaults to True.
-        show_percentile : :ref:`param-show_percentile`
-        which_classes : :ref:`param-which_classes`
-        figsize : :ref:`param-figsize`
-        dpi : :ref:`param-dpi`
-        ncols : :ref:`param-ncols`
-        plot_params : :ref:`param-plot_params`
-        engine : :ref:`param-engine`
-        template : :ref:`param-template`
+            If True, the axis will be converted to bins. Only applicable for numeric
+            feature. Default is True.
+        show_percentile : bool, optional
+            If True, percentiles are shown in the plot. Default is False.
+        which_classes : list of int, optional
+            List of class indices to plot. If None, all classes will be plotted.
+            Default is None.
+        figsize : tuple or None, optional
+            The figure size for matplotlib or plotly figure. If None, the default
+            figure size is used. Default is None.
+        dpi : int, optional
+            The resolution of the plot, measured in dots per inch. Only applicable when
+            `engine` is 'matplotlib'. Default is 300.
+        ncols : int, optional
+            The number of columns of subplots in the figure. Default is 2.
+        plot_params : dict or None, optional
+            Custom plot parameters that control the style and aesthetics of the plot.
+            Default is None.
+        engine : {'matplotlib', 'plotly'}, optional
+            The plotting engine to use. Default is plotly.
+        template : str, optional
+            The template to use for plotly plots. Only applicable when `engine` is
+            'plotly'. Reference: https://plotly.com/python/templates/ Default is
+            plotly_white.
 
         Returns
         -------
-        A tuple of 2 elements:
-            1. plotly or matplotlib figure object
-            2. matplotlib axes object or None (when `engine` is `"plotly"`)
+        matplotlib.figure.Figure or plotly.graph_objects.Figure
+            A Matplotlib or Plotly figure object depending on the plot engine being
+            used.
+        dict of matplotlib.axes.Axes or None
+            A dictionary of Matplotlib axes objects. The keys are the names of the
+            axes. The values are the axes objects. If `engine` is 'ploltly', it is
+            None.
         """
         if plot_params is None:
             plot_params = {}

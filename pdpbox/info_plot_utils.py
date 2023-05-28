@@ -294,22 +294,12 @@ class InfoPlotEngine(BaseInfoPlotEngine):
 
 class TargetPlotEngine(InfoPlotEngine):
     """
-    The `TargetPlotEngine` class, derived from `InfoPlotEngine` class, is designed for creating plots 
-    that demonstrate how the mean value of a target variable changes across buckets 
-    for a given feature.
-    
-    Attributes
-    ----------
-    which_classes
-    plot_obj
-    feat_name : :ref:`param-feat_name`
-    feat_type : :ref:`param-feat_type`
-    plot_style : `InfoPlotStyle` object
-        Contains the stylistic parameters and configurations for the plot such as color, font, etc.
-    display_columns : :ref:`param-display_columns`
-    percentile_columns : :ref:`param-percentile_columns`
-    line_colors : cycle
-        A cycle iterator that produces the colors to be used for the lines in the plot.
+    Create plots for `TargetPlot`
+
+    Methods
+    -------
+    plot_matplotlib : plot using matplotlib
+    plot_plotly : plot using plotly
     """
 
     def __init__(
@@ -318,14 +308,6 @@ class TargetPlotEngine(InfoPlotEngine):
         which_classes,
         plot_params,
     ):
-        """
-        Parameters
-        ----------
-        plot_obj : object
-            An instance of `TargetPlot` class.
-        which_classes : :ref:`param-which_classes`
-        plot_params : :ref:`param-plot_params`
-        """
         super().__init__(
             plot_obj,
             which_classes,
@@ -409,36 +391,20 @@ class TargetPlotEngine(InfoPlotEngine):
 
 class PredictPlotEngine(InfoPlotEngine):
     """
-    A class that inherits from the `InfoPlotEngine` and is responsible for creating prediction plots.
-    It uses matplotlib and plotly as plotting libraries.
-    
-    Attributes
-    ----------
-    which_classes
-    plot_obj
-    feat_name : :ref:`param-feat_name`
-    feat_type : :ref:`param-feat_type`
-    plot_style : `InfoPlotStyle` object
-        Contains the stylistic parameters and configurations for the plot such as color, font, etc.
-    display_columns : :ref:`param-display_columns`
-    percentile_columns : :ref:`param-percentile_columns`
-    box_colors : cycle
-        A cycle iterator that produces the colors to be used for the boxes in the plot.
+    Create plots for `PredictPlot`
+
+    Methods
+    -------
+    plot_matplotlib : plot using matplotlib
+    plot_plotly : plot using plotly
     """
+
     def __init__(
         self,
         plot_obj,
         which_classes,
         plot_params,
     ):
-        """
-        Parameters
-        ----------
-        plot_obj : object
-            An instance of `PredictPlot` class.
-        which_classes : :ref:`param-which_classes`
-        plot_params : :ref:`param-plot_params`
-        """
         super().__init__(
             plot_obj,
             which_classes,
@@ -528,41 +494,20 @@ class PredictPlotEngine(InfoPlotEngine):
 
 class InteractInfoPlotEngine(BaseInfoPlotEngine):
     """
-    A class that inherits from the `BaseInfoPlotEngine` and is responsible for creating prediction plots.
-    It uses matplotlib and plotly as plotting libraries.
-    
-    Attributes
-    ----------
-    which_classes
-    plot_obj
-    feat_names : list of FeatureInfo.name
-    feat_types : list of FeatureInfo.type
-    plot_style : `InteractInfoPlotStyle` object
-        Contains the stylistic parameters and configurations for the plot such as color, font, etc.
-    display_columns : :ref:`param-display_columns`
-    percentile_columns : :ref:`param-percentile_columns`
-    percentile_columns : :ref:`param-cmaps`
-    count_min : int
-        The minimum count value in the plot.
-    count_max : int
-        The maximum count value in the plot.
-    marker_sizes : list of int
-        The sizes of the markers in the plot.
+    Create plots for `InteractTargetPlot` or `InteractPredictPlot`
+
+    Methods
+    -------
+    plot_matplotlib : plot using matplotlib
+    plot_plotly : plot using plotly
     """
+
     def __init__(
         self,
         plot_obj,
         which_classes,
         plot_params,
     ):
-        """
-        Parameters
-        ----------
-        plot_obj : object
-            An instance of `InterectTargetPlot` or `InterectPredictPlot` class.
-        which_classes : :ref:`param-which_classes`
-        plot_params : :ref:`param-plot_params`
-        """
         super().__init__(
             plot_obj,
             which_classes,

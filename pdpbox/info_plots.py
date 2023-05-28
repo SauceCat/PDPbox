@@ -35,9 +35,9 @@ class _BaseInfoPlot:
         """
         Prepare for a target plot.
 
-        Assign `self.target` with a list of target column names.
-        Assign `self.n_classes` according to target type.
-        Assign `self.df` with a DataFrame containing feature and target columns.
+        - Assign `self.target` with a list of target columns.
+        - Assign `self.n_classes` according to target type.
+        - Assign `self.df` with a DataFrame containing feature and target columns.
         """
         target_type = _check_target(target, df)
         self.target = _make_list(target)
@@ -55,11 +55,11 @@ class _BaseInfoPlot:
         self, model, df, pred_func, n_classes, predict_kwds, chunk_size
     ):
         """
-        Prepare for a predict plot.
+        Prepare for a prediction plot.
 
-        Update `self.n_classes` according to `model` and `n_classes`.
-        Assign `self.target` with a list of pred column names.
-        Assign `self.df` with a DataFrame containing feature and pred columns.
+        - Update `self.n_classes` according to `model` and `n_classes`.
+        - Assign `self.target` with a list of pred columns.
+        - Assign `self.df` with a DataFrame containing feature and prediction columns.
         """
         self.n_classes, pred_func, from_model = _check_model(
             model, n_classes, pred_func
@@ -154,23 +154,32 @@ class _InfoPlot(_BaseInfoPlot):
         """
         Prepare the feature information.
 
-        Update `self.df` with feature bucket information.
-        Assign `self.count_df` with the count of each feature bucket.
-        Assign `self.summary_df` with the summary statistics for each feature bucket.
+        - Update `self.df` with feature bucket information.
+        - Assign `self.count_df` with the count of each feature bucket.
+        - Assign `self.summary_df` with the summary statistics for each feature bucket.
         """
         self.df, self.count_df, self.summary_df = self.feature_info.prepare(self.df)
 
     def agg_target(self):
         """
-        Aggregate the target variable according to `self.plot_type`.
+        Aggregates the target or prediction variable based on the plot type specified
+        in `self.plot_type`.
 
-        If `self.plot_type` is `'target'`, the target variable is aggregated by 
-        taking the mean of the target for each feature bucket `x`.
-        If `self.plot_type` is `'predict'`, the target variable is aggregated by 
-        taking the first quartile, median (second quartile), and third quartile 
-        of the target for each feature bucket `x`.
-        The aggregated results are stored in `self.target_lines`.
-        `self.summary_df` is updated with the aggregated results.
+        Depending on `self.plot_type`, this function employs different strategies to
+        aggregate:
+
+        - If `self.plot_type` is 'target', it calculates the mean of the target
+        variable for each feature bucket 'x'.
+        - If `self.plot_type` is 'predict', it calculates the first quartile, median
+        (second quartile), and third quartile of the prediction variable for each
+        feature bucket 'x'.
+
+        The results of these aggregation operations are then stored in
+        `self.target_lines`.
+
+        Additionally, this function updates `self.summary_df` with the aggregate
+        results to provide a summarized view of the target or prediction variable
+        across different feature buckets.
         """
         if self.plot_type == "target":
 
@@ -212,11 +221,12 @@ class _InfoPlot(_BaseInfoPlot):
     ):
         """
         The plot function for `TargetPlot` and `PredictPlot`.
-    
+
         Parameters
         ----------
         which_classes : list of int, optional
             List of class indices to plot. If None, all classes will be plotted.
+            Default is None.
         show_percentile : bool, optional
             If True, percentiles are shown in the plot. Default is False.
         figsize : tuple or None, optional
@@ -231,24 +241,24 @@ class _InfoPlot(_BaseInfoPlot):
             Custom plot parameters that control the style and aesthetics of the plot.
             Default is None.
         engine : {'matplotlib', 'plotly'}, optional
-            The plotting engine to use. Default is 'plotly'.
+            The plotting engine to use. Default is plotly.
         template : str, optional
             The template to use for plotly plots. Only applicable when `engine` is
-            'plotly'. Default is 'plotly_white'. Reference:
-            https://plotly.com/python/templates/
+            'plotly'. Reference: https://plotly.com/python/templates/ Default is
+            plotly_white.
 
         Returns
         -------
-        matplotlib.figure.Figure or plotly.graph_objects.Figure : 
+        matplotlib.figure.Figure or plotly.graph_objects.Figure
             A Matplotlib or Plotly figure object depending on the plot engine being
             used.
-        dict of matplotlib.axes.Axes or None : 
+        dict of matplotlib.axes.Axes or None
             A dictionary of Matplotlib axes objects. The keys are the names of the
             axes. The values are the axes objects. If `engine` is 'ploltly', it is
             None.
-        pd.DataFrame : 
-            A Pandas DataFrame containing the summary statistics for each feature
-            bucket.
+        pd.DataFrame
+            A DataFrame that contains the summary statistics of target (for target
+            plot) or predict (for predict plot) values for each feature bucket.
         """
         return self._plot(
             which_classes,
@@ -265,22 +275,50 @@ class _InfoPlot(_BaseInfoPlot):
 
 class TargetPlot(_InfoPlot):
     """
-    Class for creating target plots based on input data and specified parameters.
+    Generates plots displaying the average values of target variables
+    across distinct groups (or buckets) of a single feature.
+
+    These plots provide insights into how the target's average values change with
+    respect to the different groups of a chosen feature. This understanding is
+    crucial for comprehensive feature analysis and facilitates the interpretation
+    of model predictions.
 
     Attributes
     ----------
-    df
-    target
-    n_classes : only applicable for `PredictPlot`
-    plot_type : str
-        The type of the plot to be generated. For this class, it's `'target'`.
-    plot_engines : :ref:`param-plot_engines`
-    feature_info : :ref:`param-feature_info`
+    df : pd.DataFrame
+        A processed DataFrame that includes feature and target (for target plot) or
+        predict (for predict plot) columns, feature buckets, along with the count
+        of samples within each bucket.
+    feature_info : :class:`FeatureInfo`
+        An instance of the `FeatureInfo` class.
     feature_cols : list of str
-        List of feature column names.
-    count_df : :ref:`param-count_df`
-    summary_df : :ref:`param-summary_df`
-    target_lines : :ref:`param-target_lines`
+        List of feature columns.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    n_classes : int
+        The number of classes inferred from the target columns.
+    plot_type : str
+        The type of the plot to be generated.
+    plot_engines : dict
+        A dictionary that maps plot types to their plotting engines.
+    count_df : pd.DataFrame
+        A DataFrame that contains the count as well as the normalized count
+        (percentage) of samples within each feature bucket.
+    summary_df : pd.DataFrame
+        A DataFrame that contains the summary statistics of target (for target
+        plot) or predict (for predict plot) values for each feature bucket.
+    target_lines : list of pd.DataFrame
+        A list of DataFrames, each DataFrame includes aggregate metrics across
+        feature buckets for a target (for target plot) or predict (for predict
+        plot) variable. For binary and regression problems, the list will contain a
+        single DataFrame. For multi-class targets, the list will contain a
+        DataFrame for each class.
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the plot.
     """
 
     def __init__(
@@ -298,21 +336,43 @@ class TargetPlot(_InfoPlot):
         endpoint=True,
     ):
         """
+        Initialize a `TargetPlot` instance.
+
         Parameters
         ----------
         df : pd.DataFrame
-            Input data frame at least containing the feature and target columns.
-        feature : :ref:`param-feature`
-        feature_name : :ref:`param-feature_name`
+            A DataFrame that at least contains the feature(s) and target columns.
+        feature : str or list of str
+            The column name(s) of the chosen feature. It is a list of str when the
+            chosen feature is one-hot encoded.
+        feature_name : str
+            A custom name for the chosen feature.
         target : str or list of str
-            The target column(s) used for the y-axis in the plot.
-        cust_grid_points : :ref:`param-cust_grid_points`
-        grid_type : :ref:`param-grid_type`
-        num_grid_points : :ref:`param-num_grid_points`
-        percentile_range : :ref:`param-percentile_range`
-        grid_range : :ref:`param-grid_range`
-        show_outliers : :ref:`param-show_outliers`
-        endpoint : :ref:`param-endpoint`
+            The target column or columns (when it is multi-class).
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        grid_type : {'percentile', 'equal'}, optional
+            The grid type. Only applicable for numeric feature. Default is percentile.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        percentile_range : tuple, optional
+            A tuple of two values indicating the range of percentiles to use. Only
+            applicable for numeric feature and when `grid_type` is 'percentile'. If it
+            is None, will use all samples. Default is None.
+        grid_range : tuple, optional
+            A tuple of two values indicating the range of grid values to use. Only
+            applicable for numeric feature. If it is None, will use all samples.
+            Default is None.
+        show_outliers : bool or list of bool, optional
+            Whether to show outliers in the plot. Only applicable for numeric feature.
+            For interact plot, it can also be a list of two booleans, indicating
+            whether to show outliers for each feature. Default is False.
+        endpoint : bool, optional
+            Whether to include the endpoint of the range. Default is True.
         """
         super().__init__(
             df,
@@ -332,22 +392,53 @@ class TargetPlot(_InfoPlot):
 
 class PredictPlot(_InfoPlot):
     """
-    Class for creating prediction plots based on input data and specified parameters.
+    Generates box plots depicting the statistical distribution of prediction values
+    across distinct groups (or buckets) of a single feature.
+
+    The box plots illustrate the distribution of prediction values, with emphasis
+    on the first quartile, median (second quartile), and third quartile, across
+    different feature buckets. This visualization provides insights into the
+    variation of predicted values with respect to different groups of the chosen
+    feature. Such understanding is essential for comprehensive feature analysis
+    and aids in interpreting model predictions.
 
     Attributes
     ----------
-    df
-    plot_type : str
-        The type of the plot to be generated. For this class, it's `'predict'`.
-    plot_engines : :ref:`param-plot_engines`
-    feature_info : :ref:`param-feature_info`
+    df : pd.DataFrame
+        A processed DataFrame that includes feature and target (for target plot) or
+        predict (for predict plot) columns, feature buckets, along with the count
+        of samples within each bucket.
+    feature_info : :class:`FeatureInfo`
+        An instance of the `FeatureInfo` class.
     feature_cols : list of str
-        List of feature column names.
-    n_classes : :ref:`param-n_classes`
-    target : only applicable for `TargetPlot`
-    count_df : :ref:`param-count_df`
-    summary_df : :ref:`param-summary_df`
-    target_lines : :ref:`param-target_lines`
+        List of feature columns.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    n_classes : int
+        The number of classes provided, or inferred from the model when it is not
+        provided.
+    plot_type : str
+        The type of the plot to be generated.
+    plot_engines : dict
+        A dictionary that maps plot types to their plotting engines.
+    count_df : pd.DataFrame
+        A DataFrame that contains the count as well as the normalized count
+        (percentage) of samples within each feature bucket.
+    summary_df : pd.DataFrame
+        A DataFrame that contains the summary statistics of target (for target
+        plot) or predict (for predict plot) values for each feature bucket.
+    target_lines : list of pd.DataFrame
+        A list of DataFrames, each DataFrame includes aggregate metrics across
+        feature buckets for a target (for target plot) or predict (for predict
+        plot) variable. For binary and regression problems, the list will contain a
+        single DataFrame. For multi-class targets, the list will contain a
+        DataFrame for each class.
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the plot.
     """
 
     def __init__(
@@ -370,25 +461,59 @@ class PredictPlot(_InfoPlot):
         endpoint=True,
     ):
         """
+        Initialize a `PredictPlot` instance.
+
         Parameters
         ----------
         df : pd.DataFrame
-            Input data frame at least containing the feature and target columns.
-        feature : :ref:`param-feature`
-        feature_name : :ref:`param-feature_name`
-        model : :ref:`param-model`
-        model_features : :ref:`param-model_features`
-        pred_func : :ref:`param-pred_func`
-        n_classes : :ref:`param-n_classes`
-        predict_kwds : :ref:`param-predict_kwds`
-        chunk_size : :ref:`param-chunk_size`
-        cust_grid_points : :ref:`param-cust_grid_points`
-        grid_type : :ref:`param-grid_type`
-        num_grid_points : :ref:`param-num_grid_points`
-        percentile_range : :ref:`param-percentile_range`
-        grid_range : :ref:`param-grid_range`
-        show_outliers : :ref:`param-show_outliers`
-        endpoint : :ref:`param-endpoint`
+            A DataFrame that at least contains columns specified by `model_features`.
+        feature : str or list of str
+            The column name(s) of the chosen feature. It is a list of str when the
+            chosen feature is one-hot encoded.
+        feature_name : str
+            A custom name for the chosen feature.
+        model : object
+            A trained model object. The model should have a `predict` or
+            `predict_proba` method. Otherwise a custom prediction function should be
+            provided through `pred_func`.
+        model_features : list of str
+            A list of features used in model prediction.
+        pred_func : callable, optional
+            A custom prediction function. If not provided, `predict` or `predict_proba`
+            method of `model` is used to generate the predictions. Default is None.
+        n_classes : int, optional
+            Number of classes. If it is None, will infer from `model.n_classes_`.
+            Please set it as 0 for regression. Default is None.
+        predict_kwds : dict, optional
+            Additional keyword arguments to pass to the `model`'s predict function.
+            Default is {}.
+        chunk_size : int, optional
+            The number of samples to predict at each iteration. -1 means all samples at
+            once. Default is -1.
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        grid_type : {'percentile', 'equal'}, optional
+            The grid type. Only applicable for numeric feature. Default is percentile.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        percentile_range : tuple, optional
+            A tuple of two values indicating the range of percentiles to use. Only
+            applicable for numeric feature and when `grid_type` is 'percentile'. If it
+            is None, will use all samples. Default is None.
+        grid_range : tuple, optional
+            A tuple of two values indicating the range of grid values to use. Only
+            applicable for numeric feature. If it is None, will use all samples.
+            Default is None.
+        show_outliers : bool or list of bool, optional
+            Whether to show outliers in the plot. Only applicable for numeric feature.
+            For interact plot, it can also be a list of two booleans, indicating
+            whether to show outliers for each feature. Default is False.
+        endpoint : bool, optional
+            Whether to include the endpoint of the range. Default is True.
         """
         super().__init__(
             df,
@@ -471,12 +596,26 @@ class _InteractInfoPlot(_BaseInfoPlot):
 
     def agg_target(self):
         """
-        Aggregate the target variable based on the interaction of two features.
+        Aggregates the target or prediction variable according to the chosen plot
+        type.
 
-        This function creates a DataFrame that contains the mean value of the target variable
-        (for each unique pair of feature values) if the plot type is "interact_target". Otherwise, 
-        it calculates the median value of the target variable. It also counts the number of instances
-        for each unique pair of feature values. The result is stored in `self.summary_df` and `self.plot_df`.
+        This method creates a DataFrame that contains aggregate measures of the target
+        variable across different feature buckets (distinct 'x1' and 'x2'
+        combinations). The aggregation strategy depends on the selected plot type:
+
+        - If the plot type is "interact_target", the target variable is aggregated by
+        calculating the mean for each unique pair of feature values ('x1' and 'x2').
+        - If the plot type is not "interact_target", the prediction variable is
+        aggregated by calculating the median for each unique pair of feature values
+        ('x1' and 'x2').
+
+        It also determines the count of instances for each unique pair of feature
+        values. The resulting DataFrame is saved in `self.summary_df`, while
+        `self.plot_df` stores the aggregated results for each unique pair of feature
+        values.
+
+        This method also updates feature values in `self.summary_df` with their
+        corresponding display and percentile values from the `FeatureInfo` objects.
         """
         self.df["count"] = 1
         target_agg_func = "mean" if self.plot_type == "interact_target" else _q2
@@ -521,24 +660,44 @@ class _InteractInfoPlot(_BaseInfoPlot):
 
         Parameters
         ----------
-        which_classes : :ref:`param-which_classes`
-        show_percentile : :ref:`param-show_percentile`
-        figsize : :ref:`param-figsize`
-        dpi : :ref:`param-dpi`
-        ncols : :ref:`param-ncols`
-        annotate : :ref:`param-annotate`
-        plot_params : :ref:`param-plot_params`
-        engine : :ref:`param-engine`
-        template : :ref:`param-template`
+        which_classes : list of int, optional
+            List of class indices to plot. If None, all classes will be plotted.
+            Default is None.
+        show_percentile : bool, optional
+            If True, percentiles are shown in the plot. Default is False.
+        figsize : tuple or None, optional
+            The figure size for matplotlib or plotly figure. If None, the default
+            figure size is used. Default is None.
+        dpi : int, optional
+            The resolution of the plot, measured in dots per inch. Only applicable when
+            `engine` is 'matplotlib'. Default is 300.
+        ncols : int, optional
+            The number of columns of subplots in the figure. Default is 2.
+        annotate : bool, optional
+            If it is True, the circles on the plot will be annotated with detailed
+            information. Default is False.
+        plot_params : dict or None, optional
+            Custom plot parameters that control the style and aesthetics of the plot.
+            Default is None.
+        engine : {'matplotlib', 'plotly'}, optional
+            The plotting engine to use. Default is plotly.
+        template : str, optional
+            The template to use for plotly plots. Only applicable when `engine` is
+            'plotly'. Reference: https://plotly.com/python/templates/ Default is
+            plotly_white.
 
         Returns
         -------
-        object :
-            plotly or matplotlib figure object
-        matplotlib axes object or None :
-            None when `engine` is `"plotly"`
-        pandas.DataFrame :
-            summary_df
+        matplotlib.figure.Figure or plotly.graph_objects.Figure
+            A Matplotlib or Plotly figure object depending on the plot engine being
+            used.
+        dict of matplotlib.axes.Axes or None
+            A dictionary of Matplotlib axes objects. The keys are the names of the
+            axes. The values are the axes objects. If `engine` is 'ploltly', it is
+            None.
+        pd.DataFrame
+            A DataFrame that contains the summary statistics of target (for target
+            plot) or predict (for predict plot) values for each feature bucket.
         """
         return self._plot(
             which_classes,
@@ -553,23 +712,40 @@ class _InteractInfoPlot(_BaseInfoPlot):
         )
 
 
-class InterectTargetPlot(_InteractInfoPlot):
+class InteractTargetPlot(_InteractInfoPlot):
     """
-    Class for visualizing the relationship between two features and their aggregated target values in an interactive 2D plot.
+    `TargetPlot` for interaction between two features.
 
     Attributes
     ----------
-    df
-    target
-    plot_type : str
-        The type of the plot to be generated. For this class, it's `'interact_target'`.
-    plot_engines : :ref:`param-plot_engines`
-    feature_infos : :ref:`param-feature_infos`
+    df : pd.DataFrame
+        A processed DataFrame that includes feature and target (for target plot) or
+        predict (for predict plot) columns, feature buckets, along with the count
+        of samples within each bucket.
+    feature_infos : list of :class:`FeatureInfo`
+        A list of `FeatureInfo` objects.
     feature_cols : list of str
-        List of feature column names.
-    n_classes : only applicable for `InteractPredictPlot`
-    summary_df : :ref:`param-summary_df`
-    plot_df : :ref:`param-plot_df`
+        List of feature columns.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    n_classes : int
+        The number of classes inferred from the target columns.
+    plot_type : str
+        The type of the plot to be generated.
+    plot_engines : dict
+        A dictionary that maps plot types to their plotting engines.
+    summary_df : pd.DataFrame
+        A DataFrame that contains the summary statistics of target (for target
+        plot) or predict (for predict plot) values for each feature bucket.
+    plot_df : pd.DataFrame
+        A DataFrame that contains the aggregated target (for target plot) or
+        predict (for predict plot) values for each unique pair of feature values.
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the plot.
     """
 
     def __init__(
@@ -587,21 +763,44 @@ class InterectTargetPlot(_InteractInfoPlot):
         endpoints=True,
     ):
         """
+        Initialize an `InteractTargetPlot` instance.
+
         Parameters
         ----------
         df : pd.DataFrame
-            The input DataFrame.
-        features : :ref:`param-features`
-        feature_names : :ref:`param-feature_names`
+            A DataFrame that at least contains the feature(s) and target columns.
+        features : list
+            List of column name(s) for the 2 chosen features. The length of the list
+            should be strictly 2.
+        feature_names : list
+            List of custom names for the 2 chosen features. The length of the list
+            should be strictly 2.
         target : str or list of str
-            The target column(s) used for the y-axis in the plot.
-        num_grid_points : :ref:`param-num_grid_points`
-        grid_types : :ref:`param-grid_types`
-        percentile_ranges : :ref:`param-percentile_ranges`
-        grid_ranges : :ref:`param-grid_ranges`
-        cust_grid_points : :ref:`param-cust_grid_points`
-        show_outliers : :ref:`param-show_outliers`
-        endpoint : :ref:`param-endpoint`
+            The target column or columns (when it is multi-class).
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        grid_types : str or list of str, optional
+            Same as `grid_type`, but could be a list of two strings, indicating the
+            grid type for each feature. Default is percentile.
+        percentile_ranges : tuple or a list of tuples, optional
+            Same as `percentile_range`, but could be a list of two tuples, indicating
+            the percentile range for each feature. Default is None.
+        grid_ranges : tuple or list of tuples, optional
+            Same as `grid_range`, but could be a list of two tuples, indicating the
+            grid range for each feature. Default is None.
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        show_outliers : bool or list of bool, optional
+            Whether to show outliers in the plot. Only applicable for numeric feature.
+            For interact plot, it can also be a list of two booleans, indicating
+            whether to show outliers for each feature. Default is False.
+        endpoints : bool or list of bool, optional
+            Same as `endpoint`, but could be a list of two booleans, indicating whether
+            to include the endpoint for each feature. Default is True.
         """
         super().__init__(
             df,
@@ -619,23 +818,41 @@ class InterectTargetPlot(_InteractInfoPlot):
         )
 
 
-class InterectPredictPlot(_InteractInfoPlot):
+class InteractPredictPlot(_InteractInfoPlot):
     """
-    Class for visualizing the relationship between two features and their aggregated predictions from a model in an interactive 2D plot.
+    `PredictPlot` for interaction between two features.
 
     Attributes
     ----------
-    df
-    target : only applicable for `InteractTargetPlot`
-    plot_type : str
-        The type of the plot to be generated. For this class, it's `'interact_predict'`.
-    plot_engines : :ref:`param-plot_engines`
-    feature_infos : :ref:`param-feature_infos`
+    df : pd.DataFrame
+        A processed DataFrame that includes feature and target (for target plot) or
+        predict (for predict plot) columns, feature buckets, along with the count
+        of samples within each bucket.
+    feature_infos : list of :class:`FeatureInfo`
+        A list of `FeatureInfo` objects.
     feature_cols : list of str
-        List of feature column names.
-    n_classes : only applicable for `InteractPredictPlot`
-    summary_df : :ref:`param-summary_df`
-    plot_df : :ref:`param-plot_df`
+        List of feature columns.
+    target : list of int
+        List of target indices. For binary and regression problems, the list will
+        be just [0]. For multi-class targets, the list is the class indices.
+    n_classes : int
+        The number of classes provided, or inferred from the model when it is not
+        provided.
+    plot_type : str
+        The type of the plot to be generated.
+    plot_engines : dict
+        A dictionary that maps plot types to their plotting engines.
+    summary_df : pd.DataFrame
+        A DataFrame that contains the summary statistics of target (for target
+        plot) or predict (for predict plot) values for each feature bucket.
+    plot_df : pd.DataFrame
+        A DataFrame that contains the aggregated target (for target plot) or
+        predict (for predict plot) values for each unique pair of feature values.
+
+    Methods
+    -------
+    plot(**kwargs) :
+        Generates the plot.
     """
 
     def __init__(
@@ -658,25 +875,60 @@ class InterectPredictPlot(_InteractInfoPlot):
         endpoints=True,
     ):
         """
+        Initialize an `InteractPredictPlot` instance.
+
         Parameters
         ----------
         df : pd.DataFrame
-            The input DataFrame.
-        features : :ref:`param-features`
-        feature_names : :ref:`param-feature_names`
-        model : :ref:`param-model`
-        model_features : :ref:`param-model_features`
-        pred_func : :ref:`param-pred_func`
-        n_classes : :ref:`param-n_classes`
-        predict_kwds : :ref:`param-predict_kwds`
-        chunk_size : :ref:`param-chunk_size`
-        num_grid_points : :ref:`param-num_grid_points`
-        grid_types : :ref:`param-grid_types`
-        percentile_ranges : :ref:`param-percentile_ranges`
-        grid_ranges : :ref:`param-grid_ranges`
-        cust_grid_points : :ref:`param-cust_grid_points`
-        show_outliers : :ref:`param-show_outliers`
-        endpoint : :ref:`param-endpoint`
+            A DataFrame that at least contains columns specified by `model_features`.
+        features : list
+            List of column name(s) for the 2 chosen features. The length of the list
+            should be strictly 2.
+        feature_names : list
+            List of custom names for the 2 chosen features. The length of the list
+            should be strictly 2.
+        model : object
+            A trained model object. The model should have a `predict` or
+            `predict_proba` method. Otherwise a custom prediction function should be
+            provided through `pred_func`.
+        model_features : list of str
+            A list of features used in model prediction.
+        pred_func : callable, optional
+            A custom prediction function. If not provided, `predict` or `predict_proba`
+            method of `model` is used to generate the predictions. Default is None.
+        n_classes : int, optional
+            Number of classes. If it is None, will infer from `model.n_classes_`.
+            Please set it as 0 for regression. Default is None.
+        predict_kwds : dict, optional
+            Additional keyword arguments to pass to the `model`'s predict function.
+            Default is {}.
+        chunk_size : int, optional
+            The number of samples to predict at each iteration. -1 means all samples at
+            once. Default is -1.
+        num_grid_points : int or list of int, optional
+            The number of grid points to use. Only applicable for numeric feature. For
+            interact plot, it can also be a list of two integers, indicating the number
+            of grid points for each feature. Default is 10.
+        grid_types : str or list of str, optional
+            Same as `grid_type`, but could be a list of two strings, indicating the
+            grid type for each feature. Default is percentile.
+        percentile_ranges : tuple or a list of tuples, optional
+            Same as `percentile_range`, but could be a list of two tuples, indicating
+            the percentile range for each feature. Default is None.
+        grid_ranges : tuple or list of tuples, optional
+            Same as `grid_range`, but could be a list of two tuples, indicating the
+            grid range for each feature. Default is None.
+        cust_grid_points : array-like or list of arrays, optional
+            Custom grid points for the feature. For interact plot, it can also be a
+            list of two arrays, indicating the grid points for each feature. Default is
+            None.
+        show_outliers : bool or list of bool, optional
+            Whether to show outliers in the plot. Only applicable for numeric feature.
+            For interact plot, it can also be a list of two booleans, indicating
+            whether to show outliers for each feature. Default is False.
+        endpoints : bool or list of bool, optional
+            Same as `endpoint`, but could be a list of two booleans, indicating whether
+            to include the endpoint for each feature. Default is True.
         """
         super().__init__(
             df,

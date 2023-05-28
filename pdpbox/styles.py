@@ -87,40 +87,7 @@ def _prepare_plot_style(feat_name, num_plots, plot_params, plot_type):
 
 
 class PlotStyle:
-    """
-    A class for managing the basic style of a plot including figure size, tick style, 
-    label style, title style, and subplots.
-
-    Attributes
-    ----------
-    num_bins : int
-        The number of bins for histogram plots.
-    font_family : str
-        The font family used for text elements in the plot.
-    figsize : tuple
-        The size of the figure in inches (width, height).
-    nrows : int
-        The number of rows of subplots.
-    ncols : :ref:`param-ncols`
-    tick : dict
-        Tick style settings for the plot.
-    label : dict
-        Label style settings for the plot.
-    title : dict
-        Title style settings for the plot.
-    dpi : :ref:`param-dpi`
-    engine : :ref:`param-engine`
-    template : :ref:`param-template`
-    show_percentile : :ref:`param-show_percentile`
-    """
-
     def __init__(self, num_plots, plot_params):
-        """
-        Parameters
-        ----------
-        num_plots : :ref:`param-num_plots`
-        plot_params : :ref:`param-plot_params`
-        """
         self.plot_params = plot_params or {}
 
         self.set_default_attributes()
@@ -317,33 +284,66 @@ class PlotStyle:
 
 class InfoPlotStyle(PlotStyle):
     """
-    A class for managing the style of an information plot, inheriting from the `PlotStyle` class.
+    Manges the style of an information plot, including `TargetPlot` and `PredictPlot`.
 
     Attributes
     ----------
+    plot_params : dict or None
+        Custom plot parameters that control the style and aesthetics of the plot.
+    dpi : int
+        The resolution of the plot, measured in dots per inch. Only applicable when
+        `engine` is 'matplotlib'.
+    engine : {'matplotlib', 'plotly'}
+        The plotting engine to use.
+    template : str
+        The template to use for plotly plots. Only applicable when `engine` is
+        'plotly'. Reference: https://plotly.com/python/templates/
+    show_percentile : bool
+        If True, percentiles are shown in the plot.
+    num_bins : int
+        The number of feature bins. For binary and one-hot encoded features, it is
+        the same as number of grids. For numeric features, it is the number of
+        grids minus 1.
+    font_family : str
+        The font family to use for the plot.
+    figsize : tuple or None
+        The figure size for matplotlib or plotly figure. If None, the default
+        figure size is used.
+    nrows : int
+        The number of rows of subplots in the figure.
+    ncols : int
+        The number of columns of subplots in the figure.
+    tick : dict
+        The tick style. Configurable through `plot_params['tick']`.
+    label : dict
+        The label style. Configurable through `plot_params['label']`.
+    title : dict
+        The title style. You can config three types of titles: 'title', 'subtitle',
+        'subplot_title'. Configurable through `plot_params['title']`.
+    plot_type : str
+        The type of the plot to be generated.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
     line : dict
-        Line style settings for the plot.
+        The style config for the line plot. Configurable through
+        `plot_params['line']`.
     bar : dict
-        Bar style settings for the plot.
+        The style config for the bar plot. Configurable through
+        `plot_params['bar']`.
     box : dict
-        Box style settings for the plot.
-    plot_type_to_title : :ref:`param-plot_type_to_title`
-    subplot_ratio : :ref:`param-subplot_ratio`
-    gaps : :ref:`param-gaps`
-    plot_sizes : :ref:`param-plot_sizes`
+        The style config for the box plot. Only applicable for `PredictPlot`.
+        Configurable through `plot_params['box']`.
+    subplot_ratio : dict
+        The ratio for the subplots. Configurable through
+        `plot_params['subplot_ratio']`.
+    gaps : dict
+        The gaps between subplots, as well as the inner gaps for each subplot.
+        Configurable through `plot_params['gaps']`.
+    plot_sizes : dict
+        The calculated plot sizes.
     """
 
     def __init__(self, feat_name, num_plots, plot_params, plot_type="target"):
-        """
-        Parameters
-        ----------
-        feat_name : str
-            The name of the feature for the plot.
-        num_plots : :ref:`param-num_plots`
-        plot_params : :ref:`param-plot_params`
-        plot_type : str, optional
-            The type of plot, either `"target"` or `"predict"`, by default `"target"`.
-        """
         super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
@@ -472,33 +472,66 @@ class InfoPlotStyle(PlotStyle):
 
 class InteractInfoPlotStyle(PlotStyle):
     """
-    A class for managing the style of an interactive information plot, inheriting from the `PlotStyle` class.
+    Manages the style of an interactive information plot, including `InteractTargetPlot` and `InteractPredictPlot`.
 
     Attributes
     ----------
+    plot_params : dict or None
+        Custom plot parameters that control the style and aesthetics of the plot.
+    dpi : int
+        The resolution of the plot, measured in dots per inch. Only applicable when
+        `engine` is 'matplotlib'.
+    engine : {'matplotlib', 'plotly'}
+        The plotting engine to use.
+    template : str
+        The template to use for plotly plots. Only applicable when `engine` is
+        'plotly'. Reference: https://plotly.com/python/templates/
+    show_percentile : bool
+        If True, percentiles are shown in the plot.
+    num_bins : int
+        The number of feature bins. For binary and one-hot encoded features, it is
+        the same as number of grids. For numeric features, it is the number of
+        grids minus 1.
+    font_family : str
+        The font family to use for the plot.
+    figsize : tuple or None
+        The figure size for matplotlib or plotly figure. If None, the default
+        figure size is used.
+    nrows : int
+        The number of rows of subplots in the figure.
+    ncols : int
+        The number of columns of subplots in the figure.
+    tick : dict
+        The tick style. Configurable through `plot_params['tick']`.
+    label : dict
+        The label style. Configurable through `plot_params['label']`.
+    title : dict
+        The title style. You can config three types of titles: 'title', 'subtitle',
+        'subplot_title'. Configurable through `plot_params['title']`.
+    plot_type : str
+        The type of the plot to be generated.
     annotate : bool
-        Flag indicating whether to annotate the plot.
+        If it is True, the circles on the plot will be annotated with detailed
+        information.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
     marker : dict
-        Marker style settings for the plot.
+        The style config for the scatter plot marker. Configurable through
+        `plot_params['marker']`.
     legend : dict
-        Legend style settings for the plot.
-    plot_type_to_title : :ref:`param-plot_type_to_title`
-    subplot_ratio : :ref:`param-subplot_ratio`
-    gaps : :ref:`param-gaps`
-    plot_sizes : :ref:`param-plot_sizes`
+        The style config for the legend, including color bar and marker.
+        Configurable through `plot_params['legend']`.
+    subplot_ratio : dict
+        The ratio for the subplots. Configurable through
+        `plot_params['subplot_ratio']`.
+    gaps : dict
+        The gaps between subplots, as well as the inner gaps for each subplot.
+        Configurable through `plot_params['gaps']`.
+    plot_sizes : dict
+        The calculated plot sizes.
     """
 
     def __init__(self, feat_names, num_plots, plot_params, plot_type="interact_target"):
-        """
-        Parameters
-        ----------
-        feat_names : list
-            The names of the features for the plot.
-        num_plots : :ref:`param-num_plots`
-        plot_params : :ref:`param-plot_params`
-        plot_type : str, optional
-            The type of plot, either `"interact_target"` or `"interact_predict"`, by default `"interact_target"`.
-        """
         super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
         self.annotate = self.plot_params["annotate"]
@@ -623,49 +656,82 @@ class InteractInfoPlotStyle(PlotStyle):
 
 class PDPIsolatePlotStyle(PlotStyle):
     """
-    A class for managing the style of a `PDPIsolatePlot`, inheriting from the `PlotStyle` class.
+    Manages the style of the `PDPIsolate` plot.
 
     Attributes
     ----------
+    plot_params : dict or None
+        Custom plot parameters that control the style and aesthetics of the plot.
+    dpi : int
+        The resolution of the plot, measured in dots per inch. Only applicable when
+        `engine` is 'matplotlib'.
+    engine : {'matplotlib', 'plotly'}
+        The plotting engine to use.
+    template : str
+        The template to use for plotly plots. Only applicable when `engine` is
+        'plotly'. Reference: https://plotly.com/python/templates/
+    show_percentile : bool
+        If True, percentiles are shown in the plot.
+    num_bins : int
+        The number of feature bins. For binary and one-hot encoded features, it is
+        the same as number of grids. For numeric features, it is the number of
+        grids minus 1.
+    font_family : str
+        The font family to use for the plot.
+    figsize : tuple or None
+        The figure size for matplotlib or plotly figure. If None, the default
+        figure size is used.
+    nrows : int
+        The number of rows of subplots in the figure.
+    ncols : int
+        The number of columns of subplots in the figure.
+    tick : dict
+        The tick style. Configurable through `plot_params['tick']`.
+    label : dict
+        The label style. Configurable through `plot_params['label']`.
+    title : dict
+        The title style. You can config three types of titles: 'title', 'subtitle',
+        'subplot_title'. Configurable through `plot_params['title']`.
     plot_type : str
-        The type of plot.
+        The type of the plot to be generated.
     plot_lines : bool
-        Whether or not to plot individual lines.
-    frac_to_plot : float
-        Fraction of lines to plot.
+        If True, ICE lines will be plotted.
+    frac_to_plot : int or float
+        Fraction of ICE lines to plot.
     center : bool
-        Whether to center the plot.
-    clustering : bool
-        Whether to use clustering to plot the lines.
+        If True, the PDP will be centered by deducting the values of `grids[0]`.
+    clustering : dict
+        The clustering config.
     plot_pts_dist : bool
-        Whether or not to plot the distribution of points.
+        If True, distribution of points will be plotted.
     to_bins : bool
-        Whether or not to discretize continuous variables.
+        If True, the axis will be converted to bins. Only applicable for numeric
+        feature.
     std_fill : bool
-        Whether or not to fill the standard deviation.
+        If it is True, std of pdp will be colored. Configurable through
+        `plot_params['std_fill']`.
     pdp_hl : bool
-        Whether or not to highlight the pdp curve.
+        If it is True, pdp will be highlighted. Configurable through
+        `plot_params['pdp_hl']`.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
     line : dict
-        Line style settings for the plot.
+        The style config for the line plot. Configurable through
+        `plot_params['line']`.
     dist : dict
-        Distribution style settings for the plot.
-    plot_type_to_title : :ref:`param-plot_type_to_title`
-    subplot_ratio : :ref:`param-subplot_ratio`
-    gaps : :ref:`param-gaps`
-    plot_sizes : :ref:`param-plot_sizes`
+        The style config for the distribution plot. Configurable through
+        `plot_params['dist']`.
+    subplot_ratio : dict
+        The ratio for the subplots. Configurable through
+        `plot_params['subplot_ratio']`.
+    gaps : dict
+        The gaps between subplots, as well as the inner gaps for each subplot.
+        Configurable through `plot_params['gaps']`.
+    plot_sizes : dict
+        The calculated plot sizes.
     """
 
     def __init__(self, feat_name, num_plots, plot_params, plot_type):
-        """
-        Parameters
-        ----------
-        feat_name : str
-            The name of the feature for the plot.
-        num_plots : :ref:`param-num_plots`
-        plot_params : :ref:`param-plot_params`
-        plot_type : str, optional
-            The type of plot.
-        """
         super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
@@ -799,37 +865,68 @@ class PDPIsolatePlotStyle(PlotStyle):
 
 class PDPInteractPlotStyle(PlotStyle):
     """
-    A class for managing the style of a PDPInteractPlot, inheriting from the PlotStyle class.
+    Manages the style of the `PDPInteract` plot.
 
     Attributes
     ----------
+    plot_params : dict or None
+        Custom plot parameters that control the style and aesthetics of the plot.
+    dpi : int
+        The resolution of the plot, measured in dots per inch. Only applicable when
+        `engine` is 'matplotlib'.
+    engine : {'matplotlib', 'plotly'}
+        The plotting engine to use.
+    template : str
+        The template to use for plotly plots. Only applicable when `engine` is
+        'plotly'. Reference: https://plotly.com/python/templates/
+    show_percentile : bool
+        If True, percentiles are shown in the plot.
+    num_bins : int
+        The number of feature bins. For binary and one-hot encoded features, it is
+        the same as number of grids. For numeric features, it is the number of
+        grids minus 1.
+    font_family : str
+        The font family to use for the plot.
+    figsize : tuple or None
+        The figure size for matplotlib or plotly figure. If None, the default
+        figure size is used.
+    nrows : int
+        The number of rows of subplots in the figure.
+    ncols : int
+        The number of columns of subplots in the figure.
+    tick : dict
+        The tick style. Configurable through `plot_params['tick']`.
+    label : dict
+        The label style. Configurable through `plot_params['label']`.
+    title : dict
+        The title style. You can config three types of titles: 'title', 'subtitle',
+        'subplot_title'. Configurable through `plot_params['title']`.
     plot_type : str
-        The type of plot.
+        The type of the plot to be generated.
     plot_pdp : bool
-        Whether or not to include the pdp isolate plot for each feature.
+        If it is True, pdp for each feature will be plotted.
     to_bins : bool
-        Whether or not to discretize continuous variables.
+        If True, the axis will be converted to bins. Only applicable for numeric
+        feature.
+    plot_type_to_title : dict
+        Dictionary containing title and subtitle text for each plot type.
     interact : dict
-        Style settings for the interactive plot.
+        The style config for the interaction pdp. Configurable through
+        `plot_params['interact']`.
     isolate : dict
-        Style settings for the isolated plots.
-    plot_type_to_title : :ref:`param-plot_type_to_title`
-    subplot_ratio : :ref:`param-subplot_ratio`
-    gaps : :ref:`param-gaps`
-    plot_sizes : :ref:`param-plot_sizes`
+        The style config for the isolation pdp. Configurable through
+        `plot_params['isolate']`.
+    subplot_ratio : dict
+        The ratio for the subplots. Configurable through
+        `plot_params['subplot_ratio']`.
+    gaps : dict
+        The gaps between subplots, as well as the inner gaps for each subplot.
+        Configurable through `plot_params['gaps']`.
+    plot_sizes : dict
+        The calculated plot sizes.
     """
 
     def __init__(self, feat_names, num_plots, plot_params, plot_type):
-        """
-        Parameters
-        ----------
-        feat_names : list
-            The names of the features for the plot.
-        num_plots : :ref:`param-num_plots`
-        plot_params : :ref:`param-plot_params`
-        plot_type : str, optional
-            The type of plot.
-        """
         super().__init__(num_plots, plot_params)
         self.plot_type = plot_type
 
@@ -972,20 +1069,22 @@ class PDPInteractPlotStyle(PlotStyle):
 
 def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
     """
-    Modify axes settings according to the provided plot_style object.
+    Modify axes settings.
 
     Parameters
     ----------
     axes : matplotlib.axes.Axes
         The axes object to modify.
-    plot_style : PlotStyle
-        The plot style object containing the style settings for the axes.
-    top : bool, optional, default=False
-        Whether to set the x-axis ticks position at the top of the plot.
-    right : bool, optional, default=False
-        Whether to set the y-axis ticks position at the right side of the plot.
-    grid : bool, optional, default=True
-        Whether to display the grid on the plot.
+    plot_style : :class:`InfoPlotStyle`
+        An instance of the `InfoPlotStyle` class.
+    top : bool, optional
+        If True, set the target x-axis ticks position at the top of the plot.
+        Default is False.
+    right : bool, optional
+        If True, set the target y-axis ticks position at the right side of the
+        plot. Default is False.
+    grid : bool, optional
+        If True, display the grid on the plot. Default is True.
     """
     axes.set_facecolor("white")
     axes.tick_params(**plot_style.tick)
@@ -1001,14 +1100,14 @@ def _axes_modify(axes, plot_style, top=False, right=False, grid=True):
 
 def _modify_legend_axes(axes, font_family):
     """
-    Modify the legend axes settings according to the provided font family.
+    Modify the legend axes settings.
 
     Parameters
     ----------
     axes : matplotlib.axes.Axes
         The axes object to modify.
     font_family : str
-        The font family to apply to the tick labels.
+        The font family to use for the plot.
     """
     axes.set_frame_on(False)
 
@@ -1031,22 +1130,22 @@ def _display_percentile(
     Parameters
     ----------
     axes : matplotlib.axes.Axes
-        The axes object on which to display the percentile values.
+        The axes object to modify.
     label : str
-        The label for the percentile axis.
-    percentile_columns : array-like
-        The percentile values to be displayed on the axis.
-    plot_style : PlotStyle instance
-        An instance of the PlotStyle class containing the styling information.
-    is_y : bool, optional, default: False
-        If True, the percentile values will be displayed on the y-axis, 
-        otherwise they will be displayed on the x-axis.
-    right : bool, optional, default: True
-        If True, the percentile values will be displayed on the right side of the y-axis, 
-        otherwise they will be displayed on the left side.
-    top : bool, optional, default: True
-        If True, the percentile values will be displayed on the top side of the x-axis, 
-        otherwise they will be displayed on the bottom side.
+        The axis label.
+    percentile_columns : list of str
+        percentile_columns from :class:`FeatureInfo`
+    plot_style : :class:`InfoPlotStyle`
+        An instance of the `InfoPlotStyle` class.
+    is_y : bool, optional
+        If True, the percentile values will be displayed on the y-axis, otherwise
+        they will be displayed on the x-axis. Default is False.
+    right : bool, optional
+        If True, set the target y-axis ticks position at the right side of the
+        plot. Default is True.
+    top : bool, optional
+        If True, set the target x-axis ticks position at the top of the plot.
+        Default is True.
     """
     label = _get_bold_text(label, plot_style.engine)
     if is_y:
