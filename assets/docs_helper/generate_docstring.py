@@ -24,8 +24,15 @@ from collections import defaultdict
 NO_DEFAULT = "<No Default>"
 MAX_WIDTH = 79
 INDENT = " " * 4
+
+# <_InfoPlot.plot-DOC_FUNC>
+# <_InfoPlot.plot-DOC_RETURN>
 DOC_FUNC = "-DOC_FUNC>"
 DOC_RETURN = "-DOC_RETURN>"
+
+# <TargetPlot-DOC_ATTR>
+# ... list of attributes ...
+# <TargetPlot-DOC_ATTR>
 DOC_ATTR = "-DOC_ATTR>"
 
 
@@ -146,10 +153,13 @@ def generate_returns_docstring(func_name, doc_items):
 def extract_params(func):
     """Extracts parameters and their default values from a function."""
     params = [arg.arg for arg in func.args.args if arg.arg != "self"]
-    default_values = [
-        NO_DEFAULT if i < len(func.args.defaults) else ast.literal_eval(node)
-        for i, node in enumerate(func.args.defaults)
-    ]
+    default_values = [NO_DEFAULT] * len(params)
+
+    if func.args.defaults:
+        default_values[-len(func.args.defaults) :] = [
+            ast.literal_eval(node) for node in func.args.defaults
+        ]
+
     return dict(zip(params, default_values))
 
 
