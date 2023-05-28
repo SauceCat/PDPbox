@@ -1,56 +1,47 @@
 PDPbox
 ======
 
-python partial dependence plot toolbox
+Python <b>P</b>artial <b>D</b>ependence <b>P</b>lot tool<b>box</b>. 
 
 Motivation
 ----------
 
-This repository is inspired by ICEbox. The goal is to visualize the impact of certain
-features towards model prediction for any supervised learning algorithm using partial dependence
-plots [R1]_ [R2]_. PDPbox now supports all scikit-learn algorithms.
+PDPbox is inspired by `ICEbox <https://cran.r-project.org/web/packages/ICEbox/index.html>`_.
+The goal is to visualize the influence of certain features on model predictions for supervised machine learning algorithms, 
+utilizing partial dependence plots.
+
+While PDPbox is initially designed to be compatible with all scikit-learn models, 
+it is important to understand that different models may have different prediction interfaces. 
+Standard scikit-learn models typically provide `model.predict` or `model.predict_proba` methods for prediction generation.
+Therefore, if your model is a standard scikit-learn model, PDPbox will automatically detect the prediction interface and generate predictions accordingly.
+
+For other models, the prediction interface may vary. 
+Thus, PDPbox provides the ability to incorporate a customized prediction function via the `pred_func` parameter in PDPbox methods, 
+ensuring broad applicability across various models.
+
+For a more detailed understanding of the prediction generation process, please refer to the following functions:
+
+- `pdpbox.utils._check_model` 
+- `pdpbox.utils._calc_preds_each` 
+- `pdpbox.utils._calc_preds` 
 
 
 The common headache
 -------------------
 
-When using black box machine learning algorithms like random forest and boosting, it is hard to
-understand the relations between predictors and model outcome. For example, in terms of random
-forest, all we get is the feature importance. Although we can know which feature is significantly
-influencing the outcome based on the importance calculation, it really sucks that we don’t know
-in which direction it is influencing. And in most of the real cases, the effect is non-monotonic.
-We need some powerful tools to help understanding the complex relations between predictors and
-model prediction.
+When employing "black box" machine learning algorithms such as random forest and boosting, 
+deciphering the relationships between predictors and the model outcome can pose a significant challenge. 
+While these algorithms provide insights in the form of feature importance, 
+it only offers a partial view - telling us which features are impactful, 
+but leaving us in the dark about the direction and complexity of their influence.
 
+For instance, a random forest algorithm will tell us that a particular feature is important, 
+but it does not tell us whether increasing or decreasing that feature value would result in an increase or decrease in the predicted outcome. 
+Moreover, in real-world scenarios, the effects are typically non-monotonic, making the relationships even more intricate.
 
-Highlight
----------
+To tackle this, we need powerful tools capable of illuminating these complex relationships between predictors and model predictions, 
+giving us a better understanding of how our model is making its decisions.
 
-1. Helper functions for visualizing target distribution as well as prediction distribution.
-2. Proper way to handle one-hot encoding features.
-3. Solution for handling complex mutual dependency among features.
-4. Support multi-class classifier.
-5. Support two variable interaction partial dependence plot.
-
-
-Documentation
--------------
-
-- Latest version: http://pdpbox.readthedocs.io/en/latest/
-
-
-Installation
-------------
-
-- through pip::
-
-  $ pip install pdpbox
-
-- through git::
-
-  $ git clone https://github.com/SauceCat/PDPbox.git
-  $ cd PDPbox
-  $ python setup.py install
 
 .. _home-docs:
 

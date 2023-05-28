@@ -3,68 +3,32 @@
 [![PyPI version](https://badge.fury.io/py/PDPbox.svg)](https://badge.fury.io/py/PDPbox)
 [![Build Status](https://travis-ci.com/SauceCat/PDPbox.svg?branch=master)](https://travis-ci.com/SauceCat/PDPbox)
 
-python partial dependence plot toolbox
+Python <b>P</b>artial <b>D</b>ependence <b>P</b>lot tool<b>box</b>. 
 
+Visualize the influence of certain features on model predictions for supervised machine learning algorithms, 
+utilizing partial dependence plots.
 
 ## I am back! :smirk_cat:
-After four years... 
 
-It seems PDPbox has become quite popular, which is beyond my expectation. 
-Honestly, when I developed this package four years ago, I just treated it as a small side project that 
-would give me a quick taste of real-world python package development. 
+After four years...
 
-Also, I personally switched to deep learning related field since 2018 and thus ceased the development 
-as well as maintenance. Well, during these years, I started to see it appeared in some online courses and books. 
-I think I should take on some responsibilities by reviewing my codes, adding new features if necessary and creating more tutorials.
+I'm delighted to see how popular PDPbox has become; it has exceeded all my expectations. 
+When I first embarked on this project, it was a modest endeavor, 
+simply to whet my appetite for real-world Python package development.
 
-Update for versions:
-```
-xgboost==1.3.3
-matplotlib==3.1.1
-sklearn==0.23.1
-```
+With the shift in my career path towards deep learning in 2018, I had to halt the development and maintenance of PDPbox. 
+As I no longer actively used it and several other outstanding packages such as 
+[lime](https://github.com/marcotcr/lime) and [shap](https://github.com/slundberg/shap) were emerging.
 
+However, as the years have passed, I have seen PDPbox gain a significant presence in the community. 
+It's been referenced in various online courses and books, demonstrating its valuable role. 
+Despite well-known limitations of partial dependence plots, 
+their simplicity and intuitiveness might have made them a popular starting point for many, 
+appealing to a broad range of audiences.
 
-## Motivation
-
-This repository is inspired by ICEbox. The goal is to visualize the impact of certain features towards model
-prediction for any supervised learning algorithm. (now support all scikit-learn algorithms)
-
-
-## The common headache
-
-When using black box machine learning algorithms like random forest and boosting, it is hard to understand the
-relations between predictors and model outcome.
-
-For example, in terms of random forest, all we get is the feature importance.
-Although we can know which feature is significantly influencing the outcome based on the importance
-calculation, it really sucks that we don’t know in which direction it is influencing. And in most of the real cases,
-the effect is non-monotonic.
-
-We need some powerful tools to help understanding the complex relations
-between predictors and model prediction.
-
-
-## Highlight
-
-1. Helper functions for visualizing target distribution as well as prediction distribution.
-2. Proper way to handle one-hot encoding features.
-3. Solution for handling complex mutual dependency among features.
-4. Support multi-class classifier.
-5. Support two variable interaction partial dependence plot.
-
-
-## Documentation
-
-- Latest version: http://pdpbox.readthedocs.io/en/latest/
-- Historical versions:
-  - [v0.1.0](https://github.com/SauceCat/PDPbox/blob/master/docs_history/v0.1/docs.md)
-  
-## Tutorials
-https://github.com/SauceCat/PDPbox/tree/master/tutorials
-
-## Change Logs
-https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
+Given this, I feel a renewed sense of responsibility to revisit the project, refine the existing code, 
+potentially add new features, and create additional tutorials. 
+I'm excited about this next phase and look forward to contributing more to the open source community.
 
 ## Installation
 
@@ -80,8 +44,22 @@ https://github.com/SauceCat/PDPbox/blob/master/CHANGELOG.md
   $ python setup.py install
   ```
 
-## Testing
+## Reference
 
+- Documentation: http://pdpbox.readthedocs.io/en/latest/
+- Tutorials: tutorials
+- Change Log: CHANGELOG.md
+
+
+## Testing
+### Test with `pytest`
+
+```
+cd <dir>/PDPbox
+python -m pytest tests
+```
+
+### Test with `tox`
 PDPbox can be tested using `tox`.
 
 - First install `tox` and `tox-venv`
@@ -99,25 +77,47 @@ PDPbox can be tested using `tox`.
 
 ## Gallery
 - **PDP:** PDP for a single feature
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_plot.png' width=90%>
+
+    <img src='images/pdp_plot.jpeg' width=90%>
+
+---
 
 - **PDP:** PDP for a multi-class
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_plot_multiclass.png' width=90%>
+
+    <img src='images/pdp_plot_multiclass.jpeg' width=90%>
+
+---
 
 - **PDP Interact:** PDP Interact for two features with contour plot
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_contour.png' width=60%>
+
+    <img src='images/pdp_interact_contour.jpeg' width=90%>
+
+---
 
 - **PDP Interact:** PDP Interact for two features with grid plot
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_grid.png' width=60%>
+
+    <img src='images/pdp_interact_grid.jpeg' width=90%>
+
+---
 
 - **PDP Interact:** PDP Interact for multi-class
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/pdp_interact_multiclass.png' width=90%>
+
+    <img src='images/pdp_interact_multiclass.jpeg' width=90%>
+
+---
 
 - **Information plot:** target plot for a single feature
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/target_plot.png' width=90%>
+
+    <img src='images/target_plot.jpeg' width=90%>
+
+---
 
 - **Information plot:** target interact plot for two features
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/target_plot_interact.png' width=90%>
 
-- **Information plot:** actual prediction plot for a single feature
-    <img src='https://github.com/SauceCat/PDPbox/blob/master/images/actual_plot.png' width=90%>
+    <img src='images/target_plot_interact.jpeg' width=90%>
+
+---
+
+- **Information plot:** prediction plot for a single feature
+
+    <img src='images/predict_plot.jpeg' width=90%>

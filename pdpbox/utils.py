@@ -682,9 +682,12 @@ def _expand_params_for_interact(params):
 
 
 def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
+    """Calculate model predictions for a single chunk of data."""
     if from_model:
         preds = pred_func(X, **predict_kwds)
     else:
+        # if pred_func is provided by user
+        # it should be a function that takes three arguments
         preds = pred_func(model, X, **predict_kwds)
     return preds
 
