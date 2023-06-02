@@ -78,46 +78,46 @@ PDPbox can be tested using `tox`.
 ## Gallery
 - **PDP:** PDP for a single feature
 
-    <img src='images/pdp_plot.jpeg' width=90%>
+    <img src='assets/images/pdp_plot.jpeg' width=90%>
 
 ---
 
 - **PDP:** PDP for a multi-class
 
-    <img src='images/pdp_plot_multiclass.jpeg' width=90%>
+    <img src='assets/images/pdp_plot_multiclass.jpeg' width=90%>
 
 ---
 
 - **PDP Interact:** PDP Interact for two features with contour plot
 
-    <img src='images/pdp_interact_contour.jpeg' width=90%>
+    <img src='assets/images/pdp_interact_contour.jpeg' width=90%>
 
 ---
 
 - **PDP Interact:** PDP Interact for two features with grid plot
 
-    <img src='images/pdp_interact_grid.jpeg' width=90%>
+    <img src='assets/images/pdp_interact_grid.jpeg' width=90%>
 
 ---
 
 - **PDP Interact:** PDP Interact for multi-class
 
-    <img src='images/pdp_interact_multiclass.jpeg' width=90%>
+    <img src='assets/images/pdp_interact_multiclass.jpeg' width=90%>
 
 ---
 
 - **Information plot:** target plot for a single feature
 
-    <img src='images/target_plot.jpeg' width=90%>
+    <img src='assets/images/target_plot.jpeg' width=90%>
 
 ---
 
 - **Information plot:** target interact plot for two features
 
-    <img src='images/target_plot_interact.jpeg' width=90%>
+    <img src='assets/images/target_plot_interact.jpeg' width=90%>
 
 ---
 
 - **Information plot:** prediction plot for a single feature
 
-    <img src='images/predict_plot.jpeg' width=90%>
+    <img src='assets/images/predict_plot.jpeg' width=90%>

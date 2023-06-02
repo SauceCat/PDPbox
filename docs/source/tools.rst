@@ -1,13 +1,14 @@
 Tools
 =====
 
-List down tools used for this project, so we understand what those weird files for.
+For clarity and understanding, here is a list of the tools utilized for this project.
 
 
 Setuptools
 ----------
 
-`Setuptools <https://setuptools.pypa.io/en/latest/index.html>`_ is a fully-featured, actively-maintained, and stable library designed to facilitate packaging Python projects.
+`Setuptools <https://setuptools.pypa.io/en/latest/index.html>`_ is a fully-featured, actively-maintained, 
+and stable library designed to facilitate packaging Python projects.
 
 -  :code:`setup.py`: Setuptools offers first class support for :code:`setup.py` files as a configuration mechanism.
 
@@ -17,6 +18,9 @@ Setuptools
 -  :code:`MANIFEST.in`: Setuptools offers three ways to specify data files to be included in your packages. For the simplest use, 
    you can simply use the :code:`include_package_data` keyword. This tells setuptools to install any data files it finds in your packages. 
    The data files must be specified via the :code:`MANIFEST.in` file or automatically added by a Revision Control System plugin.
+
+-  :code:`requirements.txt`: Specifies the set of dependencies needed for the Python project.
+   It can be created manually, but it is recommended to use `pipreqs <https://github.com/bndr/pipreqs>`_ to generate it automatically.
 
 
 Documentation
@@ -95,8 +99,8 @@ Others
       next to :code:`setup.py` and the :code:`setup.cfg` that configures it.
 
 
-Others
-------
+Git
+---
 
 -  :code:`.gitattributes`: If the attribute :code:`export-subst` is set for a file then Git will expand several placeholders 
    when adding this file to an archive. 
