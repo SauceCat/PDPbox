@@ -11,3 +11,4 @@ setuptools>=63.4.1
 sphinx_rtd_theme>=1.1.1
 tqdm>=4.64.1
 xgboost >= 1.7.1
+numpydoc >= 1.4.0
