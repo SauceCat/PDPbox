@@ -8,6 +8,8 @@ Python <b>P</b>artial <b>D</b>ependence <b>P</b>lot tool<b>box</b>.
 Visualize the influence of certain features on model predictions for supervised machine learning algorithms, 
 utilizing partial dependence plots.
 
+For a comprehensive explanation, I recommend referring to the [Partial Dependence Plot (PDP)](https://christophm.github.io/interpretable-ml-book/pdp.html) chapter in Christoph Molnar's book, [Interpretable Machine Learning](https://christophm.github.io/interpretable-ml-book/). 
+
 ## I am back! :smirk_cat:
 
 After four years...
