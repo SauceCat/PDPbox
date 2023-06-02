@@ -10,8 +10,6 @@ API Reference
    InteractTargetPlot
    PredictPlot
    InteractPredictPlot
-   _InfoPlot
-   _InteractInfoPlot
 
 .. toctree::
    :maxdepth: 2

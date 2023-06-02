@@ -1,7 +1,7 @@
 PDPbox
 ======
 
-Python <b>P</b>artial <b>D</b>ependence <b>P</b>lot tool<b>box</b>. 
+Python Partial Dependence Plot toolbox.
 
 Motivation
 ----------
