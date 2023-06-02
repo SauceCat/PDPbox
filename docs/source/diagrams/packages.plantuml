@@ -1,0 +1,29 @@
+@startuml packages
+set namespaceSeparator none
+package "pdpbox" as pdpbox {
+}
+package "pdpbox._version" as pdpbox._version {
+}
+package "pdpbox.get_example" as pdpbox.get_example {
+}
+package "pdpbox.info_plot_utils" as pdpbox.info_plot_utils {
+}
+package "pdpbox.info_plots" as pdpbox.info_plots {
+}
+package "pdpbox.pdp" as pdpbox.pdp {
+}
+package "pdpbox.pdp_utils" as pdpbox.pdp_utils {
+}
+package "pdpbox.styles" as pdpbox.styles {
+}
+package "pdpbox.utils" as pdpbox.utils {
+}
+pdpbox --> pdpbox._version
+pdpbox.info_plot_utils --> pdpbox.styles
+pdpbox.info_plots --> pdpbox.info_plot_utils
+pdpbox.info_plots --> pdpbox.utils
+pdpbox.pdp --> pdpbox.pdp_utils
+pdpbox.pdp --> pdpbox.utils
+pdpbox.pdp_utils --> pdpbox.styles
+pdpbox.pdp_utils --> pdpbox.utils
+@enduml

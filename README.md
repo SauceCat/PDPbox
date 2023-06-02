@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/PDPbox.svg)](https://badge.fury.io/py/PDPbox)
 [![Build Status](https://travis-ci.com/SauceCat/PDPbox.svg?branch=master)](https://travis-ci.com/SauceCat/PDPbox)
 
-Python <b>P</b>artial <b>D</b>ependence <b>P</b>lot tool<b>box</b>. 
+Python **P**artial **D**ependence **P**lot tool**box**.
 
 Visualize the influence of certain features on model predictions for supervised machine learning algorithms, 
 utilizing partial dependence plots.

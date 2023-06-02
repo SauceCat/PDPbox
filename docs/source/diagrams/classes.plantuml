@@ -1,0 +1,334 @@
+@startuml classes
+set namespaceSeparator none
+class "BaseInfoPlotEngine" as pdpbox.info_plot_utils.BaseInfoPlotEngine {
+  feat_name
+  feat_names
+  feat_type
+  feat_types
+  plot_obj
+  plot_style
+  which_classes
+  plot()
+  plot_matplotlib()
+  plot_plotly()
+  set_subplot_title(title, axes)
+}
+class "FeatureInfo" as pdpbox.utils.FeatureInfo {
+  col_name
+  cust_grid_points : NoneType
+  display_columns : list
+  endpoint : bool
+  grid_range : NoneType
+  grid_type : str
+  grids : ndarray
+  name
+  num_bins : int
+  num_grid_points : int
+  percentile_columns : list
+  percentile_range : NoneType
+  percentiles : NoneType
+  show_outliers : bool
+  type : str
+  prepare(df)
+}
+class "InfoPlotEngine" as pdpbox.info_plot_utils.InfoPlotEngine {
+  display_columns
+  percentile_columns
+  get_axes_label()
+  wrapup(title, bar_axes, line_axes, box_axes)
+  wrapup_plotly(target, fig, bar_grids, box_grids, yrange)
+}
+class "InfoPlotStyle" as pdpbox.styles.InfoPlotStyle {
+  bar : dict
+  box : dict
+  gaps : dict
+  line : dict
+  plot_sizes : dict
+  plot_type : str
+  plot_type_to_title : dict
+  subplot_ratio : dict
+  set_bar_style()
+  set_box_style()
+  set_gaps()
+  set_line_style()
+  set_plot_sizes()
+  set_plot_title(feat_name)
+  set_subplot_ratio()
+  update_plot_domains(fig, nr, nc, grids, title_text)
+  update_styles()
+}
+class "InteractInfoPlotEngine" as pdpbox.info_plot_utils.InteractInfoPlotEngine {
+  cmaps : cycle
+  count_max
+  count_min
+  display_columns
+  feat_names
+  feat_types
+  marker_sizes
+  percentile_columns
+  get_axes_label(i)
+  plot_matplotlib()
+  plot_plotly()
+  prepare_axes(inner_grid)
+  prepare_data(class_idx)
+  prepare_grids(i)
+}
+class "InteractInfoPlotStyle" as pdpbox.styles.InteractInfoPlotStyle {
+  annotate
+  gaps : dict
+  legend : dict
+  marker : dict
+  plot_sizes : dict
+  plot_type : str
+  plot_type_to_title : dict
+  subplot_ratio : dict
+  set_gaps()
+  set_legend_style()
+  set_marker_style()
+  set_plot_sizes()
+  set_plot_title(feat_names)
+  set_subplot_ratio()
+  update_plot_domains(fig, nr, nc, grids, title_text)
+}
+class "InteractPredictPlot" as pdpbox.info_plots.InteractPredictPlot {
+}
+class "InteractTargetPlot" as pdpbox.info_plots.InteractTargetPlot {
+}
+class "<color:red>NotThisMethod</color>" as pdpbox._version.NotThisMethod {
+}
+class "PDPInteract" as pdpbox.pdp.PDPInteract {
+  df
+  feature_grid_combos : ndarray
+  feature_names
+  features
+  model_features
+  n_grids : ndarray
+  pdp_isolate_objs
+  plot_type : str
+  plot(plot_type, plot_pdp, to_bins, show_percentile, which_classes, figsize, dpi, ncols, plot_params, engine, template)
+}
+class "PDPInteractPlotEngine" as pdpbox.pdp_utils.PDPInteractPlotEngine {
+  cmaps : cycle
+  display_columns
+  feat_grids
+  feat_names
+  feat_types
+  grids : list
+  percentile_columns
+  percentiles
+  plot_obj
+  plot_style
+  which_classes
+  get_axes_label(i)
+  plot()
+  plot_matplotlib()
+  plot_plotly()
+  prepare_axes(inner_grid)
+  prepare_data(class_idx)
+  prepare_grids(nc, nr)
+  wrapup(title, xy_axes, x_axes, y_axes)
+  wrapup_plotly(fig, xy_grids, x_grids, y_grids)
+}
+class "PDPInteractPlotStyle" as pdpbox.styles.PDPInteractPlotStyle {
+  gaps : dict
+  interact : dict
+  isolate : dict
+  plot_sizes : dict
+  plot_type
+  plot_type_to_title : dict
+  subplot_ratio : dict
+  set_gaps()
+  set_interact_style()
+  set_isolate_style()
+  set_plot_attributes()
+  set_plot_sizes()
+  set_plot_title(feat_names)
+  set_subplot_ratio()
+  update_plot_domains(fig, nc, nr, grids, title_text)
+}
+class "PDPIsolate" as pdpbox.pdp.PDPIsolate {
+  count_df
+  df
+  dist_df
+  feature_info
+  model_features
+  n_grids
+  plot_type : str
+  plot(center, plot_lines, frac_to_plot, cluster, n_cluster_centers, cluster_method, plot_pts_dist, to_bins, show_percentile, which_classes, figsize, dpi, ncols, plot_params, engine, template)
+}
+class "PDPIsolatePlotEngine" as pdpbox.pdp_utils.PDPIsolatePlotEngine {
+  cmaps : cycle
+  display_columns
+  feat_name
+  feat_type
+  grids : list
+  is_numeric
+  percentile_columns
+  percentiles : list
+  plot_obj
+  plot_style
+  which_classes
+  get_axes_label()
+  plot()
+  plot_matplotlib()
+  plot_plotly()
+  prepare_axes(inner_grid)
+  prepare_data(class_idx)
+  prepare_grids(nc, nr)
+  wrapup(title, line_axes, dist_axes)
+  wrapup_plotly(fig, line_grids, dist_grids)
+}
+class "PDPIsolatePlotStyle" as pdpbox.styles.PDPIsolatePlotStyle {
+  dist : dict
+  gaps : dict
+  line : dict
+  pdp_hl
+  plot_sizes : dict
+  plot_type
+  plot_type_to_title : dict
+  std_fill : bool
+  subplot_ratio : dict
+  set_dist_style()
+  set_gaps()
+  set_line_style()
+  set_plot_attributes()
+  set_plot_sizes()
+  set_plot_title(feat_name)
+  set_subplot_ratio()
+  update_plot_domains(fig, nc, nr, grids, title_text)
+}
+class "PDPResult" as pdpbox.pdp.PDPResult {
+  class_id
+  ice_lines
+  pdp
+}
+class "PlotStyle" as pdpbox.styles.PlotStyle {
+  figsize : tuple
+  font_family
+  label : dict
+  ncols : int
+  nrows : int
+  plot_params
+  tick : dict
+  title : dict
+  get_plot_sizes()
+  get_subplot_title(x, y, title_text)
+  make_subplots()
+  make_subplots_plotly(plot_args)
+  set_default_attributes()
+  set_figsize(num_plots)
+  set_label_style()
+  set_tick_style()
+  set_title_style()
+  update_plot_domains(fig, nr, nc, grids, title_text, plot_domain_func)
+  update_styles()
+}
+class "PredictPlot" as pdpbox.info_plots.PredictPlot {
+}
+class "PredictPlotEngine" as pdpbox.info_plot_utils.PredictPlotEngine {
+  box_colors : cycle
+  plot_matplotlib()
+  plot_plotly()
+  prepare_axes(inner_grid)
+  prepare_data(class_idx)
+  prepare_grids(i)
+}
+class "TargetPlot" as pdpbox.info_plots.TargetPlot {
+}
+class "TargetPlotEngine" as pdpbox.info_plot_utils.TargetPlotEngine {
+  line_colors : cycle
+  plot_matplotlib()
+  plot_plotly()
+  prepare_axes(inner_grid)
+  prepare_data(class_idx)
+  prepare_grids(i)
+}
+class "VersioneerConfig" as pdpbox._version.VersioneerConfig {
+  VCS : str
+  parentdir_prefix : str
+  style : str
+  tag_prefix : str
+  verbose : bool
+  versionfile_source : str
+}
+class "_BaseInfoPlot" as pdpbox.info_plots._BaseInfoPlot {
+  df
+  n_classes : int, NoneType
+  plot_engines : dict
+  plot_type
+  target : list
+  prepare_predict_plot(model, df, pred_func, n_classes, predict_kwds, chunk_size)
+  prepare_target_plot(df, target)
+}
+class "_InfoPlot" as pdpbox.info_plots._InfoPlot {
+  count_df
+  df
+  feature_cols : list
+  feature_info
+  plot_type : str
+  summary_df
+  target_lines
+  agg_target()
+  plot(which_classes, show_percentile, figsize, dpi, ncols, plot_params, engine, template)
+  prepare_feature()
+}
+class "_InteractInfoPlot" as pdpbox.info_plots._InteractInfoPlot {
+  df
+  feature_cols
+  feature_infos
+  plot_df
+  plot_type : str
+  summary_df
+  agg_target()
+  plot(which_classes, show_percentile, figsize, dpi, ncols, annotate, plot_params, engine, template)
+  prepare_feature()
+}
+class "_PDPBase" as pdpbox.pdp._PDPBase {
+  chunk_size : int
+  data_transformer : NoneType
+  dist_num_samples : int
+  from_model : bool
+  memory_limit : float
+  model
+  model_features
+  n_classes : NoneType
+  n_jobs : int
+  pred_func : NoneType
+  predict_kwds : dict
+  results : list
+  target : list
+}
+class "defaultColors" as pdpbox.styles.defaultColors {
+  black : str
+  blue : str
+  cmap_inter : str
+  cmaps : list
+  colors : list
+  darkBlue : str
+  darkGray : str
+  darkGreen : str
+  lightBlue : str
+  lightGray : str
+  lightGreen : str
+  red : str
+  yellow : str
+}
+pdpbox.info_plot_utils.InfoPlotEngine --|> pdpbox.info_plot_utils.BaseInfoPlotEngine
+pdpbox.info_plot_utils.InteractInfoPlotEngine --|> pdpbox.info_plot_utils.BaseInfoPlotEngine
+pdpbox.info_plot_utils.PredictPlotEngine --|> pdpbox.info_plot_utils.InfoPlotEngine
+pdpbox.info_plot_utils.TargetPlotEngine --|> pdpbox.info_plot_utils.InfoPlotEngine
+pdpbox.info_plots.InteractPredictPlot --|> pdpbox.info_plots._InteractInfoPlot
+pdpbox.info_plots.InteractTargetPlot --|> pdpbox.info_plots._InteractInfoPlot
+pdpbox.info_plots.PredictPlot --|> pdpbox.info_plots._InfoPlot
+pdpbox.info_plots.TargetPlot --|> pdpbox.info_plots._InfoPlot
+pdpbox.info_plots._InfoPlot --|> pdpbox.info_plots._BaseInfoPlot
+pdpbox.info_plots._InteractInfoPlot --|> pdpbox.info_plots._BaseInfoPlot
+pdpbox.pdp.PDPInteract --|> pdpbox.pdp._PDPBase
+pdpbox.pdp.PDPIsolate --|> pdpbox.pdp._PDPBase
+pdpbox.styles.InfoPlotStyle --|> pdpbox.styles.PlotStyle
+pdpbox.styles.InteractInfoPlotStyle --|> pdpbox.styles.PlotStyle
+pdpbox.styles.PDPInteractPlotStyle --|> pdpbox.styles.PlotStyle
+pdpbox.styles.PDPIsolatePlotStyle --|> pdpbox.styles.PlotStyle
+pdpbox.utils.FeatureInfo --* pdpbox.info_plots._InfoPlot : feature_info
+pdpbox.utils.FeatureInfo --* pdpbox.pdp.PDPIsolate : feature_info
+@enduml
