@@ -24,7 +24,7 @@ and stable library designed to facilitate packaging Python projects.
 
 
 Documentation
--------------
+-------------   
 
 ``````
 Sphinx
@@ -111,4 +111,3 @@ Git
    when adding this file to an archive. 
 
 -  :code:`.gitignore`: Specifies intentionally untracked files to ignore.
-

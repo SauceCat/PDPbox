@@ -61,3 +61,4 @@ giving us a better understanding of how our model is making its decisions.
    tools
    api
    design
+   autodoc

@@ -5,9 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [0.3.0]
 ### Changed
-- Refactor.
+- Refactor. Please refer to the `Design Overview` session in docs for more details.
 - Support both `matplotlib` and `plotly`.
-
+- Update tutorials according to the refactor codes.
+- Better unit test.
+- Semi-automate dosctring generation.
 
 ## [0.2.0] 
 ### Added
