@@ -1,11 +1,8 @@
-import os
-import sys
 import numpy as np
 import pytest
 import copy
 from abc import abstractmethod
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pdpbox.pdp import PDPResult, PDPIsolate, PDPInteract
 from pdpbox.utils import FeatureInfo, _make_list
 from conftest import DummyModel, PlotTestBase

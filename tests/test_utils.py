@@ -1,11 +1,6 @@
-# for local debug use
-import sys
-import os
 import pandas as pd
 import numpy as np
 import pytest
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from pdpbox.utils import (
     FeatureInfo,

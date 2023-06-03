@@ -1,10 +1,5 @@
-# for local debug use
-import sys
-import os
 import pytest
 import numpy as np
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from pdpbox.info_plots import (
     TargetPlot,
