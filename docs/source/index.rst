@@ -12,18 +12,18 @@ utilizing partial dependence plots.
 
 While PDPbox is initially designed to be compatible with all scikit-learn models, 
 it is important to understand that different models may have different prediction interfaces. 
-Standard scikit-learn models typically provide `model.predict` or `model.predict_proba` methods for prediction generation.
+Standard scikit-learn models typically provide :code:`model.predict` or :code:`model.predict_proba` methods for prediction generation.
 Therefore, if your model is a standard scikit-learn model, PDPbox will automatically detect the prediction interface and generate predictions accordingly.
 
 For other models, the prediction interface may vary. 
-Thus, PDPbox provides the ability to incorporate a customized prediction function via the `pred_func` parameter in PDPbox methods, 
+Thus, PDPbox provides the ability to incorporate a customized prediction function via the :code:`pred_func` parameter in PDPbox methods, 
 ensuring broad applicability across various models.
 
 For a more detailed understanding of the prediction generation process, please refer to the following functions:
 
-- `pdpbox.utils._check_model` 
-- `pdpbox.utils._calc_preds_each` 
-- `pdpbox.utils._calc_preds` 
+- :code:`pdpbox.utils._check_model` 
+- :code:`pdpbox.utils._calc_preds_each` 
+- :code:`pdpbox.utils._calc_preds` 
 
 
 The common headache
@@ -60,3 +60,4 @@ giving us a better understanding of how our model is making its decisions.
    papers
    tools
    api
+   design
