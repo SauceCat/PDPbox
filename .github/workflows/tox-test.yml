@@ -1,0 +1,47 @@
+name: Tox Test
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+        toxenv: [py39, docs]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # this is equivalent to Travis CI's `git fetch` in before_install
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox tox-venv
+
+    - name: Run Tox
+      env:
+        TOXENV: ${{ matrix.toxenv }}
+      run: tox -e $TOXENV
+
+    # This step will set up a display that you can use for running tests that require a GUI (like certain selenium tests)
+    - name: Run xvfb
+      run: |
+        sudo apt-get install -y xvfb
+        export DISPLAY=:99.0
+        sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
