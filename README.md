@@ -70,7 +70,7 @@ PDPbox can be tested using `tox`.
   $ pip install tox tox-venv
   ```
   
-- Call `tox` inside the pdpbox clone directory. This will run tests with python3.7.
+- Call `tox` inside the pdpbox clone directory. This will run tests with python3.9.
 
 - To test the documentation, call `tox -e docs`. 
   The documentation should open up in your browser if it is successfully build.

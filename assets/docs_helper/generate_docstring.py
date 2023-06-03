@@ -205,7 +205,7 @@ def extract_string_between_markers(text, start_marker, end_marker):
     return next(re.finditer(pattern, text, flags=re.DOTALL)).group()
 
 
-def generate_attrs_docstring(attrs, doc_items):
+def generate_attrs_docstring(cls_name, attrs, doc_items):
     """
     Generates docstring for the attributes based on the documentation items provided.
 
@@ -241,7 +241,9 @@ def process_class(cls, cls_name, cls_doc_items, content):
     )
     attrs = [attr.strip() for attr in attr_string.split("\n")[1:-1]]
     if attr_string in content:
-        attrs_docstring = generate_attrs_docstring(attrs, cls_doc_items["attrs"])
+        attrs_docstring = generate_attrs_docstring(
+            cls_name, attrs, cls_doc_items["attrs"]
+        )
         indent = " " * (cls.col_offset + 4)
         content = content.replace(attr_string, add_indent(attrs_docstring, indent))
     else:

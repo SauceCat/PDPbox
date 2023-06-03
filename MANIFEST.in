@@ -1,3 +1,4 @@
 include versioneer.py
 include pdpbox/_version.py
 include README.md
+include requirements.txt
