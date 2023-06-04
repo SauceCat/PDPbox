@@ -19,12 +19,12 @@ jobs:
         toxenv: [py39, docs]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0  # this is equivalent to Travis CI's `git fetch` in before_install
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -45,3 +45,10 @@ jobs:
         export DISPLAY=:99.0
         sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         sleep 3
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+        env: CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
