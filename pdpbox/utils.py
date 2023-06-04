@@ -183,7 +183,7 @@ class FeatureInfo:
                     }
                 )
                 .groupby(["grids"], as_index=False)
-                .agg({"percentiles": lambda x: list(x)})
+                .agg({"percentiles": list})
                 .sort_values("grids", ascending=True)
             )
             return grids_df["grids"].values, grids_df["percentiles"].values
@@ -245,7 +245,7 @@ class FeatureInfo:
                     if row[col_name] >= grids[-1]:
                         return x_max + 1
 
-                df["x"] = df.apply(lambda row: _assign_x(row), axis=1)
+                df["x"] = df.apply(_assign_x, axis=1)
                 if df["x"].min() == -1:
                     display_columns = ["<" + str(self.grids[0])] + display_columns
 
@@ -692,7 +692,7 @@ def _calc_preds_each(model, X, pred_func, from_model, predict_kwds):
     return preds
 
 
-def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
+def _calc_preds(model, X, pred_func, from_model, predict_kwds=None, chunk_size=-1):
     """
     Calculate model predictions with an optional chunk size.
 
@@ -717,6 +717,8 @@ def _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size=-1):
         Predictions made by the model.
     """
     total = len(X)
+    if predict_kwds is None:
+        predict_kwds = {}
 
     if 0 < chunk_size < total:
         preds = np.concatenate(

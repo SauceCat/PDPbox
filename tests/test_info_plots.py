@@ -36,7 +36,7 @@ plot_params = [
 ]
 
 
-def titanic_predict_proba(model, X, predict_kwds={}):
+def titanic_predict_proba(model, X, predict_kwds):
     return model.predict_proba(X, **predict_kwds) + 0.05
 
 
@@ -289,7 +289,7 @@ class _TestInfoPlot(PlotTestBase):
 
     def _test_real_plot(self, plot_obj, plot_params_list):
         for plot_params in plot_params_list:
-            fig, axes, summary_df = plot_obj.plot(**plot_params)
+            fig, axes, _ = plot_obj.plot(**plot_params)
             self.close_plt(plot_params)
             assert fig is not None
             if plot_params.get("engine", "plotly") == "matplotlib":
@@ -300,7 +300,7 @@ class _TestInfoPlot(PlotTestBase):
 
 class TestTargetPlot(_TestInfoPlot):
     def get_plot_objs(self, target_type):
-        for df, features, feat_types in self.data_gen.get_dummy_dfs(target_type):
+        for df, features, _ in self.data_gen.get_dummy_dfs(target_type):
             yield TargetPlot(
                 df,
                 features[0],

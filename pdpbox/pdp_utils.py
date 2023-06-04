@@ -310,9 +310,7 @@ class PDPIsolatePlotEngine:
                 )
 
     def _set_pdp_xticks_plotly(self, fig, grids, is_line=True):
-        ticks, v_range, ticklabels, per_ticklabels, set_ticks = self._get_pdp_xticks(
-            is_line
-        )
+        ticks, v_range, ticklabels, _, set_ticks = self._get_pdp_xticks(is_line)
 
         if set_ticks:
             fig.update_xaxes(
@@ -347,14 +345,14 @@ class PDPIsolatePlotEngine:
             extent=(np.min(xticks) - 0.5, np.max(xticks) + 0.5, 0, 0.5),
         )
 
-        for i in range(len(count_norm)):
+        for i, v in enumerate(count_norm):
             text_color = "black"
-            if count_norm[i] >= np.max(count_norm) * 0.5:
+            if v >= np.max(count_norm) * 0.5:
                 text_color = "white"
             axes.text(
                 xticks[i],
                 0.25,
-                round(count_norm[i], 3),
+                round(v, 3),
                 ha="center",
                 va="center",
                 color=text_color,
@@ -369,7 +367,7 @@ class PDPIsolatePlotEngine:
         axes.tick_params(which="minor", bottom=False, left=False)
 
     def _pdp_dist_plot(self, colors, axes, line_axes):
-        cmap, light_color, dark_color = colors
+        cmap, _, dark_color = colors
 
         if self.is_numeric and not self.plot_style.to_bins:
             dist_df = self.plot_obj.dist_df
@@ -514,7 +512,7 @@ class PDPIsolatePlotEngine:
         axes = {"title_axes": title_axes, "line_axes": [], "dist_axes": []}
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap, colors = self.prepare_data(class_idx)
+            target, _, colors = self.prepare_data(class_idx)
             line_axes, dist_axes = self.prepare_axes(inner_grids[i])
 
             self._pdp_line_plot(class_idx, colors, line_axes)
@@ -745,10 +743,10 @@ class PDPInteractPlotEngine:
             alpha=self.plot_style.isolate["fill_alpha"],
         )
 
-        for i in range(len(pdp)):
-            text_color = "black" if pdp[i] < vmean else "w"
+        for i, v in enumerate(pdp):
+            text_color = "black" if v < vmean else "w"
             text_params = {
-                "s": round(pdp[i], 3),
+                "s": round(v, 3),
                 "ha": "center",
                 "va": "center",
                 "color": text_color,

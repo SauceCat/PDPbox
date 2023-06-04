@@ -126,7 +126,7 @@ class _InfoPlot(_BaseInfoPlot):
         model_features=None,
         pred_func=None,
         n_classes=None,
-        predict_kwds={},
+        predict_kwds=None,
         chunk_size=-1,
         plot_type="target",
         **kwargs,
@@ -450,7 +450,7 @@ class PredictPlot(_InfoPlot):
         model_features,
         pred_func=None,
         n_classes=None,
-        predict_kwds={},
+        predict_kwds=None,
         chunk_size=-1,
         cust_grid_points=None,
         grid_type="percentile",
@@ -486,7 +486,7 @@ class PredictPlot(_InfoPlot):
             Please set it as 0 for regression. Default is None.
         predict_kwds : dict, optional
             Additional keyword arguments to pass to the `model`'s predict function.
-            Default is {}.
+            Default is None.
         chunk_size : int, optional
             The number of samples to predict at each iteration. -1 means all samples at
             once. Default is -1.
@@ -548,7 +548,7 @@ class _InteractInfoPlot(_BaseInfoPlot):
         model_features=None,
         pred_func=None,
         n_classes=None,
-        predict_kwds={},
+        predict_kwds=None,
         chunk_size=-1,
         plot_type="interact_target",
         **kwargs,
@@ -864,7 +864,7 @@ class InteractPredictPlot(_InteractInfoPlot):
         model_features,
         pred_func=None,
         n_classes=None,
-        predict_kwds={},
+        predict_kwds=None,
         chunk_size=-1,
         num_grid_points=10,
         grid_types="percentile",
@@ -901,7 +901,7 @@ class InteractPredictPlot(_InteractInfoPlot):
             Please set it as 0 for regression. Default is None.
         predict_kwds : dict, optional
             Additional keyword arguments to pass to the `model`'s predict function.
-            Default is {}.
+            Default is None.
         chunk_size : int, optional
             The number of samples to predict at each iteration. -1 means all samples at
             once. Default is -1.

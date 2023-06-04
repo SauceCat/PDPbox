@@ -64,7 +64,7 @@ class _PDPBase:
         memory_limit=0.5,
         chunk_size=-1,
         n_jobs=1,
-        predict_kwds={},
+        predict_kwds=None,
         data_transformer=None,
     ):
         self.model = model
@@ -236,7 +236,7 @@ class PDPIsolate(_PDPBase):
         memory_limit=0.5,
         chunk_size=-1,
         n_jobs=1,
-        predict_kwds={},
+        predict_kwds=None,
         data_transformer=None,
         cust_grid_points=None,
         grid_type="percentile",
@@ -279,7 +279,7 @@ class PDPIsolate(_PDPBase):
             CPUs are used. Default is 1.
         predict_kwds : dict, optional
             Additional keyword arguments to pass to the `model`'s predict function.
-            Default is {}.
+            Default is None.
         data_transformer : callable, optional
             A function to transform the input data before prediction. Default is None.
         cust_grid_points : array-like or list of arrays, optional
@@ -545,7 +545,7 @@ class PDPInteract(_PDPBase):
         memory_limit=0.5,
         chunk_size=-1,
         n_jobs=1,
-        predict_kwds={},
+        predict_kwds=None,
         data_transformer=None,
         num_grid_points=10,
         grid_types="percentile",
@@ -589,7 +589,7 @@ class PDPInteract(_PDPBase):
             CPUs are used. Default is 1.
         predict_kwds : dict, optional
             Additional keyword arguments to pass to the `model`'s predict function.
-            Default is {}.
+            Default is None.
         data_transformer : callable, optional
             A function to transform the input data before prediction. Default is None.
         num_grid_points : int or list of int, optional

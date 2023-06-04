@@ -10,16 +10,16 @@ class defaultColors:
     cmap_inter = "viridis"
     cmaps = ["Blues", "Greens", "Oranges", "Reds", "Purples", "Greys"]
     colors = ["tab20", px.colors.qualitative.Plotly]
-    darkGreen = "#1A4E5D"
-    lightGreen = "#5BB573"
-    darkGray = "#424242"
-    lightGray = "#9E9E9E"
-    black = "#000000"
-    blue = "#3288bd"
-    darkBlue = "#1A4E5D"
-    lightBlue = "#66C2D7"
-    yellow = "#FEDC00"
-    red = "#E75438"
+    DARK_GREEN = "#1A4E5D"
+    LIGHT_GREEN = "#5BB573"
+    DARK_GRAY = "#424242"
+    LIGHT_GRAY = "#9E9E9E"
+    BLACK = "#000000"
+    BLUE = "#3288bd"
+    DARK_BLUE = "#1A4E5D"
+    LIGHT_BLUE = "#66C2D7"
+    YELLOW = "#FEDC00"
+    RED = "#E75438"
 
 
 default_font_family = "Arial"
@@ -123,8 +123,8 @@ class PlotStyle:
             "axis": "both",
             "which": "major",
             "labelsize": 9,
-            "labelcolor": defaultColors.darkGray,
-            "colors": defaultColors.lightGray,
+            "labelcolor": defaultColors.DARK_GRAY,
+            "colors": defaultColors.LIGHT_GRAY,
             "labelrotation": 0,
         }
 
@@ -140,17 +140,17 @@ class PlotStyle:
         self.title = {
             "title": {
                 "fontsize": 13,
-                "color": defaultColors.black,
+                "color": defaultColors.BLACK,
                 "text": "",
             },
             "subtitle": {
                 "fontsize": 11,
-                "color": defaultColors.lightGray,
+                "color": defaultColors.LIGHT_GRAY,
                 "text": "",
             },
             "subplot_title": {
                 "fontsize": 12,
-                "color": defaultColors.black,
+                "color": defaultColors.BLACK,
                 "fontweight": "bold",
             },
         }
@@ -382,7 +382,7 @@ class InfoPlotStyle(PlotStyle):
     def set_bar_style(self):
         self.bar = {
             "width": None,
-            "color": defaultColors.lightGreen,
+            "color": defaultColors.LIGHT_GREEN,
             "fontdict": self.label["fontdict"],
             "alpha": 0.5,
         }
@@ -447,7 +447,7 @@ class InfoPlotStyle(PlotStyle):
         )
 
     def update_plot_domains(self, fig, nr, nc, grids, title_text):
-        title, domains = super().update_plot_domains(
+        title, _ = super().update_plot_domains(
             fig, nr, nc, grids, title_text, self._info_plot_domain
         )
         return title
@@ -778,8 +778,8 @@ class PDPIsolatePlotStyle(PlotStyle):
 
     def set_line_style(self):
         self.line = {
-            "hl_color": defaultColors.yellow,
-            "zero_color": defaultColors.red,
+            "hl_color": defaultColors.YELLOW,
+            "zero_color": defaultColors.RED,
             "cmaps": defaultColors.cmaps,
             "width": 1 if self.engine == "matplotlib" else 1.5,
             "fontdict": self.label["fontdict"],

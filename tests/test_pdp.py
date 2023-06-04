@@ -136,7 +136,6 @@ pdp_regression_params = [
             "plot_lines": True,
             "frac_to_plot": 100,
             "show_percentile": True,
-            "show_percentile": True,
             "plot_params": {
                 "title": {
                     "title": {"text": "I am a title"},

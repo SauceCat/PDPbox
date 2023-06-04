@@ -220,7 +220,7 @@ class InfoPlotEngine(BaseInfoPlotEngine):
 
     def _draw_boxplot_plotly(self, target, box_df, line_df, box_color, fig, grids):
         box_style = self.plot_style.box
-        xs, ys = self._prepare_box_data(box_df)
+        _, ys = self._prepare_box_data(box_df)
         for i, y in enumerate(ys):
             fig.add_trace(
                 go.Box(
@@ -634,7 +634,9 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
                     [PathEffects.withStroke(linewidth=3, foreground="w")]
                 )
 
-        [self._set_ticks(axes, is_y) for is_y in [False, True]]
+        for is_y in [False, True]:
+            self._set_ticks(axes, is_y)
+
         _axes_modify(axes, self.plot_style)
 
         return value_min, value_max
@@ -687,7 +689,9 @@ class InteractInfoPlotEngine(BaseInfoPlotEngine):
             ),
             **grids,
         )
-        [self._set_ticks_plotly(fig, grids, is_y) for is_y in [False, True]]
+
+        for is_y in [False, True]:
+            self._set_ticks_plotly(fig, grids, is_y)
 
         return value_min, value_max
 
