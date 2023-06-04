@@ -57,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v3
+    
     - name: Download coverage.xml artifact
       uses: actions/download-artifact@v3
       with:
