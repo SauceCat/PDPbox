@@ -9,8 +9,3 @@ omit =
     tutorials/*
     .tox/*
     assets/*
-
-[paths]
-source =
-    .
-    /home/runner/work/PDPbox/PDPbox
