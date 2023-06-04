@@ -537,7 +537,7 @@ class PDPIsolatePlotEngine:
         subplot_titles = []
 
         for i, class_idx in enumerate(self.which_classes):
-            target, cmap, colors = self.prepare_data(class_idx)
+            target, _, colors = self.prepare_data(class_idx)
             nc, nr = i % ncols + 1, i // ncols + 1
             line_grids, dist_grids = self.prepare_grids(nc, nr)
 

@@ -130,7 +130,7 @@ class DummyModel:
 
 
 class PlotTestBase(ABC):
-    def setup(self):
+    def setup_method(self):
         self.model_types = ["regression", "binary", "multi-class"]
         self.data_gen = DummyDataGenerator()
 

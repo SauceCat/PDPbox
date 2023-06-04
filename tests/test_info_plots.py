@@ -36,7 +36,9 @@ plot_params = [
 ]
 
 
-def titanic_predict_proba(model, X, predict_kwds):
+def titanic_predict_proba(model, X, predict_kwds=None):
+    if predict_kwds is None:
+        predict_kwds = {}
     return model.predict_proba(X, **predict_kwds) + 0.05
 
 
@@ -444,7 +446,7 @@ class TestPredictPlot(_TestInfoPlot):
 
 class TestInteractTargetPlot(_TestInfoPlot):
     def get_plot_objs(self, target_type):
-        for df, features, feat_types in self.data_gen.get_dummy_dfs(target_type):
+        for df, features, _ in self.data_gen.get_dummy_dfs(target_type):
             yield InteractTargetPlot(
                 df,
                 features,

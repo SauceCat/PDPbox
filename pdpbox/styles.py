@@ -257,7 +257,7 @@ class PlotStyle:
             font=dict(size=self.title["subplot_title"]["fontsize"]),
         )
 
-    def update_plot_domains(self, fig, nr, nc, grids, title_text, plot_domain_func):
+    def _update_plot_domains(self, fig, nr, nc, grids, title_text, plot_domain_func):
         subplot_w, subplot_h = (
             self.plot_sizes["subplot_w"],
             self.plot_sizes["subplot_h"],
@@ -447,7 +447,7 @@ class InfoPlotStyle(PlotStyle):
         )
 
     def update_plot_domains(self, fig, nr, nc, grids, title_text):
-        title, _ = super().update_plot_domains(
+        title, _ = self._update_plot_domains(
             fig, nr, nc, grids, title_text, self._info_plot_domain
         )
         return title
@@ -623,7 +623,7 @@ class InteractInfoPlotStyle(PlotStyle):
         )
 
     def update_plot_domains(self, fig, nr, nc, grids, title_text):
-        title, domains = super().update_plot_domains(
+        title, domains = self._update_plot_domains(
             fig, nr, nc, grids, title_text, self._interact_info_plot_domain
         )
         return domains[1], title
@@ -842,7 +842,7 @@ class PDPIsolatePlotStyle(PlotStyle):
             )
 
     def update_plot_domains(self, fig, nc, nr, grids, title_text):
-        title, domains = super().update_plot_domains(
+        title, _ = self._update_plot_domains(
             fig, nr, nc, grids, title_text, self._pdp_isolate_plot_domain
         )
         return title
@@ -1029,7 +1029,7 @@ class PDPInteractPlotStyle(PlotStyle):
             )
 
     def update_plot_domains(self, fig, nc, nr, grids, title_text):
-        title, domains = super().update_plot_domains(
+        title, domains = self._update_plot_domains(
             fig, nr, nc, grids, title_text, self._pdp_interact_plot_domain
         )
 
