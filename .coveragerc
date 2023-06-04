@@ -3,9 +3,14 @@ include =
     ./*
 
 omit =
-    *tests*
+    tests/*
     */_version.py
     docs/*
     tutorials/*
     .tox/*
     assets/*
+
+[paths]
+source =
+    .
+    /home/runner/work/PDPbox/PDPbox
