@@ -64,10 +64,10 @@ python -m pytest tests
 ### Test with `tox`
 PDPbox can be tested using `tox`.
 
-- First install `tox` and `tox-venv`
+- First install `tox`
 
   ```
-  $ pip install tox tox-venv
+  $ pip install tox
   ```
   
 - Call `tox` inside the pdpbox clone directory. This will run tests with python3.9.
