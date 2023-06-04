@@ -20,9 +20,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  # this is equivalent to Travis CI's `git fetch` in before_install
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
@@ -46,9 +44,27 @@ jobs:
         sudo Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         sleep 3
 
+    - name: Upload coverage.xml as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage
+        path: ./coverage.xml
+
+  upload-codecov:
+    needs: ['test']
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Download coverage.xml artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage
+
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
-      env: 
+      env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
         file: ./coverage.xml
