@@ -93,6 +93,18 @@ Travis CI
    stored in the file :code:`.travis.yml` in your repository. This allows your configuration to be version controlled and flexible.
 
 
+`````````````
+GitHub Action
+`````````````
+
+`GitHub Actions <https://docs.github.com/en/actions>`_ is a feature of GitHub that allows you to automate software workflows. 
+It's effectively a CI/CD system that's built into GitHub. In the latest refactor, I migrated from Travis CI to GitHub Actions.
+
+-  :code:`.github/workflows/tox-test.yml`: Workflows configuration. 
+   Workflows are custom automated processes that you can set up in your repository to build, test, package, release, 
+   or deploy any code project on GitHub. 
+
+
 ``````
 Others
 ``````
@@ -102,7 +114,14 @@ Others
 
 -  `coverage <https://coverage.readthedocs.io/en/6.6.0b1/>`_ : A tool for measuring code coverage of Python programs.
 
-   -  :code:`.coveragerc`: The default name for configuration files is :code:`.coveragerc`, in the same directory :code:`coverage.py` is being run in. 
+   -  :code:`.coveragerc`: A configuration file for :code:`Coverage.py`, a tool for measuring code coverage in Python. 
+      The default name for configuration files is :code:`.coveragerc`, in the same directory :code:`coverage.py` is being run in. 
+
+   -  :code:`codecov.yml`: A configuration file for **Codecov**, a tool that collects coverage reports and provides visualizations, 
+      analytics, and various other features.
+
+   -  In other words, :code:`.coveragerc` is used to control how coverage data is collected, 
+      and :code:`codecov.yml` is used to control how that data is interpreted and presented.
 
 -  `diff-cover <https://github.com/Bachmann1234/diff_cover>`_ : Automatically find diff lines that need test coverage. 
    Also finds diff lines that have violations (according to tools such as pycodestyle, pyflakes, flake8, or pylint). 

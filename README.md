@@ -1,7 +1,8 @@
 
 # PDPbox
 [![PyPI version](https://badge.fury.io/py/PDPbox.svg)](https://badge.fury.io/py/PDPbox)
-[![Build Status](https://travis-ci.com/SauceCat/PDPbox.svg?branch=master)](https://travis-ci.com/SauceCat/PDPbox)
+[![codecov](https://codecov.io/gh/SauceCat/PDPbox/branch/master/graph/badge.svg?token=wIGFZIoSKJ)](https://codecov.io/gh/SauceCat/PDPbox)
+![Build Status](https://github.com/SauceCat/PDPbox/actions/workflows/tox-test.yml/badge.svg)
 
 Python **P**artial **D**ependence **P**lot tool**box**.
 
@@ -34,7 +35,7 @@ I'm excited about this next phase and look forward to contributing more to the o
 
 ## Installation
 
-- through pip (latest stable version： 0.2.1)
+- through pip
   ```
   $ pip install pdpbox
   ```
