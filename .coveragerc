@@ -3,9 +3,9 @@ include =
     ./*
 
 omit =
-    *tests*
+    tests/*
     */_version.py
     docs/*
-    docs_history/*
-    notebooks/*
+    tutorials/*
     .tox/*
+    assets/*

@@ -1,538 +1,893 @@
-import pytest
-import numpy as np
-from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pandas as pd
+import numpy as np
+import pytest
+
 from pdpbox.utils import (
-    _check_feature,
-    _check_target,
-    _get_grids,
-    _get_grid_combos,
-    _make_bucket_column_names,
-    _make_bucket_column_names_percentile,
+    FeatureInfo,
+    _to_rgba,
+    _check_col,
+    _check_dataset,
+    _make_list,
+    _check_model,
+    _check_classes,
+    _check_memory_limit,
+    _check_frac_to_plot,
+    _calc_n_jobs,
+    _get_string,
+    _expand_params_for_interact,
+    _calc_preds,
+    _check_cluster_params,
+    _check_plot_engine,
+    _check_pdp_interact_plot_type,
 )
 
 
-class TestCheckFeature(object):
-    def test_feature_binary(self, titanic_data):
-        feature_type = _check_feature(feature="Sex", df=titanic_data)
-        assert feature_type == "binary"
+class FeatureInfoTestCases:
+    grid_types = [
+        ["percentile", True],
+        ["equal", True],
+        ["wrong", False],
+    ]
 
-    def test_feature_onehot(self, titanic_data):
-        feature_type = _check_feature(
-            feature=["Embarked_C", "Embarked_S", "Embarked_Q"], df=titanic_data
+    percentile_ranges = [
+        # Correct inputs
+        [(0, 100), True],
+        [(25, 75), True],
+        [(1.5, 98.5), True],
+        # Wrong inputs
+        # Incorrect type
+        [[0, 100], False],
+        ["0, 100", False],
+        [100, False],
+        # Incorrect tuple length
+        [(0, 100, 200), False],
+        [(0,), False],
+        # Tuple elements not in order
+        [(100, 0), False],
+        [(75, 25), False],
+        [(98.5, 1.5), False],
+        # Tuple elements out of range (0-100)
+        [(-10, 110), False],
+        [(50, 120), False],
+        [(-5, 50), False],
+    ]
+
+    grid_ranges = [
+        # Correct inputs
+        [(0, 100), True],
+        [(-50, 50), True],
+        [(10.5, 20.5), True],
+        # Wrong inputs
+        # Incorrect type
+        [[0, 100], False],
+        ["0, 100", False],
+        [100, False],
+        # Incorrect tuple length
+        [(0, 100, 200), False],
+        [(0,), False],
+        # Tuple elements not in order
+        [(100, 0), False],
+        [(50, -50), False],
+        [(20.5, 10.5), False],
+    ]
+
+    binary_feature_info_params = [
+        {
+            "feature": "Sex",
+            "feature_name": "gender",
+        },
+    ]
+
+    onehot_feature_info_params = [
+        {
+            "feature": ["Embarked_C", "Embarked_S", "Embarked_Q"],
+            "feature_name": "embarked",
+        },
+    ]
+
+    numeric_feature_info_params = [
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+            "cust_grid_points": None,
+            "grid_type": "percentile",
+            "num_grid_points": 10,
+            "percentile_range": None,
+            "grid_range": None,
+            "show_outliers": False,
+            "endpoint": True,
+        },
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+            "cust_grid_points": None,
+            "grid_type": "equal",
+            "num_grid_points": 7,
+            "percentile_range": None,
+            "grid_range": None,
+            "show_outliers": False,
+            "endpoint": True,
+        },
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+            "cust_grid_points": [5, 10, 20, 50, 100],
+            "grid_type": "percentile",
+            "num_grid_points": None,
+            "percentile_range": None,
+            "grid_range": None,
+            "show_outliers": False,
+            "endpoint": True,
+        },
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+            "cust_grid_points": None,
+            "grid_type": "percentile",
+            "num_grid_points": 8,
+            "percentile_range": (5, 95),
+            "grid_range": None,
+            "show_outliers": True,
+            "endpoint": True,
+        },
+        {
+            "feature": "Fare",
+            "feature_name": "fare",
+            "cust_grid_points": None,
+            "grid_type": "equal",
+            "num_grid_points": 10,
+            "percentile_range": None,
+            "grid_range": (0, 200),
+            "show_outliers": False,
+            "endpoint": False,
+        },
+    ]
+
+    numeric_feature_buckets = [
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "show_outliers": False,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 8]),
+                "display_columns": [
+                    "[1.0, 2.0)",
+                    "[2.0, 3.0)",
+                    "[3.0, 4.0)",
+                    "[4.0, 5.0)",
+                    "[5.0, 6.0)",
+                    "[6.0, 7.0)",
+                    "[7.0, 8.0)",
+                    "[8.0, 9.0)",
+                    "[9.0, 10.0]",
+                ],
+                "percentile_columns": [
+                    "[0.0, 11.11)",
+                    "[11.11, 22.22)",
+                    "[22.22, 33.33)",
+                    "[33.33, 44.44)",
+                    "[44.44, 55.56)",
+                    "[55.56, 66.67)",
+                    "[66.67, 77.78)",
+                    "[77.78, 88.89)",
+                    "[88.89, 100.0]",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": False,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "show_outliers": False,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 5, 6, 7, 8]),
+                "display_columns": [
+                    "[1.0, 2.0)",
+                    "[2.0, 3.0)",
+                    "[3.0, 4.0)",
+                    "[4.0, 5.0)",
+                    "[5.0, 6.0)",
+                    "[6.0, 7.0)",
+                    "[7.0, 8.0)",
+                    "[8.0, 9.0)",
+                    "[9.0, 10.0)",
+                ],
+                "percentile_columns": [
+                    "[0.0, 11.11)",
+                    "[11.11, 22.22)",
+                    "[22.22, 33.33)",
+                    "[33.33, 44.44)",
+                    "[44.44, 55.56)",
+                    "[55.56, 66.67)",
+                    "[66.67, 77.78)",
+                    "[77.78, 88.89)",
+                    "[88.89, 100.0)",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": False,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "percentile_range": (0, 90),
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+                "display_columns": [
+                    "[1.0, 1.9)",
+                    "[1.9, 2.8)",
+                    "[2.8, 3.7)",
+                    "[3.7, 4.6)",
+                    "[4.6, 5.5)",
+                    "[5.5, 6.4)",
+                    "[6.4, 7.3)",
+                    "[7.3, 8.2)",
+                    "[8.2, 9.1)",
+                    ">=9.1",
+                ],
+                "percentile_columns": [
+                    "[0.0, 10.0)",
+                    "[10.0, 20.0)",
+                    "[20.0, 30.0)",
+                    "[30.0, 40.0)",
+                    "[40.0, 50.0)",
+                    "[50.0, 60.0)",
+                    "[60.0, 70.0)",
+                    "[70.0, 80.0)",
+                    "[80.0, 90.0)",
+                    ">=90.0",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "percentile_range": (0, 90),
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+                "display_columns": [
+                    "[1.0, 1.9)",
+                    "[1.9, 2.8)",
+                    "[2.8, 3.7)",
+                    "[3.7, 4.6)",
+                    "[4.6, 5.5)",
+                    "[5.5, 6.4)",
+                    "[6.4, 7.3)",
+                    "[7.3, 8.2)",
+                    "[8.2, 9.1]",
+                    ">9.1",
+                ],
+                "percentile_columns": [
+                    "[0.0, 10.0)",
+                    "[10.0, 20.0)",
+                    "[20.0, 30.0)",
+                    "[30.0, 40.0)",
+                    "[40.0, 50.0)",
+                    "[50.0, 60.0)",
+                    "[60.0, 70.0)",
+                    "[70.0, 80.0)",
+                    "[80.0, 90.0]",
+                    ">90.0",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "percentile_range": (10, 100),
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+                "display_columns": [
+                    "<1.9",
+                    "[1.9, 2.8)",
+                    "[2.8, 3.7)",
+                    "[3.7, 4.6)",
+                    "[4.6, 5.5)",
+                    "[5.5, 6.4)",
+                    "[6.4, 7.3)",
+                    "[7.3, 8.2)",
+                    "[8.2, 9.1)",
+                    "[9.1, 10.0]",
+                ],
+                "percentile_columns": [
+                    "<10.0",
+                    "[10.0, 20.0)",
+                    "[20.0, 30.0)",
+                    "[30.0, 40.0)",
+                    "[40.0, 50.0)",
+                    "[50.0, 60.0)",
+                    "[60.0, 70.0)",
+                    "[70.0, 80.0)",
+                    "[80.0, 90.0)",
+                    "[90.0, 100.0]",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": None,
+                "grid_type": "percentile",
+                "percentile_range": (10, 90),
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 6, 7, 8, 9, 10]),
+                "display_columns": [
+                    "<1.9",
+                    "[1.9, 2.7)",
+                    "[2.7, 3.5)",
+                    "[3.5, 4.3)",
+                    "[4.3, 5.1)",
+                    "[5.1, 5.9)",
+                    "[5.9, 6.7)",
+                    "[6.7, 7.5)",
+                    "[7.5, 8.3)",
+                    "[8.3, 9.1]",
+                    ">9.1",
+                ],
+                "percentile_columns": [
+                    "<10.0",
+                    "[10.0, 18.89)",
+                    "[18.89, 27.78)",
+                    "[27.78, 36.67)",
+                    "[36.67, 45.56)",
+                    "[45.56, 54.44)",
+                    "[54.44, 63.33)",
+                    "[63.33, 72.22)",
+                    "[72.22, 81.11)",
+                    "[81.11, 90.0]",
+                    ">90.0",
+                ],
+            },
+        ],
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": None,
+                "grid_type": "equal",
+                "grid_range": (2, 9),
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 2, 3, 4, 6, 7, 8, 9, 10]),
+                "display_columns": [
+                    "<2.0",
+                    "[2.0, 2.78)",
+                    "[2.78, 3.56)",
+                    "[3.56, 4.33)",
+                    "[4.33, 5.11)",
+                    "[5.11, 5.89)",
+                    "[5.89, 6.67)",
+                    "[6.67, 7.44)",
+                    "[7.44, 8.22)",
+                    "[8.22, 9.0]",
+                    ">9.0",
+                ],
+                "percentile_columns": [],
+            },
+        ],
+        [
+            {
+                "endpoint": True,
+                "cust_grid_points": [2, 4, 6, 8],
+                "show_outliers": True,
+            },
+            {
+                "x": np.array([0, 1, 1, 2, 2, 3, 3, 3, 4, 4]),
+                "display_columns": ["<2", "[2, 4)", "[4, 6)", "[6, 8]", ">8"],
+                "percentile_columns": [],
+            },
+        ],
+    ]
+
+
+class TestFeatureInfo:
+    @pytest.fixture(scope="function")
+    def sample_data(self):
+        return pd.DataFrame({"feature": np.arange(1, 11)})
+
+    @pytest.fixture(scope="function")
+    def feature_info_sample(self, sample_data):
+        feature_info = FeatureInfo(
+            feature="feature",
+            feature_name="Feature",
+            df=sample_data,
+            grid_type="percentile",
+            num_grid_points=5,
         )
-        assert feature_type == "onehot"
+        return feature_info
 
-    def test_feature_numeric(self, titanic_data):
-        feature_type = _check_feature(feature="Fare", df=titanic_data)
-        assert feature_type == "numeric"
+    def get_feature_info(self, titanic_data, **kwargs):
+        return FeatureInfo(df=titanic_data, **kwargs)
 
-    def test_feature_not_exist(self, titanic_data):
-        with pytest.raises(ValueError):
-            _ = _check_feature(feature="gender", df=titanic_data)
+    def get_random_numeric_params(self):
+        return np.random.choice(FeatureInfoTestCases.numeric_feature_info_params, 1)[
+            0
+        ].copy()
 
-    def test_feature_onehot_not_exist(self, titanic_data):
-        with pytest.raises(ValueError):
-            _ = _check_feature(
-                feature=["Embarked_C", "Embarked_S", "Embarked_Q", "Embarked_F"],
-                df=titanic_data,
+    def check_valid(self, titanic_data, params, is_valid):
+        if is_valid:
+            self.get_feature_info(titanic_data, **params)
+        else:
+            with pytest.raises(AssertionError):
+                self.get_feature_info(titanic_data, **params)
+
+    @pytest.mark.parametrize("grid_type, is_valid", FeatureInfoTestCases.grid_types)
+    def test_grid_type(self, titanic_data, grid_type, is_valid):
+        params = self.get_random_numeric_params()
+        params["grid_type"] = grid_type
+        self.check_valid(titanic_data, params, is_valid)
+
+    @pytest.mark.parametrize("grid_range, is_valid", FeatureInfoTestCases.grid_ranges)
+    def test_check_grid_range(self, titanic_data, grid_range, is_valid):
+        params = self.get_random_numeric_params()
+        params["grid_range"] = grid_range
+        self.check_valid(titanic_data, params, is_valid)
+
+    @pytest.mark.parametrize(
+        "percentile_range, is_valid", FeatureInfoTestCases.percentile_ranges
+    )
+    def test_check_percentile_range(self, titanic_data, percentile_range, is_valid):
+        params = self.get_random_numeric_params()
+        params["percentile_range"] = percentile_range
+        self.check_valid(titanic_data, params, is_valid)
+
+    def check_prepare_results(self, df, count_df, summary_df):
+        assert "x" in df.columns
+        assert set(count_df.columns) == set(["x", "count", "count_norm"])
+        summary_cols = ["x", "value", "count"]
+        assert (
+            set(summary_cols)
+            <= set(summary_df.columns)
+            <= set(summary_cols + ["percentile"])
+        )
+
+    @pytest.mark.parametrize("params", FeatureInfoTestCases.binary_feature_info_params)
+    def test_binary_feature(self, params, titanic_data):
+        binary_feature_info = self.get_feature_info(titanic_data, **params)
+        assert binary_feature_info.type == "binary"
+
+        df, count_df, summary_df = binary_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
+        assert np.array_equal(binary_feature_info.grids, [0, 1])
+        assert binary_feature_info.percentiles is None
+        assert binary_feature_info.num_bins == 2
+
+    @pytest.mark.parametrize("params", FeatureInfoTestCases.onehot_feature_info_params)
+    def test_onehot_feature(self, params, titanic_data):
+        onehot_feature_info = self.get_feature_info(titanic_data, **params)
+        assert onehot_feature_info.type == "onehot"
+
+        df, count_df, summary_df = onehot_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
+        assert np.array_equal(onehot_feature_info.grids, onehot_feature_info.col_name)
+        assert onehot_feature_info.percentiles is None
+        assert onehot_feature_info.num_bins == len(onehot_feature_info.col_name)
+
+    @pytest.mark.parametrize("params", FeatureInfoTestCases.numeric_feature_info_params)
+    def test_numeric_feature(self, params, titanic_data):
+        numeric_feature_info = self.get_feature_info(titanic_data, **params)
+        assert numeric_feature_info.type == "numeric"
+
+        df, count_df, summary_df = numeric_feature_info.prepare(titanic_data)
+        self.check_prepare_results(df, count_df, summary_df)
+        if params["cust_grid_points"] is not None:
+            assert np.array_equal(
+                numeric_feature_info.grids, params["cust_grid_points"]
             )
+        else:
+            assert len(numeric_feature_info.grids) == params["num_grid_points"]
+            if params["grid_type"] == "percentile":
+                assert numeric_feature_info.percentiles is not None
+            else:
+                assert numeric_feature_info.percentiles is None
+        assert numeric_feature_info.num_bins == len(numeric_feature_info.grids) - 1
 
-    def test_feature_onehot_incomplete(self, titanic_data):
-        with pytest.raises(ValueError):
-            _ = _check_feature(feature=["Embarked_C"], df=titanic_data)
+    def test_get_numeric_grids_percentile(self, feature_info_sample, sample_data):
+        grids, percentiles = feature_info_sample._get_numeric_grids(
+            sample_data["feature"].values
+        )
+
+        assert len(grids) == feature_info_sample.num_grid_points
+        assert len(percentiles) == feature_info_sample.num_grid_points
+        assert np.all(np.diff(grids) > 0), "Grids should be sorted in ascending order"
+
+        expected_percentiles = [0, 25, 50, 75, 100]
+        for i, p in enumerate(percentiles):
+            assert len(p) == 1 or np.all(
+                np.diff(p) > 0
+            ), "Percentiles should be sorted in ascending order"
+            assert round(p[0], 2) == expected_percentiles[i]
+
+    def test_get_numeric_grids_equal(self, feature_info_sample, sample_data):
+        feature_info_sample.grid_type = "equal"
+        feature_info_sample.num_grid_points = 4
+        grids, percentiles = feature_info_sample._get_numeric_grids(
+            sample_data["feature"].values
+        )
+
+        assert len(grids) == feature_info_sample.num_grid_points
+        assert percentiles is None
+        assert np.all(np.diff(grids) > 0), "Grids should be sorted in ascending order"
+        assert np.array_equal(
+            grids, np.linspace(1, 10, feature_info_sample.num_grid_points)
+        )
+
+    def test_get_numeric_grids_percentile_range(self, feature_info_sample, sample_data):
+        feature_info_sample.grid_type = "percentile"
+        feature_info_sample.percentile_range = (25, 75)
+        grids, percentiles = feature_info_sample._get_numeric_grids(
+            sample_data["feature"].values
+        )
+
+        assert len(grids) == feature_info_sample.num_grid_points
+        assert len(percentiles) == feature_info_sample.num_grid_points
+        assert np.all(np.diff(grids) > 0), "Grids should be sorted in ascending order"
+
+        expected_percentiles = [25, 37.5, 50, 62.5, 75]
+        for i, p in enumerate(percentiles):
+            assert len(p) == 1 or np.all(
+                np.diff(p) > 0
+            ), "Percentiles should be sorted in ascending order"
+            assert round(p[0], 2) == expected_percentiles[i]
+
+    def test_get_numeric_grids_grid_range(self, feature_info_sample, sample_data):
+        feature_info_sample.grid_type = "equal"
+        feature_info_sample.grid_range = (2, 8)
+        grids, percentiles = feature_info_sample._get_numeric_grids(
+            sample_data["feature"].values
+        )
+
+        assert len(grids) == feature_info_sample.num_grid_points
+        assert percentiles is None
+        assert np.all(np.diff(grids) > 0), "Grids should be sorted in ascending order"
+        assert np.array_equal(grids, np.linspace(2, 8, 5))
+
+    def test_binary_feature_buckets(self):
+        feature_values = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+        df = pd.DataFrame(
+            {
+                "Sex": feature_values,
+            }
+        )
+        feature_info = FeatureInfo(feature="Sex", feature_name="gender", df=df)
+        feature_info._get_grids(df)
+        mapped_df = feature_info._map_values_to_buckets(df)
+
+        assert np.array_equal(mapped_df["x"].values, feature_values)
+        assert feature_info.display_columns == ["Sex_0", "Sex_1"]
+        assert feature_info.percentile_columns == []
+
+    def test_onehot_feature_buckets(self):
+        df = pd.DataFrame(
+            {
+                "Embarked_C": [1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+                "Embarked_S": [0, 1, 1, 1, 0, 0, 0, 1, 1, 1],
+                "Embarked_Q": [0, 0, 0, 0, 0, 1, 1, 0, 0, 0],
+            }
+        )
+        feature_values = np.array([0, 1, 1, 1, 0, 2, 2, 1, 1, 1])
+        one_hot_columns = ["Embarked_C", "Embarked_S", "Embarked_Q"]
+        feature_info = FeatureInfo(
+            feature=one_hot_columns, feature_name="embarked", df=df
+        )
+        feature_info._get_grids(df)
+        mapped_df = feature_info._map_values_to_buckets(df)
+
+        assert np.array_equal(mapped_df["x"].values, feature_values)
+        assert feature_info.display_columns == one_hot_columns
+        assert feature_info.percentile_columns == []
+
+    @pytest.mark.parametrize(
+        "params, expected", FeatureInfoTestCases.numeric_feature_buckets
+    )
+    def test_numeric_feature_buckets(self, params, expected, sample_data):
+        feature_info = FeatureInfo(
+            feature="feature",
+            feature_name="Feature",
+            df=sample_data,
+            num_grid_points=10,
+            **params,
+        )
+        feature_info._get_grids(sample_data)
+        mapped_df = feature_info._map_values_to_buckets(sample_data)
+
+        assert np.array_equal(mapped_df["x"].values, expected["x"])
+        assert feature_info.display_columns == expected["display_columns"]
+        assert feature_info.percentile_columns == expected["percentile_columns"]
 
 
-def test_percentile_range():
-    from pdpbox.utils import _check_percentile_range
+def test_to_rgba():
+    color = (0.5, 0.25, 0.75)
+    opacity = 0.8
+    expected_output = "rgba(127,63,191,0.8)"
 
-    with pytest.raises(ValueError):
-        _check_percentile_range(percentile_range=5)
-        _check_percentile_range(percentile_range=(5))
-        _check_percentile_range(percentile_range=(5, 105))
-        _check_percentile_range(percentile_range=(5, 105, 110))
+    assert _to_rgba(color) == "rgba(127,63,191,1.0)"
+    assert _to_rgba(color, opacity) == expected_output
+
+    # Test edge cases
+    assert _to_rgba((0, 0, 0)) == "rgba(0,0,0,1.0)"
+    assert _to_rgba((1, 1, 1)) == "rgba(255,255,255,1.0)"
+    assert _to_rgba((0.333, 0.666, 1.0), 0) == "rgba(84,169,255,0)"
 
 
-# @pytest.mark.skip(reason="slow")
-class TestCheckTarget(object):
-    def test_target_binary(self, titanic_data):
-        target_type = _check_target(target="Survived", df=titanic_data)
-        assert target_type == "binary"
+def test_check_target_col():
+    # Create sample DataFrames for testing
+    df_binary = pd.DataFrame({"target": [0, 1, 0, 1, 1]})
+    df_multi_class = pd.DataFrame(
+        {"class1": [1, 0, 0], "class2": [0, 1, 0], "class3": [0, 0, 1]}
+    )
+    df_regression = pd.DataFrame({"target": [1.5, 2.3, 3.1, 4.6, 5.9]})
 
-    def test_target_regression(self, ross_data):
-        target_type = _check_target(target="Sales", df=ross_data)
-        assert target_type == "regression"
-
-    def test_target_multi_class(self, otto_data):
-        target_list = [
-            "target_0",
-            "target_1",
-            "target_2",
-            "target_3",
-            "target_4",
-            "target_5",
-            "target_6",
-            "target_7",
-            "target_8",
-        ]
-        target_type = _check_target(target=target_list, df=otto_data)
-        assert target_type == "multi-class"
-
-    def test_target_multi_class_not_exist(self, otto_data):
-        with pytest.raises(ValueError):
-            _ = _check_target(target=["target"], df=otto_data)
-
-    def test_target_multi_class_outbound(self, otto_data):
-        with pytest.raises(ValueError):
-            _ = _check_target(target=["target_9"], df=otto_data)
-
-    def test_target_not_exist(self, titanic_data):
-        with pytest.raises(ValueError):
-            _ = _check_target(target="survived", df=titanic_data)
+    assert _check_col("target", df_binary) == "binary"
+    assert _check_col(["class1", "class2", "class3"], df_multi_class) == "multi-class"
+    assert _check_col("target", df_regression) == "regression"
 
 
 def test_check_dataset():
-    from pdpbox.utils import _check_dataset
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+    _check_dataset(df)
 
-    with pytest.raises(ValueError):
-        _check_dataset(df=np.random.rand(5, 5))
+    not_dataframe = {"A": [1, 2], "B": [3, 4]}
+    with pytest.raises(AssertionError, match="only accept pandas DataFrame"):
+        _check_dataset(not_dataframe)
+
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+    features = ["A", "B", "C"]
+    with pytest.raises(
+        ValueError, match="df doesn't contain all model features, missing: {'C'}"
+    ):
+        _check_dataset(df, features)
+
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4], "C": [5, 6]})
+    features = ["A", "B", "C"]
+    _check_dataset(df, features)
 
 
 def test_make_list():
-    from pdpbox.utils import _make_list
+    input_list = [1, 2, 3]
+    output_list = _make_list(input_list)
+    assert output_list == input_list
 
-    assert _make_list([1, 2]) == [1, 2]
-    assert _make_list(1) == [1]
+    input_not_list = "example"
+    output_list = _make_list(input_not_list)
+    assert output_list == [input_not_list]
 
+    input_list = []
+    output_list = _make_list(input_list)
+    assert output_list == input_list
 
-def test_expand_default():
-    from pdpbox.utils import _expand_default
-
-    assert _expand_default(x=None, default=10) == [10, 10]
-    assert _expand_default(x=[1, 2], default=10) == [1, 2]
-
-
-# @pytest.mark.skip(reason="slow")
-def test_check_model(titanic_model, otto_model, ross_model):
-    from pdpbox.utils import _check_model
-
-    assert (_check_model(model=titanic_model)) == (2, titanic_model.predict_proba)
-    assert (_check_model(model=otto_model)) == (9, otto_model.predict_proba)
-    assert (_check_model(model=ross_model)) == (0, ross_model.predict)
+    input_value = 42
+    output_list = _make_list(input_value)
+    assert output_list == [input_value]
 
 
-def test_check_grid_type():
-    from pdpbox.utils import _check_grid_type
+class TestCheckModel:
+    def get_dummy_model(self):
+        class DummyModel:
+            pass
 
-    with pytest.raises(ValueError):
-        _check_grid_type(grid_type="quantile")
+        return DummyModel()
+
+    def get_dummy_func(self):
+        def dummy_func():
+            pass
+
+        return dummy_func
+
+    def test_n_classes_from_model(self, titanic_model):
+        n_classes, pred_func, from_model = _check_model(titanic_model, None, None)
+        assert n_classes == 2
+        assert callable(pred_func)
+        assert from_model
+
+    def test_n_classes_from_input(self):
+        model = self.get_dummy_model()
+        model.predict_proba = self.get_dummy_func()
+        dummy_n_classes = 3
+
+        n_classes, pred_func, from_model = _check_model(model, dummy_n_classes, None)
+        assert n_classes == dummy_n_classes
+        assert callable(pred_func)
+        assert from_model
+
+    def test_pred_func_from_input(self):
+        model = self.get_dummy_model()
+        model.n_classes_ = 2
+        pred_func_input = self.get_dummy_func()
+        n_classes, pred_func, from_model = _check_model(model, None, pred_func_input)
+        assert n_classes == model.n_classes_
+        assert callable(pred_func)
+        assert pred_func == pred_func_input
+        assert not from_model
+
+    def test_raises_n_classes_error(self):
+        model = self.get_dummy_model()
+        model.predict = self.get_dummy_func()
+
+        with pytest.raises(AssertionError, match="n_classes is required"):
+            _check_model(model, None, None)
+
+    def test_raises_pred_func_error(self):
+        model = self.get_dummy_model()
+        model.n_classes_ = 3
+
+        with pytest.raises(AssertionError, match="pred_func is required"):
+            _check_model(model, None, None)
 
 
 def test_check_classes():
-    from pdpbox.utils import _check_classes
+    for which_classes in [None, []]:
+        which_classes = _check_classes(which_classes, 4)
+        assert which_classes == [0, 1, 2, 3]
 
-    with pytest.raises(ValueError):
-        _check_classes(classes_list=[1, 2, 3], n_classes=3)
-        _check_classes(classes_list=[-1, 2], n_classes=3)
+    for n_classes in range(3):
+        which_classes = _check_classes(None, n_classes)
+        assert which_classes == [0]
+
+    which_classes = _check_classes([0, 2], 4)
+    assert which_classes == [0, 2]
+
+    with pytest.raises(ValueError, match="class index should be >= 0"):
+        _check_classes([-1, 0, 1], 3)
+
+    with pytest.raises(ValueError, match="class index should be < n_classes"):
+        _check_classes([0, 3], 3)
 
 
 def test_check_memory_limit():
-    from pdpbox.utils import _check_memory_limit
+    valid_values = [0.5, 0.1, 0.99]
+    for limit in valid_values:
+        _check_memory_limit(limit)
 
-    with pytest.raises(ValueError):
-        _check_memory_limit(memory_limit=1)
-        _check_memory_limit(memory_limit=5)
-        _check_memory_limit(memory_limit=-1)
+    invalid_values = [0, 1, -0.1, 1.1]
+    for limit in invalid_values:
+        with pytest.raises(ValueError):
+            _check_memory_limit(limit)
 
 
 def test_check_frac_to_plot():
-    from pdpbox.utils import _check_frac_to_plot
+    valid_values = [0.5, 0.1, 1, 10]
+    for frac in valid_values:
+        _check_frac_to_plot(frac)
 
-    with pytest.raises(ValueError):
-        _check_frac_to_plot(frac_to_plot=1.5)
-        _check_frac_to_plot(frac_to_plot=0)
-        _check_frac_to_plot(frac_to_plot=-1)
-        _check_frac_to_plot(frac_to_plot="1")
+    with pytest.raises(
+        ValueError, match="frac_to_plot: should in range\\(0, 1\\) when it is a float"
+    ):
+        _check_frac_to_plot(0.0)
+    with pytest.raises(
+        ValueError, match="frac_to_plot: should in range\\(0, 1\\) when it is a float"
+    ):
+        _check_frac_to_plot(-0.1)
+    with pytest.raises(ValueError, match="frac_to_plot: should be larger than 0."):
+        _check_frac_to_plot(0)
+    with pytest.raises(ValueError, match="frac_to_plot: should be float or integer"):
+        _check_frac_to_plot("invalid")
 
 
-def test_calc_memory_usage(titanic_data):
-    from pdpbox.utils import _calc_memory_usage
-
-    assert (
-        _calc_memory_usage(df=titanic_data, total_units=10, n_jobs=1, memory_limit=0.5)
-        == 1
+def test_calc_n_jobs():
+    # make a random big DataFrame
+    df = pd.DataFrame(
+        np.random.random((np.power(10, 8), 4)), columns=["A", "B", "C", "D"]
     )
+    n_grids = 10
+    n_jobs = 4
+    prev_n_jobs = 4
 
-
-class TestGetGrids(object):
-    def test_grids_default(self, titanic_data):
-        # default setting
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=10,
-            grid_type="percentile",
-            percentile_range=None,
-            grid_range=None,
-        )
-
-        expected_feature_grids = np.array([0.0, 13.0, 35.11111111])
-        expected_percentile_info = np.array(["(0.0)", "(44.44)", "(77.78)"])
-
-        assert_array_almost_equal(
-            feature_grids[[0, 4, 7]], expected_feature_grids, decimal=8
-        )
-        assert_array_equal(percentile_info[[0, 4, 7]], expected_percentile_info)
-
-    def test_grids_15(self, titanic_data):
-        # num_grid_points=15
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=15,
-            grid_type="percentile",
-            percentile_range=None,
-            grid_range=None,
-        )
-
-        expected_feature_grids = np.array([0.0, 8.05, 14.4542, 37.0042])
-        expected_percentile_info = np.array(["(0.0)", "(28.57)", "(50.0)", "(78.57)"])
-
-        assert_array_equal(feature_grids[[0, 4, 7, 11]], expected_feature_grids)
-        assert_array_equal(percentile_info[[0, 4, 7, 11]], expected_percentile_info)
-
-    def test_grids_percentile_range(self, titanic_data):
-        # percentile_range=(5, 95)
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=10,
-            grid_type="percentile",
-            percentile_range=(5, 95),
-            grid_range=None,
-        )
-
-        expected_feature_grids = np.array([7.225, 13.0, 31.0])
-        expected_percentile_info = np.array(["(5.0)", "(45.0)", "(75.0)"])
-
-        assert_array_equal(feature_grids[[0, 4, 7]], expected_feature_grids)
-        assert_array_equal(percentile_info[[0, 4, 7]], expected_percentile_info)
-
-    def test_grids_grid_type(self, titanic_data):
-        # grid_type='equal'
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=10,
-            grid_type="equal",
-            percentile_range=None,
-            grid_range=None,
-        )
-
-        expected_feature_grids = np.array([0.0, 227.70186666, 398.47826666])
-        expected_percentile_info = []
-
-        assert_array_almost_equal(
-            feature_grids[[0, 4, 7]], expected_feature_grids, decimal=8
-        )
-        assert percentile_info == expected_percentile_info
-
-    def test_grids_grid_range_percentile(self, titanic_data):
-        # grid_range=(0, 100), grid_type='percentile'
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=10,
-            grid_type="percentile",
-            percentile_range=None,
-            grid_range=(0, 100),
-        )
-
-        expected_feature_grids = np.array([0.0, 13.0, 35.11111111])
-        expected_percentile_info = np.array(["(0.0)", "(44.44)", "(77.78)"])
-
-        assert_array_almost_equal(
-            feature_grids[[0, 4, 7]], expected_feature_grids, decimal=8
-        )
-        assert_array_equal(percentile_info[[0, 4, 7]], expected_percentile_info)
-
-    def test_grids_grid_range_equal(self, titanic_data):
-        # grid_range=(0, 100), grid_type='equal'
-        feature_grids, percentile_info = _get_grids(
-            feature_values=titanic_data["Fare"].values,
-            num_grid_points=10,
-            grid_type="equal",
-            percentile_range=None,
-            grid_range=(0, 100),
-        )
-
-        expected_feature_grids = np.array([0.0, 44.44444444, 77.77777777])
-        expected_percentile_info = []
-
-        assert_array_almost_equal(
-            feature_grids[[0, 4, 7]], expected_feature_grids, decimal=8
-        )
-        assert percentile_info == expected_percentile_info
-
-
-class TestGetGridCombos(object):
-    def test_grid_combo_binary_binary(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[0, 1], [0, 1]], feature_types=["binary", "binary"]
-        )
-        assert_array_equal(grid_combos, np.array([[0, 0], [0, 1], [1, 0], [1, 1]]))
-
-    def test_grid_combo_binary_onehot(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[0, 1], ["a", "b", "c"]], feature_types=["binary", "onehot"]
-        )
-        assert_array_equal(
-            grid_combos,
-            np.array(
-                [
-                    [0, 1, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1],
-                    [1, 1, 0, 0],
-                    [1, 0, 1, 0],
-                    [1, 0, 0, 1],
-                ]
-            ),
-        )
-
-    def test_grid_combo_binary_numeric(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[0, 1], [1, 2, 3]], feature_types=["binary", "numeric"]
-        )
-        assert_array_equal(
-            grid_combos, np.array([[0, 1], [0, 2], [0, 3], [1, 1], [1, 2], [1, 3]])
-        )
-
-    def test_grid_combo_onehot_onehot(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[["one", "two"], ["a", "b", "c"]],
-            feature_types=["onehot", "onehot"],
-        )
-        assert_array_equal(
-            grid_combos,
-            np.array(
-                [
-                    [1, 0, 1, 0, 0],
-                    [1, 0, 0, 1, 0],
-                    [1, 0, 0, 0, 1],
-                    [0, 1, 1, 0, 0],
-                    [0, 1, 0, 1, 0],
-                    [0, 1, 0, 0, 1],
-                ]
-            ),
-        )
-
-    def test_grid_combo_onehot_binary(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[["one", "two"], [0, 1]], feature_types=["onehot", "binary"]
-        )
-        assert_array_equal(
-            grid_combos, np.array([[1, 0, 0], [1, 0, 1], [0, 1, 0], [0, 1, 1]])
-        )
-
-    def test_grid_combo_onehot_numeric(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[["one", "two"], [1, 2, 3]],
-            feature_types=["onehot", "numeric"],
-        )
-        assert_array_equal(
-            grid_combos,
-            np.array(
-                [[1, 0, 1], [1, 0, 2], [1, 0, 3], [0, 1, 1], [0, 1, 2], [0, 1, 3]]
-            ),
-        )
-
-    def test_grid_combo_numeric_numeric(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[-1, -2], [1, 2, 3]], feature_types=["numeric", "numeric"]
-        )
-        assert_array_equal(
-            grid_combos,
-            np.array([[-1, 1], [-1, 2], [-1, 3], [-2, 1], [-2, 2], [-2, 3]]),
-        )
-
-    def test_grid_combo_numeric_binary(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[-1, -2], [0, 1]], feature_types=["numeric", "binary"]
-        )
-        assert_array_equal(grid_combos, np.array([[-1, 0], [-1, 1], [-2, 0], [-2, 1]]))
-
-    def test_grid_combo_numeric_onehot(self):
-        grid_combos = _get_grid_combos(
-            feature_grids=[[-1, -2], ["a", "b", "c"]],
-            feature_types=["numeric", "onehot"],
-        )
-        assert_array_equal(
-            grid_combos,
-            np.array(
-                [
-                    [-1, 1, 0, 0],
-                    [-1, 0, 1, 0],
-                    [-1, 0, 0, 1],
-                    [-2, 1, 0, 0],
-                    [-2, 0, 1, 0],
-                    [-2, 0, 0, 1],
-                ]
-            ),
-        )
-
-
-def test_sample_data():
-    from pdpbox.utils import _sample_data
-
-    fake_ice_lines = pd.DataFrame(np.arange(100), columns=["line"])
-
-    ice_plot_data = _sample_data(ice_lines=fake_ice_lines, frac_to_plot=10)
-    assert ice_plot_data.shape[0] == 10
-    assert_array_equal(ice_plot_data.index.values, np.arange(ice_plot_data.shape[0]))
-
-    ice_plot_data = _sample_data(ice_lines=fake_ice_lines, frac_to_plot=0.3)
-    assert ice_plot_data.shape[0] == 30
-    assert_array_equal(ice_plot_data.index.values, np.arange(ice_plot_data.shape[0]))
-
-    ice_plot_data = _sample_data(ice_lines=fake_ice_lines, frac_to_plot=1)
-    assert ice_plot_data.shape[0] == 100
-    assert_array_equal(ice_plot_data.index.values, np.arange(ice_plot_data.shape[0]))
-
-
-def test_find_onehot_actual():
-    from pdpbox.utils import _find_onehot_actual
-
-    assert _find_onehot_actual(x=[0, 1, 0]) == 1
-    assert np.isnan(_find_onehot_actual(x=[0, 0, 0]))
-
-
-def test_find_bucket():
-    from pdpbox.utils import _find_bucket
-
-    assert _find_bucket(x=1, feature_grids=[2, 3, 4], endpoint=True) == 0
-    assert _find_bucket(x=2, feature_grids=[2, 3, 4], endpoint=True) == 1
-    assert _find_bucket(x=3, feature_grids=[2, 3, 4], endpoint=True) == 2
-    assert _find_bucket(x=4, feature_grids=[2, 3, 4], endpoint=True) == 2
-    assert _find_bucket(x=4, feature_grids=[2, 3, 4], endpoint=False) == 3
-    assert _find_bucket(x=5, feature_grids=[2, 3, 4], endpoint=True) == 3
+    # memory_limit = 0.5, true_n_jobs = 4
+    # memory_limit = 0.4, true_n_jobs = 4
+    # memory_limit = 0.3, true_n_jobs = 4
+    # memory_limit = 0.2, true_n_jobs = 3
+    # memory_limit = 0.1, true_n_jobs = 1
+    for memory_limit in [0.5, 0.4, 0.3, 0.2, 0.1]:
+        true_n_jobs = _calc_n_jobs(df, n_grids, memory_limit, n_jobs)
+        assert isinstance(true_n_jobs, int)
+        assert true_n_jobs >= 1
+        assert true_n_jobs <= prev_n_jobs
+        prev_n_jobs = true_n_jobs
 
 
 def test_get_string():
-    from pdpbox.utils import _get_string
-
-    assert _get_string(x=1.0) == "1"
-    assert _get_string(x=1.1) == "1.1"
-    assert _get_string(x=1.12) == "1.12"
-    assert _get_string(x=1.123) == "1.12"
-
-
-class TestMakeBucketColumnNames(object):
-    def test_bucket_default(self):
-        # default settings
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1, 2, 3], endpoint=True
-        )
-        assert column_names == ["< 1", "[1, 2)", "[2, 3]", "> 3"]
-        assert bound_lows == [np.nan, 1, 2, 3]
-        assert bound_ups == [1, 2, 3, np.nan]
-
-    def test_bucket_no_endpoint(self):
-        # without endpoint
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1, 2, 3], endpoint=False
-        )
-        assert column_names == ["< 1", "[1, 2)", "[2, 3)", ">= 3"]
-        assert bound_lows == [np.nan, 1, 2, 3]
-        assert bound_ups == [1, 2, 3, np.nan]
-
-    def test_bucket_float_0(self):
-        # float grids type with 0 digit after decimal point
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1.0, 2.0, 3.0], endpoint=True
-        )
-        assert column_names == ["< 1", "[1, 2)", "[2, 3]", "> 3"]
-        assert bound_lows == [np.nan, 1.0, 2.0, 3.0]
-        assert bound_ups == [1.0, 2.0, 3.0, np.nan]
-
-    def test_bucket_float_1(self):
-        # float grids type with 1 digit after decimal point
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1.2, 2.5, 3.5], endpoint=True
-        )
-        assert column_names == ["< 1.2", "[1.2, 2.5)", "[2.5, 3.5]", "> 3.5"]
-        assert bound_lows == [np.nan, 1.2, 2.5, 3.5]
-        assert bound_ups == [1.2, 2.5, 3.5, np.nan]
-
-    def test_bucket_float_more(self):
-        # float grids type with more than 2 digits after decimal point
-        # all round to 2
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1.234, 2.54322, 3.54332], endpoint=True
-        )
-        assert column_names == ["< 1.23", "[1.23, 2.54)", "[2.54, 3.54]", "> 3.54"]
-        assert bound_lows == [np.nan, 1.234, 2.54322, 3.54332]
-        assert bound_ups == [1.234, 2.54322, 3.54332, np.nan]
-
-    def test_bucket_value_close(self):
-        # float grids type with 2 digit after decimal point
-        # grid points very close in value
-        column_names, bound_lows, bound_ups = _make_bucket_column_names(
-            feature_grids=[1.234, 2.54322, 2.54332], endpoint=True
-        )
-        assert column_names == ["< 1.23", "[1.23, 2.54)", "[2.54, 2.54]", "> 2.54"]
-        assert bound_lows == [np.nan, 1.234, 2.54322, 2.54332]
-        assert bound_ups == [1.234, 2.54322, 2.54332, np.nan]
+    assert _get_string(5.0) == "5"
+    assert _get_string(5.123) == "5.12"
+    assert _get_string(5.1) == "5.1"
+    assert _get_string(3) == "3"
+    assert _get_string(-3.14) == "-3.14"
+    assert _get_string(0.0) == "0"
 
 
-class TestMakeBucketColumnNamesPercentile(object):
-    def test_bucket_percentile_default(self):
-        results = _make_bucket_column_names_percentile(
-            percentile_info=np.array(
-                ["(0.0, 10.0)", "(28.57)", "(50.0, 60.0, 70.0)", "(78.57)"]
-            ),
-            endpoint=True,
-        )
-        assert results[0] == [
-            "< 0",
-            "[0, 28.57)",
-            "[28.57, 70)",
-            "[70, 78.57]",
-            "> 78.57",
-        ]
-        assert results[1] == [0, 0.0, 28.57, 70.0, 78.57]
-        assert results[2] == [0.0, 28.57, 70.0, 78.57, 100]
+def test_expand_params_for_interact():
+    test_params = {
+        "param1": [1, 2],
+        "param2": 3,
+    }
 
-    def test_bucket_percentile_no_endpoint(self):
-        results = _make_bucket_column_names_percentile(
-            percentile_info=np.array(
-                ["(0.0, 10.0)", "(28.57)", "(50.0, 60.0, 70.0)", "(78.57)"]
-            ),
-            endpoint=False,
-        )
-        assert results[0] == [
-            "< 0",
-            "[0, 28.57)",
-            "[28.57, 70)",
-            "[70, 78.57)",
-            ">= 78.57",
-        ]
-        assert results[1] == [0, 0.0, 28.57, 70.0, 78.57]
-        assert results[2] == [0.0, 28.57, 70.0, 78.57, 100]
+    expanded_params = _expand_params_for_interact(test_params)
+
+    assert expanded_params["param1"] == [1, 2]
+    assert expanded_params["param2"] == [3, 3]
+
+    with pytest.raises(AssertionError):
+        _expand_params_for_interact({"param3": [1, 2, 3]})
 
 
-def test_calc_figsize():
-    from pdpbox.utils import _calc_figsize
+def test_calc_preds():
+    class DummyModel:
+        def predict(self, X):
+            return X * 2
 
-    assert (
-        _calc_figsize(num_charts=1, ncols=2, title_height=2, unit_figsize=(7, 7))
-    ) == (7, 9, 1, 1)
-    assert (
-        _calc_figsize(num_charts=2, ncols=2, title_height=2, unit_figsize=(8, 7))
-    ) == (15, 9, 1, 2)
-    assert (
-        _calc_figsize(num_charts=3, ncols=2, title_height=2, unit_figsize=(8, 7))
-    ) == (15, 16, 2, 2)
-    assert (
-        _calc_figsize(num_charts=2, ncols=3, title_height=2, unit_figsize=(8, 7))
-    ) == (15, 9, 1, 2)
+    model = DummyModel()
+    X = np.random.randn(100)
+    pred_func = model.predict
+    from_model = True
+    predict_kwds = {}
+
+    # Test when chunk_size is not provided
+    preds = _calc_preds(model, X, pred_func, from_model, predict_kwds)
+    assert np.array_equal(preds, X * 2)
+
+    # Test various chunk sizes
+    for chunk_size in [1, 10, 50, 100, 150]:
+        preds = _calc_preds(model, X, pred_func, from_model, predict_kwds, chunk_size)
+        assert np.array_equal(preds, X * 2), f"Failed for chunk_size={chunk_size}"
+
+    # Test from_model=False
+    from_model = False
+
+    def dummy_prec_func(model, X, **predict_kwds):
+        return X * 3
+
+    preds = _calc_preds(model, X, dummy_prec_func, from_model, predict_kwds)
+    assert np.array_equal(preds, X * 3)
 
 
-# no idea how to test plot function yet
-# def _plot_title(title, subtitle, title_ax, plot_params)
-# def _axes_modify(font_family, ax, top=False, right=False, grid=False)
+def test_check_cluster_params():
+    # Test valid inputs
+    _check_cluster_params(5, "approx")
+    _check_cluster_params(10, "accurate")
+
+    # Test invalid n_cluster_centers
+    with pytest.raises(ValueError, match="n_cluster_centers should be specified."):
+        _check_cluster_params(None, "approx")
+    with pytest.raises(ValueError, match="n_cluster_centers should be larger than 0."):
+        _check_cluster_params(0, "approx")
+    with pytest.raises(TypeError, match="n_cluster_centers should be int."):
+        _check_cluster_params(5.5, "approx")
+
+    # Test invalid cluster_method
+    with pytest.raises(
+        ValueError, match='Clustering method should be "approx" or "accurate".'
+    ):
+        _check_cluster_params(5, "invalid")
+
+
+def test_check_plot_engine():
+    _check_plot_engine("plotly")  # should pass
+    _check_plot_engine("matplotlib")  # should pass
+
+    with pytest.raises(ValueError):  # should fail
+        _check_plot_engine("invalid_engine")
+
+
+def test_check_pdp_interact_plot_type():
+    _check_pdp_interact_plot_type("contour")  # should pass
+    _check_pdp_interact_plot_type("grid")  # should pass
+
+    with pytest.raises(ValueError):  # should fail
+        _check_pdp_interact_plot_type("invalid_plot_type")

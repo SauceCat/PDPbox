@@ -1,2 +1,15 @@
-cmake>=3.13
-xgboost==1.3.3
+joblib>=1.1.0
+matplotlib>=3.6.2
+numpy>=1.21.5
+pandas>=1.4.4
+plotly>=5.9.0
+pqdm>=0.2.0
+psutil>=5.9.0
+pytest
+scikit_learn>=1.0.2
+setuptools
+sphinx>=5.0.2
+sphinx_rtd_theme>=1.1.1
+tqdm>=4.64.1
+numpydoc>=1.4.0
+xgboost>=1.7.1

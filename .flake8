@@ -1,13 +1,19 @@
 [flake8]
-max-line-length=100
+# B905 should be enabled when we drop support for 3.9
+ignore = E203, E266, E501, W503, B905, B907
+# line length is intentionally set to 80 here because black uses Bugbear
+# See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-length for more details
+max-line-length = 80
+max-complexity = 18
+select = B,C,E,F,W,T4,B9
 exclude = 
     .git
     __pycache__
     tox.ini
     docs/*
-    docs_history/*
-    notebooks/*
+    tutorials/*
     .*
     *.cfg
-    *.in 
-ignore=
+    *.in
+    versioneer.py
+    */__init__.py
